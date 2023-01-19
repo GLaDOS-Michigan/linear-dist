@@ -85,7 +85,6 @@ module CoordinatorHost {
   }
 
   datatype Variables = Variables(
-    numParticipants: nat,
     decision: Option<Decision>, 
 /*{*/
     yesVotes: set<HostId>,
@@ -97,7 +96,7 @@ module CoordinatorHost {
     // to the Constants.
     predicate WF(c: Constants) {
 /*{*/
-    numParticipants == c.numParticipants
+    true
 /*}*/
     }
   }
@@ -135,7 +134,7 @@ module CoordinatorHost {
 /*{*/
       case VoteReqStep => NextVoteReqStep(v, v', msgOps)
       case ReceiveStep => NextVoteReqStep(v, v', msgOps)
-      case DecisionStep => NextDecisionStep(v, v', msgOps)
+      case DecisionStep => NextDecisionStep(c, v, v', msgOps)
 /*}*/
   }
 
@@ -146,21 +145,39 @@ module CoordinatorHost {
   }
 
   predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
-    true
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && match msgOps.recv.value
+        case VoteMsg(vote, src) =>
+          if vote == Yes then 
+            v' == v.(
+              yesVotes := v.yesVotes + {src}
+            )
+          else
+            v' == v.(
+              noVotes := v.noVotes + 1
+            )
+        case _ => v' == v //stutter
   }
 
-  predicate NextDecisionStep(v: Variables, v': Variables, msgOps: MessageOps) {
-    true
+  // This step doubles as a stutter step
+  predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && v' == v
+    && if v.noVotes > 0 then
+        msgOps.send == Some(DecideMsg(Abort))
+      else if |v.yesVotes| == c.numParticipants then
+        msgOps.send == Some(DecideMsg(Commit))
+      else
+        msgOps.send.None?
   }
-
-
-
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
 }
+
 
 module ParticipantHost {
   import opened CommitTypes
@@ -182,7 +199,7 @@ module ParticipantHost {
   {
     predicate WF(c: Constants) {
 /*{*/
-  true
+      true
 /*}*/
     }
   }
@@ -190,7 +207,7 @@ module ParticipantHost {
   predicate Init(c: Constants, v: Variables)
   {
 /*{*/
-  true // replace me
+    v.decision == None
 /*}*/
   }
 
@@ -202,15 +219,31 @@ module ParticipantHost {
   // JayNF
   datatype Step =
 /*{*/
-  ReplaceMeWithYourJayNFSteps()
+    ReceiveStep() | StutterStep()
 /*}*/
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
 /*{*/
-  case ReplaceMeWithYourJayNFSteps => true
+      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case StutterStep => 
+          && v == v'
+          && msgOps.send == msgOps.recv == None
 /*}*/
+  }
+
+  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && match msgOps.recv.value
+        case VoteReqMsg =>
+          && v == v' 
+          && msgOps.send == Some(VoteMsg(c.preference, c.hostId))
+        case VoteMsg(_, _) => 
+          && v' == v
+          && msgOps.send.None?
+        case DecideMsg(d) =>
+          && v' == v.(decision := Some(d))
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
