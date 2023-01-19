@@ -133,7 +133,7 @@ module CoordinatorHost {
     match step
 /*{*/
       case VoteReqStep => NextVoteReqStep(v, v', msgOps)
-      case ReceiveStep => NextVoteReqStep(v, v', msgOps)
+      case ReceiveStep => NextReceiveStep(v, v', msgOps)
       case DecisionStep => NextDecisionStep(c, v, v', msgOps)
 /*}*/
   }
@@ -163,13 +163,16 @@ module CoordinatorHost {
   // This step doubles as a stutter step
   predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    && v' == v
+    
     && if v.noVotes > 0 then
-        msgOps.send == Some(DecideMsg(Abort))
+        && v' == v.(decision := Some(Abort))
+        && msgOps.send == Some(DecideMsg(Abort))
       else if |v.yesVotes| == c.numParticipants then
-        msgOps.send == Some(DecideMsg(Commit))
+        && v' == v.(decision := Some(Commit))
+        && msgOps.send == Some(DecideMsg(Commit))
       else
-        msgOps.send.None?
+        && v' == v
+        && msgOps.send.None?
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
@@ -465,9 +468,83 @@ module DistributedSystem {
       :: GetDecisionForHost(Last(behavior).hosts[hostid]) == Some(Commit)
   {
 /*{*/
-    // TODO
-    assume false;
+
+    // Initial state
+    var network := Network.Variables({});
+    var group := InitGroup(c);
+    assert Host.GroupInit(c.hosts, group);
+    behavior := [Variables(group, network)];
+    assert Init(c, behavior[0]);
+
+    // Leader sends vote req
+    network := Network.Variables(network.sentMsgs + {VoteReqMsg});
+    behavior := behavior + [Variables(group, network)];
+    var l, l' := behavior[0].hosts[1].coordinator, behavior[1].hosts[1].coordinator;
+    var coordStep := CoordinatorHost.VoteReqStep();  // witnesses and triggers
+    var msgOps := MessageOps(None, Some(VoteReqMsg));
+    var dsStep := HostActionStep(1, msgOps); 
+    assert CoordinatorHost.NextStep(c.hosts[1].coordinator, l, l', coordStep, msgOps);
+    assert NextStep(c, behavior[0], behavior[1], dsStep);
+    assert Next(c, behavior[0], behavior[1]);
+
+    // Participant sends yes vote
+    network := Network.Variables(network.sentMsgs + {VoteMsg(Yes, 0)});
+    behavior := behavior + [Variables(group, network)];
+    var p, p' := behavior[1].hosts[0].participant, behavior[2].hosts[0].participant;
+    var partStep := ParticipantHost.ReceiveStep();  // witnesses and triggers
+    msgOps := MessageOps(Some(VoteReqMsg), Some(VoteMsg(Yes, 0)));
+    dsStep := HostActionStep(0, msgOps); 
+    assert ParticipantHost.NextStep(c.hosts[0].participant, p, p', partStep, msgOps);
+    assert NextStep(c, behavior[1], behavior[2], dsStep);
+    assert Next(c, behavior[1], behavior[2]);
+
+    // Leader receive yes vote, network unchanged
+    group := [group[0], Host.CoordinatorVariables(CoordinatorHost.Variables(None, {0}, 0))];
+    behavior := behavior + [Variables(group, network)];
+    l, l' := behavior[2].hosts[1].coordinator, behavior[3].hosts[1].coordinator;
+    coordStep := CoordinatorHost.ReceiveStep();  // witnesses and triggers
+    msgOps := MessageOps(Some(VoteMsg(Yes, 0)), None);
+    dsStep := HostActionStep(1, msgOps); 
+    assert CoordinatorHost.NextStep(c.hosts[1].coordinator, l, l', coordStep, msgOps);
+    assert NextStep(c, behavior[2], behavior[3], dsStep);
+    assert Next(c, behavior[2], behavior[3]);
+
+    // Leader decides and sends commit
+    network := Network.Variables(network.sentMsgs + {DecideMsg(Commit)});
+    group := [group[0], Host.CoordinatorVariables(CoordinatorHost.Variables(Some(Commit), {0}, 0))];
+    behavior := behavior + [Variables(group, network)];
+    l, l' := behavior[3].hosts[1].coordinator, behavior[4].hosts[1].coordinator;
+    coordStep := CoordinatorHost.DecisionStep();  // witnesses and triggers
+    msgOps := MessageOps(None, Some(DecideMsg(Commit)));
+    dsStep := HostActionStep(1, msgOps); 
+    assert CoordinatorHost.NextStep(c.hosts[1].coordinator, l, l', coordStep, msgOps);
+    assert NextStep(c, behavior[3], behavior[4], dsStep);
+    assert Next(c, behavior[3], behavior[4]);
+
+    // Participant receives commit and decides, network unchanged
+    group := [Host.ParticipantVariables(ParticipantHost.Variables(Some(Commit))), group[1]];
+    behavior := behavior + [Variables(group, network)];
+    p, p' := behavior[4].hosts[0].participant, behavior[5].hosts[0].participant;
+    partStep := ParticipantHost.ReceiveStep();  // witnesses and triggers
+    msgOps := MessageOps(Some(DecideMsg(Commit)), None);
+    dsStep := HostActionStep(0, msgOps); 
+    assert ParticipantHost.NextStep(c.hosts[0].participant, p, p', partStep, msgOps);
+    assert NextStep(c, behavior[4], behavior[5], dsStep);
+    assert Next(c, behavior[4], behavior[5]);
 /*}*/
+  }
+
+
+  function InitGroup(c: Constants) : (group: seq<Host.Variables>) 
+    requires c.WF()
+    requires |c.hosts| == 2 // There's exactly one voting participant...
+    requires c.hosts[0].participant.preference.Yes? // ... who wants a Yes.
+    ensures Host.GroupInit(c.hosts, group)
+  {
+    var initNetwork := Network.Variables({});
+    var initCoord := CoordinatorHost.Variables(None, {}, 0);
+    var initPart := ParticipantHost.Variables(None);
+    [Host.ParticipantVariables(initPart), Host.CoordinatorVariables(initCoord)]
   }
 }
 
