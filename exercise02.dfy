@@ -29,13 +29,48 @@ module Obligations {
 /*{*/
 /*}*/
 
+  predicate HostHasDecided(h: Host.Variables) {
+    match h
+      case CoordinatorVariables(c) => c.decision.Some?
+      case ParticipantVariables(p) => p.decision.Some?
+  }
+
+  predicate HostDecidedCommit(h: Host.Variables) {
+    match h
+      case CoordinatorVariables(c) => c.decision == Some(Commit)
+      case ParticipantVariables(p) => p.decision == Some(Commit)
+  }
+
+  predicate HostDecidedAbort(h: Host.Variables) {
+    match h
+      case CoordinatorVariables(c) => c.decision == Some(Abort)
+      case ParticipantVariables(p) => p.decision == Some(Abort)
+  }
+
+  predicate HostsReachSameDecision(h1: Host.Variables, h2: Host.Variables) 
+    requires HostHasDecided(h1)
+    requires HostHasDecided(h2)
+  {
+    (HostDecidedCommit(h1) && HostDecidedCommit(h2)) || (HostDecidedAbort(h1) && HostDecidedAbort(h2))
+  }
+
+  predicate AllPreferYes(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    var n := |c.hosts|;
+    forall j | 0 <= j < n-1 :: c.hosts[j].participant.preference == Yes
+  }
+
+
   // AC-1: All processes that reach a decision reach the same one.
   predicate SafetyAC1(c: Constants, v: Variables)
     requires v.WF(c)
   {
     // All hosts that reach a decision reach the same one
 /*{*/
-    true // Replace me
+    var n := |v.hosts|;
+    forall i, j | 0 <= i < n && 0 <= j < n && HostHasDecided(v.hosts[i]) && HostHasDecided(v.hosts[j])
+    :: HostsReachSameDecision(v.hosts[i], v.hosts[j])
 /*}*/
   }
 
@@ -46,7 +81,10 @@ module Obligations {
     requires v.WF(c)
   {
 /*{*/
-    true // Replace me
+    var n := |v.hosts|;
+    (exists i :: 0 <= i < n && HostDecidedCommit(v.hosts[i]))
+    ==>
+    AllPreferYes(c, v)
 /*}*/
   }
 
@@ -55,7 +93,10 @@ module Obligations {
     requires v.WF(c)
   {
 /*{*/
-    true // Replace me
+    var n := |v.hosts|;
+    AllPreferYes(c, v)
+    ==> 
+    forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) :: HostDecidedCommit(v.hosts[i])
 /*}*/
   }
 
