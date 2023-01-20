@@ -121,7 +121,7 @@ module CoordinatorHost {
   // JayNF
   datatype Step =
 /*{*/
-    VoteReqStep() | ReceiveStep() | DecisionStep()
+    VoteReqStep() | ReceiveStep() | DecisionStep() | StutterStep()
 /*}*/
 
   // msgOps is a "binding variable" -- the host and the network have to agree
@@ -135,6 +135,8 @@ module CoordinatorHost {
       case VoteReqStep => NextVoteReqStep(v, v', msgOps)
       case ReceiveStep => NextReceiveStep(v, v', msgOps)
       case DecisionStep => NextDecisionStep(c, v, v', msgOps)
+      case StutterStep => && v == v'
+                          && msgOps.send == msgOps.recv == None
 /*}*/
   }
 
@@ -163,7 +165,7 @@ module CoordinatorHost {
   // This step doubles as a stutter step
   predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    
+    && v.decision.None?  // enabling condition
     && if v.noVotes > 0 then
         && v' == v.(decision := Some(Abort))
         && msgOps.send == Some(DecideMsg(Abort))
@@ -247,6 +249,7 @@ module ParticipantHost {
           && msgOps.send.None?
         case DecideMsg(d) =>
           && v' == v.(decision := Some(d))
+          && msgOps.send.None?
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
