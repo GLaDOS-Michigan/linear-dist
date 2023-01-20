@@ -88,7 +88,7 @@ module CoordinatorHost {
     decision: Option<Decision>, 
 /*{*/
     yesVotes: set<HostId>,
-    noVotes: nat
+    noVotes: set<HostId>
 /*}*/
   )
   {
@@ -107,7 +107,7 @@ module CoordinatorHost {
     && v.WF(c)
     && v.decision.None?
     && v.yesVotes == {}
-    && v.noVotes == 0
+    && v.noVotes == {}
 /*}*/
   }
 
@@ -157,7 +157,7 @@ module CoordinatorHost {
             )
           else
             v' == v.(
-              noVotes := v.noVotes + 1
+              noVotes := v.noVotes + {src}
             )
         case _ => v' == v //stutter
   }
@@ -166,7 +166,7 @@ module CoordinatorHost {
   predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && v.decision.None?  // enabling condition
-    && if v.noVotes > 0 then
+    && if |v.noVotes| > 0 then
         && v' == v.(decision := Some(Abort))
         && msgOps.send == Some(DecideMsg(Abort))
       else if |v.yesVotes| == c.numParticipants then
@@ -502,7 +502,7 @@ module DistributedSystem {
     assert Next(c, behavior[1], behavior[2]);
 
     // Leader receive yes vote, network unchanged
-    group := [group[0], Host.CoordinatorVariables(CoordinatorHost.Variables(None, {0}, 0))];
+    group := [group[0], Host.CoordinatorVariables(CoordinatorHost.Variables(None, {0}, {}))];
     behavior := behavior + [Variables(group, network)];
     l, l' := behavior[2].hosts[1].coordinator, behavior[3].hosts[1].coordinator;
     coordStep := CoordinatorHost.ReceiveStep();  // witnesses and triggers
@@ -514,7 +514,7 @@ module DistributedSystem {
 
     // Leader decides and sends commit
     network := Network.Variables(network.sentMsgs + {DecideMsg(Commit)});
-    group := [group[0], Host.CoordinatorVariables(CoordinatorHost.Variables(Some(Commit), {0}, 0))];
+    group := [group[0], Host.CoordinatorVariables(CoordinatorHost.Variables(Some(Commit), {0}, {}))];
     behavior := behavior + [Variables(group, network)];
     l, l' := behavior[3].hosts[1].coordinator, behavior[4].hosts[1].coordinator;
     coordStep := CoordinatorHost.DecisionStep();  // witnesses and triggers
@@ -545,7 +545,7 @@ module DistributedSystem {
     ensures Host.GroupInit(c.hosts, group)
   {
     var initNetwork := Network.Variables({});
-    var initCoord := CoordinatorHost.Variables(None, {}, 0);
+    var initCoord := CoordinatorHost.Variables(None, {}, {});
     var initPart := ParticipantHost.Variables(None);
     [Host.ParticipantVariables(initPart), Host.CoordinatorVariables(initCoord)]
   }

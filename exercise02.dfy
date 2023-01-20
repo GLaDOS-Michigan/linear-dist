@@ -73,7 +73,7 @@ module Obligations {
   {
     && SafetyAC1(c, v)
     // && SafetyAC3(c, v)
-    // && SafetyAC4(c, v)
+    && SafetyAC4(c, v)
   }
 
 
@@ -94,6 +94,13 @@ module Obligations {
     requires 0 <= i < |v.hosts|-1
   {
     v.hosts[i].participant
+  }
+
+  function GetParticipantPreference(c: Constants, i: int) : Vote
+    requires c.WF()
+    requires 0 <= i < |c.hosts|-1
+  {
+    c.hosts[i].participant.preference
   }
 
   predicate HostHasDecided(h: Host.Variables) {

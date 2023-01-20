@@ -11,7 +11,31 @@ module TwoPCInvariantProof {
   import opened DistributedSystem
   import opened Obligations
 
+  // All VoteMsg have a valid participant HostId as src
+  predicate VoteMsgValidSrc(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    forall msg | msg in v.network.sentMsgs && msg.VoteMsg? 
+    :: 0 <= msg.src < |c.hosts|-1
+  }
 
+  // VoteMsg reflects the preference of the voter 
+  predicate VoteMsgAgreeWithVoter(c: Constants, v: Variables)
+    requires v.WF(c)
+    requires VoteMsgValidSrc(c, v)
+  {
+    forall msg | msg in v.network.sentMsgs && msg.VoteMsg? 
+    :: GetParticipantPreference(c, msg.src) == msg.v
+  }
+
+  predicate LeaderTallyReflectsMsgs(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    && (forall hostId | hostId in GetCoordinator(c, v).yesVotes ::
+          VoteMsg(Yes, hostId) in v.network.sentMsgs )
+    && (forall hostId | hostId in GetCoordinator(c, v).noVotes ::
+          VoteMsg(No, hostId) in v.network.sentMsgs )
+  }
 
   // // DecideMsgs should reflect the decision of the leader
   // // Tony: Boilerplate
@@ -72,6 +96,9 @@ module TwoPCInvariantProof {
   predicate Inv(c: Constants, v: Variables)
   {
     && v.WF(c)
+    && VoteMsgValidSrc(c, v)
+    && VoteMsgAgreeWithVoter(c, v)
+    && LeaderTallyReflectsMsgs(c, v)
     && DecisionMsgsAgreeWithLeader(c, v)
     && ParticipantsDecisionImpliesDecideMsg(c, v)
     && Safety(c, v)
@@ -93,7 +120,38 @@ module TwoPCInvariantProof {
     ensures Inv(c, v')
   {
     assert SafetyAC1(c, v');
+
+    AC4Proof(c, v, v');
+    assert SafetyAC4(c, v');
     assert Inv(c, v');
+  }
+
+  lemma AC4Proof(c: Constants, v: Variables, v': Variables)
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    ensures SafetyAC4(c, v');
+  {
+    if AllPreferYes(c, v') {
+      var n := |v.hosts|;
+      forall i | 0 <= i < n && HostHasDecided(v'.hosts[i]) 
+      ensures HostDecidedCommit(v'.hosts[i]) {
+        var step :| NextStep(c, v, v', step);
+        if i == step.hostid {
+          if v.hosts[step.hostid].CoordinatorVariables? {
+            /* Proof by contradiction: suppose coord decide no. By LeaderTallyReflectsMsgs
+            and VoteMsgValidSrc, there is a VoteMsg(No, src) from a valid participant in 
+            the network. By VoteMsgAgreeWithVoter, src must have preferred No, which 
+            contradicts with AllPreferYes(c, v) */
+            if HostDecidedAbort(v'.hosts[i]) {
+              var c, c' := v.hosts[step.hostid].coordinator, v'.hosts[step.hostid].coordinator;
+              var src :| src in c.noVotes;  // witness
+              assert VoteMsg(No, src) in v.network.sentMsgs;  // trigger
+              assert false;
+            }
+          }
+        }
+      }
+    }
   }
 
   lemma InvImpliesSafety(c: Constants, v: Variables)
