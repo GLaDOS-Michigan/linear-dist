@@ -54,6 +54,16 @@ module Obligations {
 /*}*/
   }
 
+  // This one is easier to prove
+  predicate AC3Contrapos(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    var n := |v.hosts|;
+    (! AllPreferYes(c, v)) 
+    ==> forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) 
+        :: HostDecidedAbort(v.hosts[i])
+  }
+
   // AC-4: If all processes prefer Yes, then the decision must be Commit.
   predicate SafetyAC4(c: Constants, v: Variables)
     requires v.WF(c)
@@ -72,7 +82,7 @@ module Obligations {
     requires v.WF(c)
   {
     && SafetyAC1(c, v)
-    // && SafetyAC3(c, v)
+    && SafetyAC3(c, v)
     && SafetyAC4(c, v)
   }
 

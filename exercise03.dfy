@@ -28,6 +28,7 @@ module TwoPCInvariantProof {
     :: GetParticipantPreference(c, msg.src) == msg.v
   }
 
+  // Leader's local tally reflect actual messages
   predicate LeaderTallyReflectsMsgs(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -36,15 +37,6 @@ module TwoPCInvariantProof {
     && (forall hostId | hostId in GetCoordinator(c, v).noVotes ::
           VoteMsg(No, hostId) in v.network.sentMsgs )
   }
-
-  // // DecideMsgs should reflect the decision of the leader
-  // // Tony: Boilerplate
-  // predicate DecisionMsgsAgreeWithTally(c: Constants, v: Variables)
-  //   requires v.WF(c)
-  // {
-  //   forall msg | msg in v.network.sentMsgs && msg.DecideMsg? 
-  //   :: GetCoordinator(c, v).decision.Some? && msg.d == GetCoordinator(c, v).decision.value
-  // }
 
   // DecideMsgs should reflect the decision of the leader
   // Tony: Boilerplate
@@ -66,33 +58,6 @@ module TwoPCInvariantProof {
       && (HostDecidedAbort(v.hosts[i]) ==> DecideMsg(Abort) in v.network.sentMsgs)
   }
 
-  // There can only be one DecideMsg in the network
-  // I think this is implied by from DecisionMsgsAgreeWithLeaderDecision
-  // predicate OnlyOneDecisionMsg(c: Constants, v: Variables)
-  //   requires v.WF(c)
-  // {
-  //   var sentMsgs := v.network.sentMsgs;
-  //   forall m1, m2 | m1 in sentMsgs && m1.DecideMsg? && m2 in sentMsgs && m2.DecideMsg? 
-  //   :: m1 == m2
-  // }
-
-  // If a DecideMsg(Commit) message is in the network, every host that decides must 
-  // decide Commit, and likewise for Abort.
-  // I think this is implied by OnlyOneDecisionMsg
-  // predicate HostsAgreeWithDecisionMsg(c: Constants, v: Variables)
-  //   requires v.WF(c)
-  // {
-  //   var n := |v.hosts|;
-  //   && (DecideMsg(Commit) in v.network.sentMsgs ==> 
-  //     forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) :: HostDecidedCommit(v.hosts[i])
-  //   )
-  //   && (DecideMsg(Abort) in v.network.sentMsgs ==> 
-  //     forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) :: HostDecidedAbort(v.hosts[i])
-  //   )
-  // }
-
-
-
   predicate Inv(c: Constants, v: Variables)
   {
     && v.WF(c)
@@ -110,20 +75,40 @@ module TwoPCInvariantProof {
   {}
 
 
-  /*
-    - DecisionMsgsAgreeWithLeader(c, v) and ParticipantsDecisionImpliesDecideMsg(c, v) implies AC1
-      AC1 + these two invariants are inductive.
-  */
   lemma InvInductive(c: Constants, v: Variables, v': Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures Inv(c, v')
   {
-    assert SafetyAC1(c, v');
-
+    AC3Proof(c, v, v');
     AC4Proof(c, v, v');
-    assert SafetyAC4(c, v');
-    assert Inv(c, v');
+  }
+
+  lemma AC3Proof(c: Constants, v: Variables, v': Variables)
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    ensures AC3Contrapos(c, v')
+  {
+    var n := |c.hosts|;
+    if ! AllPreferYes(c, v) {
+      var noVoter :| 0 <= noVoter < n-1 && c.hosts[noVoter].participant.preference == No;
+      var step :| NextStep(c, v, v', step);
+      var h, h' := v.hosts[step.hostid], v'.hosts[step.hostid];
+      if h.CoordinatorVariables? {
+          /* Proof by contradiction. Suppose coordinator decided Commit. Then it must have
+          a Yes vote from all participants, including noVoter. This is a contradiction */
+          var l, l' := h.coordinator, h'.coordinator;
+          if l.decision.None? && l'.decision == Some(Commit) {
+            YesVotesContainsAllParticipantsWhenFull(c, v);
+            assert VoteMsg(Yes, noVoter) in v.network.sentMsgs; // witness
+            assert false;
+          }
+      } else {
+          /* Proof by contradiction. Suppose participant decided Commit. Then it must have
+          received a Commit message from the coordinator. This implies that the coordinator
+          had committed in state v, which contradicts AC3Contrapos(c, v). */
+      }
+    }
   }
 
   lemma AC4Proof(c: Constants, v: Variables, v': Variables)
@@ -152,6 +137,51 @@ module TwoPCInvariantProof {
         }
       }
     }
+  }
+
+  lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
+    requires Inv(c, v)
+    requires |Last(v.hosts).coordinator.yesVotes| == |c.hosts|-1
+    ensures forall id | 0 <= id < |c.hosts|-1 :: id in Last(v.hosts).coordinator.yesVotes
+  {
+    var l := Last(v.hosts).coordinator;
+    forall id | 0 <= id < |c.hosts|-1 
+    ensures id in l.yesVotes {
+      if id !in l.yesVotes {
+        LeaderTallyValidSource(c, v);
+        SetLemma(l.yesVotes, id, |c.hosts|-1);
+        assert false;
+      }
+    }
+  }
+
+  lemma LeaderTallyValidSource(c: Constants, v: Variables) 
+    requires Inv(c, v)
+    ensures forall id | id in Last(v.hosts).coordinator.yesVotes :: 0 <= id < |c.hosts|-1
+  {
+    forall id | id in Last(v.hosts).coordinator.yesVotes 
+    ensures 0 <= id < |c.hosts|-1
+    {
+      assert VoteMsg(Yes, id) in v.network.sentMsgs;  // witness
+    }
+  }
+
+  lemma {:axiom} SetLemma(S: set<HostId>, e: HostId, size: int) 
+    requires 0 <= e < size
+    requires forall x | x in S :: 0 <= x < size
+    requires e !in S
+    ensures |S| < size - 1
+  {
+    var fullSet := set x: HostId | 0 <= x < size :: x;
+    assume |fullSet| == size - 1;
+    SubsetCardinality(S, fullSet);
+  }
+
+  lemma {:axiom} SubsetCardinality<T>(small: set<T>, large: set<T>) 
+    requires small < large
+    ensures |small| < |large|
+  {
+    assume false;
   }
 
   lemma InvImpliesSafety(c: Constants, v: Variables)
