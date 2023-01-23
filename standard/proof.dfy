@@ -1,7 +1,7 @@
 //#title Two Phase Commit Safety Proof
 //#desc Prove that the 2PC distributed system (from exercise01) accomplishes the Safety spec (from exercise02)
 
-include "exercise02.dfy"
+include "spec.dfy"
 //#extract exercise02.template solution exercise02.dfy
 
 module TwoPCInvariantProof {

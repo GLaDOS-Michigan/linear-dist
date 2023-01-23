@@ -17,7 +17,7 @@
 // Note that we include the model of exercise01, so you should write your 
 // spec accordingly. Of course, that also means double-checking that your
 // model performs all actions as described.
-include "exercise01.dfy"
+include "protocol.dfy"
 //#extract exercise01.template solution exercise01.dfy
 
 module Obligations {
