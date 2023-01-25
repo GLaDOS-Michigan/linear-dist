@@ -1,10 +1,8 @@
-//#title Two Phase Commit Safety Proof
-//#desc Prove that the 2PC distributed system (from exercise01) accomplishes the Safety spec (from exercise02)
+// Network-level "boilerplate" invariants that are application-independent
 
 include "spec.dfy"
-//#extract exercise02.template solution exercise02.dfy
 
-module TwoPCInvariantGuardsProof {
+module NetworkInvariants {
   import opened CommitTypes
   import opened Types
   import opened UtilitiesLibrary
@@ -12,7 +10,6 @@ module TwoPCInvariantGuardsProof {
   import opened Obligations
 
   // All VoteMsg have a valid participant HostId as src
-  // Boilerplate
   predicate VoteMsgValidSrc(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -21,28 +18,16 @@ module TwoPCInvariantGuardsProof {
   }
 
   // VoteMsg reflects the preference of the voter 
-  // Boilterplate
+  // Note that "0 <= msg.src < |c.hosts|-1" is prereq of GetParticipantPreference
   predicate VoteMsgAgreeWithVoter(c: Constants, v: Variables)
     requires v.WF(c)
-    requires VoteMsgValidSrc(c, v)
   {
     forall msg | msg in v.network.sentMsgs && msg.VoteMsg? 
-    :: GetParticipantPreference(c, msg.src) == msg.v
-  }
-
-  // Leader's local tally reflect actual messages
-  // Boilterplate
-  predicate LeaderTallyReflectsMsgs(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    && (forall hostId | hostId in GetCoordinator(c, v).yesVotes ::
-          VoteMsg(Yes, hostId) in v.network.sentMsgs )
-    && (forall hostId | hostId in GetCoordinator(c, v).noVotes ::
-          VoteMsg(No, hostId) in v.network.sentMsgs )
+    :: 0 <= msg.src < |c.hosts|-1 ==> GetParticipantPreference(c, msg.src) == msg.v
   }
 
   // DecideMsgs should reflect the decision of the leader
-  // Tony: Boilerplate
+  // Note that this hinges on fact that leader does not equivocate
   predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -51,7 +36,6 @@ module TwoPCInvariantGuardsProof {
   }
 
   // If a participant has decided, then there must be a corresponding DecideMsg
-  // Tony: Boilerplate
   predicate ParticipantsDecisionImpliesDecideMsg(c: Constants, v: Variables) 
     requires v.WF(c)
   {
@@ -61,25 +45,24 @@ module TwoPCInvariantGuardsProof {
       && (HostDecidedAbort(v.hosts[i]) ==> DecideMsg(Abort) in v.network.sentMsgs)
   }
 
-  predicate GuardInv(c: Constants, v: Variables)
+  predicate NetworkInv(c: Constants, v: Variables)
   {
     && v.WF(c)
     && VoteMsgValidSrc(c, v)
     && VoteMsgAgreeWithVoter(c, v)
-    && LeaderTallyReflectsMsgs(c, v)
     && DecisionMsgsAgreeWithLeader(c, v)
     && ParticipantsDecisionImpliesDecideMsg(c, v)
   }
 
-  lemma InitImpliesGuardInv(c: Constants, v: Variables)
+  lemma InitImpliesNetworkInv(c: Constants, v: Variables)
     requires Init(c, v)
-    ensures GuardInv(c, v)
+    ensures NetworkInv(c, v)
   {}
 
-  lemma GuardInvInductive(c: Constants, v: Variables, v': Variables)
-    requires GuardInv(c, v)
+  lemma NetworkInvInductive(c: Constants, v: Variables, v': Variables)
+    requires NetworkInv(c, v)
     requires Next(c, v, v')
-    ensures GuardInv(c, v')
+    ensures NetworkInv(c, v')
   {}
 }
 

@@ -1,9 +1,8 @@
-//#title Two Phase Commit Safety Proof
-//#desc Prove that the 2PC distributed system (from exercise01) accomplishes the Safety spec (from exercise02)
+// User level proofs of application invariants
 
 include "spec.dfy"
-include "guardproofs.dfy"
-//#extract exercise02.template solution exercise02.dfy
+include "networkInvs.dfy"
+
 
 module TwoPCInvariantProof {
   import opened CommitTypes
@@ -11,29 +10,60 @@ module TwoPCInvariantProof {
   import opened UtilitiesLibrary
   import opened DistributedSystem
   import opened Obligations
-  import opened TwoPCInvariantGuardsProof
+  import opened NetworkInvariants
 
+  // Leader's local tally reflect participant preferences
+  predicate LeaderTallyReflectsMsgs(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    var n := |c.hosts|;
+    && (forall hostId | hostId in GetCoordinator(c, v).yesVotes ::
+          0 <= hostId < n-1 && GetParticipantPreference(c, hostId) == Yes )
+    && (forall hostId | hostId in GetCoordinator(c, v).noVotes ::
+          0 <= hostId < n-1 && GetParticipantPreference(c, hostId) == No )
+  }
   
+  // User-level invariant
   predicate Inv(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && GuardInv(c, v)
+    && NetworkInv(c, v)
+    && LeaderTallyReflectsMsgs(c, v)
     && Safety(c, v)
   }
+
+  lemma InvImpliesSafety(c: Constants, v: Variables)
+    requires Inv(c, v)
+    ensures Safety(c, v)
+  {}
 
   lemma InitImpliesInv(c: Constants, v: Variables)
     requires Init(c, v)
     ensures Inv(c, v)
   {}
 
-
   lemma InvInductive(c: Constants, v: Variables, v': Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures Inv(c, v')
   {
+    LeaderTallyReflectsMsgsInductive(c, v, v');
     AC3Proof(c, v, v');
     AC4Proof(c, v, v');
+  }
+
+  lemma LeaderTallyReflectsMsgsInductive(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    ensures LeaderTallyReflectsMsgs(c, v')
+  {
+    var step :| NextStep(c, v, v', step);
+    var h, h' := v.hosts[step.hostid], v'.hosts[step.hostid];
+    if h.CoordinatorVariables? {
+      var l, l' := GetCoordinator(c, v), GetCoordinator(c, v');  // trigger
+    } else {
+      assert GetCoordinator(c, v) == GetCoordinator(c, v');  // trigger
+    }
   }
 
   lemma AC3Proof(c: Constants, v: Variables, v': Variables)
@@ -52,7 +82,7 @@ module TwoPCInvariantProof {
           var l, l' := h.coordinator, h'.coordinator;
           if l.decision.None? && l'.decision == Some(Commit) {
             YesVotesContainsAllParticipantsWhenFull(c, v);
-            assert VoteMsg(Yes, noVoter) in v.network.sentMsgs; // witness
+            assert GetParticipantPreference(c, noVoter) == Yes;  // witness
             assert false;
           }
       } else {
@@ -94,29 +124,18 @@ module TwoPCInvariantProof {
   lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
     requires Inv(c, v)
     requires |Last(v.hosts).coordinator.yesVotes| == |c.hosts|-1
-    ensures forall id | 0 <= id < |c.hosts|-1 :: id in Last(v.hosts).coordinator.yesVotes
+    ensures forall id | 0 <= id < |c.hosts|-1 :: id in GetCoordinator(c, v).yesVotes
   {
-    var l := Last(v.hosts).coordinator;
+    var l := GetCoordinator(c, v);
     forall id | 0 <= id < |c.hosts|-1 
     ensures id in l.yesVotes {
       if id !in l.yesVotes {
-        LeaderTallyValidSource(c, v);
         SetLemma(l.yesVotes, id, |c.hosts|-1);
         assert false;
       }
     }
   }
 
-  lemma LeaderTallyValidSource(c: Constants, v: Variables) 
-    requires Inv(c, v)
-    ensures forall id | id in Last(v.hosts).coordinator.yesVotes :: 0 <= id < |c.hosts|-1
-  {
-    forall id | id in Last(v.hosts).coordinator.yesVotes 
-    ensures 0 <= id < |c.hosts|-1
-    {
-      assert VoteMsg(Yes, id) in v.network.sentMsgs;  // witness
-    }
-  }
 
   lemma {:axiom} SetLemma(S: set<HostId>, e: HostId, size: int) 
     requires 0 <= e < size
@@ -135,10 +154,5 @@ module TwoPCInvariantProof {
   {
     assume false;
   }
-
-  lemma InvImpliesSafety(c: Constants, v: Variables)
-    requires Inv(c, v)
-    ensures Safety(c, v)
-  {}
 }
 
