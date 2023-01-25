@@ -5,27 +5,42 @@ module Types {
 
   type HostId = nat
 
-  datatype Message = Msg(val: int, src: HostId)
+  datatype Message = Msg(val: int, dst: nat)  // A host can receive if its ringPos == succ(src)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 } // end module Types
 
 
 module Host {
+  import opened UtilitiesLibrary
   import opened Types
 
-  datatype Constants = Constants(hostId: HostId)
+  datatype Constants = Constants(numParticipants:nat, ringPos: nat, hostId: HostId)
+
+  predicate ConstantsValidForGroup(c: Constants, participantCount: nat, ringPos: HostId)
+  {
+    && c.numParticipants == participantCount
+    && c.ringPos == ringPos
+  }
 
   datatype Variables = Variables(
-    highest_heard: int
+    highestHeard: int
   )
   {
     predicate WF(c: Constants) {
-      highest_heard >= -1  // not really useful, but just for fun :)
+      && 0 < c.numParticipants
+      && highestHeard >= -1  // not really useful, but just for fun :)
     }
   }
 
+  predicate GroupWFConstants(grp_c: seq<Constants>) {
+    && 0 < |grp_c|
+    && (forall ringPos: nat | ringPos < |grp_c|
+        :: ConstantsValidForGroup(grp_c[ringPos], |grp_c|, ringPos))
+  }
+
   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>) {
+    && GroupWFConstants(grp_c)
     // Variables size matches group size defined by grp_c
     && |grp_v| == |grp_c|
     // Each host is well-formed
@@ -40,7 +55,7 @@ module Host {
   predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && v.highest_heard == 0
+    && v.highestHeard == 0
   }
 
   datatype Step =
@@ -48,17 +63,27 @@ module Host {
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
-    match step
-      case TransmissionStep => NextTransmissionStep(v, v', msgOps)
-      case ReceiveStep => NextReceiveStep(v, v', msgOps)
+    && v.WF(c)
+    && match step
+      case TransmissionStep => NextTransmissionStep(c, v, v', msgOps)
+      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
   }
 
-  predicate NextTransmissionStep(v: Variables, v': Variables, msgOps: MessageOps) {
-    false // TODO
+  predicate NextTransmissionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
+    requires v.WF(c)
+  {
+    var payload := max(v.highestHeard, c.hostId); // max of what I heard vs my own hostId
+    var msg := Msg(payload, Successor(c.numParticipants, c.ringPos));
+    && msgOps.recv.None?
+    && msgOps.send == Some(msg)
+    && v == v'
   }
 
-  predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
-    false  // TODO
+  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.send.None?
+    && msgOps.recv.Some?
+    && c.ringPos == msgOps.recv.value.dst
+    && v' == v.(highestHeard := max(msgOps.recv.value.val, v.highestHeard)) // max of what I heard vs incoming
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
@@ -100,19 +125,19 @@ module DistributedSystem {
   import Host
 
   datatype Constants = Constants(
-    host_constants: seq<Host.Constants>,
+    hostConstants: seq<Host.Constants>,
     network: Network.Constants)
   {
-    predicate ValidHostIdx(id: int) {
-      0 <= id < |host_constants|
+    predicate ValidIdx(id: int) {
+      0 <= id < |hostConstants|
     }
 
     predicate UniqueIds() {
-      forall i, j | ValidHostIdx(i) && ValidHostIdx(j) && host_constants[i] == host_constants[j] :: i == j
+      forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i] == hostConstants[j] :: i == j
     }
 
     predicate WF() {
-      && 0 < |host_constants|
+      && 0 < |hostConstants|
       && UniqueIds()
     }
   }
@@ -123,14 +148,14 @@ module DistributedSystem {
   {
     predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.host_constants, hosts)
+      && Host.GroupWF(c.hostConstants, hosts)
     }
   }
 
   predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && Host.GroupInit(c.host_constants, v.hosts)
+    && Host.GroupInit(c.hostConstants, v.hosts)
     && Network.Init(c.network, v.network)
   }
 
@@ -138,10 +163,10 @@ module DistributedSystem {
   {
     && v.WF(c)
     && v'.WF(c)
-    && c.ValidHostIdx(actorIdx)
-    && Host.Next(c.host_constants[actorIdx], v.hosts[actorIdx], v'.hosts[actorIdx], msgOps)
+    && c.ValidIdx(actorIdx)
+    && Host.Next(c.hostConstants[actorIdx], v.hosts[actorIdx], v'.hosts[actorIdx], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherHostIdx | c.ValidHostIdx(otherHostIdx) && otherHostIdx != actorIdx :: v'.hosts[otherHostIdx] == v.hosts[otherHostIdx])
+    && (forall otherHostIdx | c.ValidIdx(otherHostIdx) && otherHostIdx != actorIdx :: v'.hosts[otherHostIdx] == v.hosts[otherHostIdx])
   }
 
   datatype Step = HostActionStep(actorIdx: int, msgOps: MessageOps)

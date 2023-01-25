@@ -1,4 +1,11 @@
 module UtilitiesLibrary {
+  function max(x: int, y: int) : (res: int) 
+    ensures res == x || res == y
+    ensures res >= x && res >= y
+  {
+    if x > y then x else y
+  }
+
   function DropLast<T>(theSeq: seq<T>) : seq<T>
     requires 0 < |theSeq|
   {
@@ -9,6 +16,12 @@ module UtilitiesLibrary {
     requires 0 < |theSeq|
   {
     theSeq[|theSeq|-1]
+  }
+
+  function Successor(mod: nat, idx: nat) : (ret:nat)
+    requires 0 < mod
+  {
+    if idx == mod-1 then 0 else idx+1
   }
 
   function UnionSeqOfSets<T>(theSets: seq<set<T>>) : set<T>

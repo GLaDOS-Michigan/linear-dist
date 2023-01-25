@@ -10,7 +10,7 @@ module Obligations {
     requires v.WF(c)
     requires c.ValidIdx(idx)
   {
-    v.hosts[idx].highest_heard == c.host_constants[idx].hostId
+    v.hosts[idx].highestHeard == c.hostConstants[idx].hostId
   }
 
   predicate Safety(c: Constants, v: Variables) 
