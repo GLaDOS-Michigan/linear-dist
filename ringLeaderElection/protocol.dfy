@@ -134,7 +134,7 @@ module DistributedSystem {
     }
 
     predicate UniqueIds() {
-      forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i] == hostConstants[j] :: i == j
+      forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i].hostId == hostConstants[j].hostId :: i == j
     }
 
     predicate WF() {

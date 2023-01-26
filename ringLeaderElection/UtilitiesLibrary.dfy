@@ -20,8 +20,16 @@ module UtilitiesLibrary {
 
   function Successor(mod: nat, idx: nat) : (ret:nat)
     requires 0 < mod
+    requires idx < mod
   {
     if idx == mod-1 then 0 else idx+1
+  }
+
+  function Predecessor(mod: nat, idx: nat) : (ret:nat)
+    requires 0 < mod
+    requires idx < mod
+  {
+    if idx == 0 then mod-1 else idx-1
   }
 
   function UnionSeqOfSets<T>(theSets: seq<set<T>>) : set<T>

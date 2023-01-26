@@ -2,6 +2,7 @@ include "protocol.dfy"
 
 module Obligations {
   import opened Types
+  import opened UtilitiesLibrary
   import opened DistributedSystem
 
 
@@ -28,4 +29,12 @@ module Obligations {
   /***************************************************************************************
   *                                      Utils                                           *
   ***************************************************************************************/
+
+  lemma SuccessorPredecessorRelation(n: int, idx: nat) 
+    requires 0 < n
+    requires idx < n
+    ensures Predecessor(n, Successor(n, idx)) == idx
+    ensures Successor(n, Predecessor(n, idx)) == idx
+  {}
+
 }
