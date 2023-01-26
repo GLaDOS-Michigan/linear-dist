@@ -5,7 +5,7 @@ module Types {
 
   type HostId = nat
 
-  datatype Message = Msg(val: int, dst: nat)  // A host can receive if its ringPos == succ(src)
+  datatype Message = Msg(val: int, src: nat)  // A host can receive if its ringPos == succ(src)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 } // end module Types
@@ -55,7 +55,7 @@ module Host {
   predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && v.highestHeard == 0
+    && v.highestHeard == -1
   }
 
   datatype Step =
@@ -73,7 +73,7 @@ module Host {
     requires v.WF(c)
   {
     var payload := max(v.highestHeard, c.hostId); // max of what I heard vs my own hostId
-    var msg := Msg(payload, Successor(c.numParticipants, c.ringPos));
+    var msg := Msg(payload, c.ringPos);
     && msgOps.recv.None?
     && msgOps.send == Some(msg)
     && v == v'
@@ -82,7 +82,8 @@ module Host {
   predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
     && msgOps.recv.Some?
-    && c.ringPos == msgOps.recv.value.dst
+    && msgOps.recv.value.src < c.numParticipants
+    && c.ringPos == Successor(c.numParticipants, msgOps.recv.value.src)
     && v' == v.(highestHeard := max(msgOps.recv.value.val, v.highestHeard)) // max of what I heard vs incoming
   }
 
