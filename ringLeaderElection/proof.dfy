@@ -34,8 +34,8 @@ module RingLeaderElectionProof {
     requires 0 <= start < n
     requires 0 <= end < n
   {
-    if end >= start then end - start 
-    else n - end + start
+    if start <= end then end - start 
+    else n - start + end
   }
 
   predicate ChordDominates(c: Constants, v: Variables) 
@@ -47,10 +47,12 @@ module RingLeaderElectionProof {
         && c.ValidIdx(mid)
         && v.hosts[dst].highestHeard == c.hostConstants[src].hostId
         && Between(src, mid, dst)
-            :: && c.hostConstants[mid].hostId < c.hostConstants[src].hostId
-               && Msg(c.hostConstants[src].hostId, mid) in v.network.sentMsgs
+            :: && c.hostConstants[mid].hostId < c.hostConstants[src].hostId  // Same as centralized
+               && Msg(c.hostConstants[src].hostId, mid) in v.network.sentMsgs // Extra
   }
 
+  // Extra: If a node sent a msg with a value that is NOT its hostId, it must have received that 
+  // value from its predecessor
   predicate SentNotMyIdImpliesReceivedId(c: Constants, v: Variables) 
     requires v.WF(c)
     requires VoteMsgValidSrc(c, v)
@@ -91,7 +93,6 @@ module RingLeaderElectionProof {
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures ChordDominates(c, v')
-    ensures SentNotMyIdImpliesReceivedId(c, v');
   {
     forall src:nat, dst:nat, mid:nat | 
         && c.ValidIdx(src)
@@ -112,14 +113,14 @@ module RingLeaderElectionProof {
           var pred := Predecessor(|c.hostConstants|, dst);
           assert Between(src, pred, dst);
           if pred != mid {
-            lemma_MidMustHaveSentSrcHostId(c, v', src, mid, dst);
+            MidMustHaveSentSrcHostId(c, v', src, mid, dst);
           }
         } 
       }
     }
   }
 
-  lemma lemma_MidMustHaveSentSrcHostId(c: Constants, v: Variables, src: nat, mid: nat, dst: nat) 
+  lemma {:timeLimitMultiplier 2} MidMustHaveSentSrcHostId(c: Constants, v: Variables, src: nat, mid: nat, dst: nat) 
     requires v.WF(c)
     requires NetworkInv(c, v)
     requires SentNotMyIdImpliesReceivedId(c, v)
@@ -136,9 +137,25 @@ module RingLeaderElectionProof {
       // by receiveValidity
       assert Msg(c.hostConstants[src].hostId, mid) in v.network.sentMsgs;
     } else {
-      assume Distance(n, mid, dst) > Distance(n, Successor(n, mid), dst);
-      lemma_MidMustHaveSentSrcHostId(c, v, src, Successor(n, mid), dst);
+      var succ := Successor(n, mid);
+      SuccessorDecreasesDistance(n, mid, dst);
+      MidMustHaveSentSrcHostId(c, v, src, succ, dst);
+      assert Msg(c.hostConstants[src].hostId, succ) in v.network.sentMsgs;
+      // Rip this is not inductive. I really need to keep track of whole sequence
+      // of highest heard...
+
+      assume false;
+      assert Msg(c.hostConstants[src].hostId, mid) in v.network.sentMsgs;
     }
   }
+
+  lemma SuccessorDecreasesDistance(n:nat, start:nat, end:nat) 
+    requires 0 <= start < n
+    requires 0 <= end < n
+    requires start != end
+    ensures Distance(n, start, end) > Distance(n, Successor(n, start), end)
+  {}
+
+
 }
 
