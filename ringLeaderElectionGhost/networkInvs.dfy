@@ -50,11 +50,11 @@ module NetworkInvariants {
   predicate NetworkInv(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && VoteMsgValidSrc(c, v)
-    && payloadGeqSenderHostId(c, v)
-    && payloadLeqSenderMax(c, v)
-    && payloadComesFromHighestHeardSeq(c, v)
-    && receiveValidity(c, v)
+    && VoteMsgValidSrc(c, v)                  // needed
+    && payloadGeqSenderHostId(c, v)           // needed
+    // && payloadLeqSenderMax(c, v)              // not needed
+    && payloadComesFromHighestHeardSeq(c, v)  // needed
+    && receiveValidity(c, v)                  // needed
   }
 
   lemma InitImpliesNetworkInv(c: Constants, v: Variables)

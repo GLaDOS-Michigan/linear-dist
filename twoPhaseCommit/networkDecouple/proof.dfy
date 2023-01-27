@@ -13,7 +13,7 @@ module TwoPCInvariantProof {
   import opened NetworkInvariants
 
   // Leader's local tally reflect participant preferences
-  predicate LeaderTallyReflectsMsgs(c: Constants, v: Variables)
+  predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
     requires v.WF(c)
   {
     var n := |c.hosts|;
@@ -28,7 +28,7 @@ module TwoPCInvariantProof {
   {
     && v.WF(c)
     && NetworkInv(c, v)
-    && LeaderTallyReflectsMsgs(c, v)
+    && LeaderTallyReflectsPreferences(c, v)
     && Safety(c, v)
   }
 
@@ -47,15 +47,15 @@ module TwoPCInvariantProof {
     requires Next(c, v, v')
     ensures Inv(c, v')
   {
-    LeaderTallyReflectsMsgsInductive(c, v, v');
+    LeaderTallyReflectsPreferencesInductive(c, v, v');
     AC3Proof(c, v, v');
     AC4Proof(c, v, v');
   }
 
-  lemma LeaderTallyReflectsMsgsInductive(c: Constants, v: Variables, v': Variables) 
+  lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Variables) 
     requires Inv(c, v)
     requires Next(c, v, v')
-    ensures LeaderTallyReflectsMsgs(c, v')
+    ensures LeaderTallyReflectsPreferences(c, v')
   {
     var step :| NextStep(c, v, v', step);
     var h, h' := v.hosts[step.hostid], v'.hosts[step.hostid];
@@ -105,14 +105,10 @@ module TwoPCInvariantProof {
         var step :| NextStep(c, v, v', step);
         if i == step.hostid {
           if v.hosts[step.hostid].CoordinatorVariables? {
-            /* Proof by contradiction: suppose coord decide no. By LeaderTallyReflectsMsgs
-            and VoteMsgValidSrc, there is a VoteMsg(No, src) from a valid participant in 
-            the network. By VoteMsgAgreeWithVoter, src must have preferred No, which 
+            /* Proof by contradiction: suppose coord decide no. Then leader's noVotes is
+            not empty. By LeaderTallyReflectsPreferences, this member preferred No, which 
             contradicts with AllPreferYes(c, v) */
             if HostDecidedAbort(v'.hosts[i]) {
-              var c, c' := v.hosts[step.hostid].coordinator, v'.hosts[step.hostid].coordinator;
-              var src :| src in c.noVotes;  // witness
-              assert VoteMsg(No, src) in v.network.sentMsgs;  // trigger
               assert false;
             }
           }

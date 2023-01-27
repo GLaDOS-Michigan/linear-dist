@@ -64,7 +64,6 @@ module RingLeaderElectionProof {
     requires Next(c, v, v')
     ensures Inv(c, v')
   {
-    NetworkInvInductive(c, v, v');
     ChordDominatesInductive(c, v, v');
     ChordDominatesImpliesSafety(c, v');
   }
