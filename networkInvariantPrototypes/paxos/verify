@@ -1,0 +1,53 @@
+#!/bin/bash -li
+
+if uname -a | grep -q Darwin; then
+
+    dafny="/usr/local/lib/dafny/dafny /timeLimit:20 /compile:0  /allowGlobals /noNLarith /autoTriggers:1 /vcsCores:4"
+    dafnylong="/usr/local/lib/dafny/dafny /timeLimit:40 /compile:0  /allowGlobals /noNLarith /autoTriggers:1 /vcsCores:4"
+
+elif uname -a | grep -q Linux; then
+
+    dafny="/usr/lib/dafny3/dafny /timeLimit:20 /compile:0  /allowGlobals /noNLarith /autoTriggers:1 /vcsCores:4"
+    dafnylong="/usr/lib/dafny3/dafny /timeLimit:40 /compile:0  /allowGlobals /noNLarith /autoTriggers:1 /vcsCores:4"
+
+else
+    echo "Verification failed"
+    exit 1
+fi
+
+### Definition Files 
+echo ""
+echo "Verifying all definition files"
+$dafny types.dfy agents.dfy network.dfy synod.dfy
+
+
+### Proof Files
+echo ""
+echo "Verifying proof_validity.dfy"
+$dafny proof_validity.dfy
+
+echo ""
+echo "Verifying proof_agreement_invariants.dfy"
+$dafny proof_agreement_invariants.dfy
+
+echo ""
+echo "Verifying proof_axioms.dfy"
+$dafny proof_axioms.dfy
+
+echo ""
+echo "Verifying proof_helper.dfy"
+$dafny proof_helper.dfy
+
+echo ""
+echo "Verifying proof_agreement_chosenProperties1.dfy"
+$dafny proof_agreement_chosenProperties1.dfy
+
+echo ""
+echo "Verifying proof_agreement_chosenProperties2.dfy"
+$dafny proof_agreement_chosenProperties2.dfy
+
+echo ""
+echo "Verifying proof_agreement.dfy"
+$dafny proof_agreement.dfy
+
+echo "Done"
