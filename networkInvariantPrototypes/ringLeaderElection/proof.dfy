@@ -19,6 +19,7 @@ module RingLeaderElectionProof {
     // User-level invariants:
     && SentNotMyIdImpliesReceivedId(c, v)
     && ChordDominates(c, v)
+    && ChordDominatesMsgs(c, v)
     && Safety(c, v)
   }
   
@@ -47,8 +48,21 @@ module RingLeaderElectionProof {
         && c.ValidIdx(mid)
         && v.hosts[dst].highestHeard == c.hostConstants[src].hostId
         && Between(src, mid, dst)
-            :: && c.hostConstants[mid].hostId < c.hostConstants[src].hostId  // Same as centralized
-               && Msg(c.hostConstants[src].hostId, mid) in v.network.sentMsgs // Extra
+            :: && c.hostConstants[mid].hostId < c.hostConstants[src].hostId
+  }
+
+  // Extra: Given a src node and a dst node such that v.hosts[dst].highestHeard == c.hostConstants[src].hostId
+  // any middle node mid between them must have sent Msg(c.hostConstants[src].hostId, mid)
+  predicate ChordDominatesMsgs(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall src:nat, dst:nat, mid:nat | 
+        && c.ValidIdx(src)
+        && c.ValidIdx(dst)
+        && c.ValidIdx(mid)
+        && v.hosts[dst].highestHeard == c.hostConstants[src].hostId
+        && Between(src, mid, dst)
+            :: Msg(c.hostConstants[src].hostId, mid) in v.network.sentMsgs
   }
 
   // Extra: If a node sent a msg with a value that is NOT its hostId, it must have received that 
@@ -93,6 +107,7 @@ module RingLeaderElectionProof {
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures ChordDominates(c, v')
+    ensures ChordDominatesMsgs(c, v')
   {
     forall src:nat, dst:nat, mid:nat | 
         && c.ValidIdx(src)
@@ -120,7 +135,7 @@ module RingLeaderElectionProof {
     }
   }
 
-  lemma {:timeLimitMultiplier 2} MidMustHaveSentSrcHostId(c: Constants, v: Variables, src: nat, mid: nat, dst: nat) 
+  lemma MidMustHaveSentSrcHostId(c: Constants, v: Variables, src: nat, mid: nat, dst: nat) 
     requires v.WF(c)
     requires NetworkInv(c, v)
     requires SentNotMyIdImpliesReceivedId(c, v)
@@ -140,12 +155,6 @@ module RingLeaderElectionProof {
       var succ := Successor(n, mid);
       SuccessorDecreasesDistance(n, mid, dst);
       MidMustHaveSentSrcHostId(c, v, src, succ, dst);
-      assert Msg(c.hostConstants[src].hostId, succ) in v.network.sentMsgs;
-      // Rip this is not inductive. I really need to keep track of whole sequence
-      // of highest heard...
-
-      assume false;
-      assert Msg(c.hostConstants[src].hostId, mid) in v.network.sentMsgs;
     }
   }
 
