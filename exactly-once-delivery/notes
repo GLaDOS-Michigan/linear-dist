@@ -1,0 +1,8 @@
+Observation from today:
+
+First Exactly-Once Protocol shouldn't be for a single instance,
+even though that has a simpler implementation. Because: that requires
+a contract with the client code. Instead, the contract should be
+that the protocol preserves whatever set of linear objects the
+client has brewed up. Now the contract is almost implicit: the
+network protocol keeps the set constant across the network.
