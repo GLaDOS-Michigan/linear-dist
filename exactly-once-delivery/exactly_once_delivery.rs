@@ -18,6 +18,9 @@ use option::Option::{Some, None};
 tokenized_state_machine!{
 
 ExactlyOnceDelivery<StoredType> {
+    // StoredType may have some invariants independent of the application
+    // - these are message invariants
+ 
     fields {
         // maps host src, dst pairs to a map from sequence
         // number to StoredType

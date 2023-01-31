@@ -1,21 +1,5 @@
 
 
-Distributed Lock:
-
-// represents who holds the lock
-StoredType = LockHeld;
-
-init(tracked lock: LockHeld)
-    // one node gets the only LockHeld 
-    //
-    // or exclusive resource; having two is false
-    //     based on contradiction lemma:
-
-        proof fn only_one(a: tracked LockHeld, b: tracked LockHeld)
-            ensures false
-
-// how do we use this property
-
 // ================================================================
 
 Sharded key-value store
@@ -50,9 +34,18 @@ transition!{
 
 ExactlyOnceDelivery<StoredType = HasKeyValue>
 
+// the StoredType(?) can be a refinement type which is a message invariant
+
 // ================================================================
 
 // in the implementation,
 // - sending a message deposits a HasKeyValue
-//   <- ghost state, physical state connected by an invariant
-//      invariant has a global meaning
+//   <- ghost state, physical state connected by a predicate that couples them
+//      this coupling predicate must have a global meaning
+//
+
+// ================================================================
+
+// to have an exclusive resource we can use a contradiction lemma:
+    proof fn only_one(a: tracked LockHeld, b: tracked LockHeld)
+        ensures false
