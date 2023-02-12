@@ -34,6 +34,7 @@ module NetworkInvariants {
   // from its predecessor
   predicate receiveValidity(c: Constants, v: Variables) 
     requires v.WF(c)
+    requires VoteMsgValidSrc(c, v)
   {
     forall idx | 0 <= idx < |c.hostConstants| && v.hosts[idx].highestHeard > -1
     :: (exists msg :: && msg in v.network.sentMsgs 
@@ -46,7 +47,7 @@ module NetworkInvariants {
     && v.WF(c)
     && VoteMsgValidSrc(c, v)
     && payloadGeqSenderHostId(c, v)
-    && payloadLeqSenderMax(c, v)
+    // && payloadLeqSenderMax(c, v)
     && receiveValidity(c, v)
   }
 
