@@ -2,7 +2,7 @@
 
 dafny="/usr/local/lib/dafny/dafny /timeLimit:20 /compile:0 /allowGlobals /vcsCores:4"
 
-files="../lib/UtilitiesLibrary.dfy protocol.dfy spec.dfy"
+files="../lib/UtilitiesLibrary.dfy protocol.dfy spec.dfy proof.dfy"
 
 echo "Verifying $files"
 

@@ -17,6 +17,10 @@ module Types {
     StartElection | VoteReq(candidate: HostId) | Vote(voter: HostId, candidate: HostId) | Leader(src: HostId)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
+
+  predicate SetIsQuorum<T>(clusterSize: nat, S: set<T>) {
+    |S| > clusterSize / 2
+  }
 }
 
 module Host {
@@ -73,12 +77,13 @@ module Host {
     && msgOps.recv.Some?
     && match msgOps.recv.value
         case StartElection =>
-          && v == v'
-          &&  if v.voted then 
-                msgOps.send == None
-              else
-                // Nominate myself as leader
-                msgOps.send == Some(VoteReq(c.hostId))
+          if v.voted then 
+            && msgOps.send == None
+            && v == v'
+          else
+            // Nominate myself as leader
+            && msgOps.send == Some(VoteReq(c.hostId))
+            && v == v'
         case VoteReq(candidate) => 
           if v.voted then
             // Stutter
@@ -105,8 +110,9 @@ module Host {
 
   predicate NextVictoryStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    && |v.receivedVotes| > c.clusterSize / 2
+    && SetIsQuorum(c.clusterSize, v.receivedVotes)
     && msgOps.send == Some(Leader(c.hostId))
+    && v == v'
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
