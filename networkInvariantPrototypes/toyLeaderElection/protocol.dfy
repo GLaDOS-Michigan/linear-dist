@@ -17,10 +17,6 @@ module Types {
     StartElection | VoteReq(candidate: HostId) | Vote(voter: HostId, candidate: HostId) | Leader(src: HostId)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
-
-  predicate SetIsQuorum<T>(clusterSize: nat, S: set<T>) {
-    |S| > clusterSize / 2
-  }
 }
 
 module Host {

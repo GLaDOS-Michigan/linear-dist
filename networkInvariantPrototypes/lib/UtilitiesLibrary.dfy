@@ -70,6 +70,27 @@ module UtilitiesLibrary {
     idx := chosenIdx;
   }
 
+  predicate SetIsQuorum<T>(clusterSize: nat, S: set<T>) {
+    |S| > clusterSize / 2
+  }
+
+  lemma QuorumIntersection<T>(cluster: set<T>, S1: set<T>, S2: set<T>) returns (e: T) 
+    requires SetIsQuorum(|cluster|, S1)
+    requires SetIsQuorum(|cluster|, S2)
+    requires S1 <= cluster
+    requires S2 <= cluster
+    ensures e in S1 && e in S2
+  {
+    assume false;  // TODO
+    e :| e in S1 && e in S2;
+  }
+
+  lemma SetComprehensionSize(n: nat) 
+    ensures |(set x | 0 <= x < n)| == n
+  {
+    assume false;  // TODO
+  }
+
   datatype Option<T> = Some(value:T) | None
 
   function {:opaque} MapRemoveOne<K,V>(m:map<K,V>, key:K) : (m':map<K,V>)

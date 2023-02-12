@@ -60,7 +60,7 @@ module RingLeaderElectionProof {
     && VoteMsgImpliesVoterVoted(c, v)
   }
 
-  // Application Invariant
+  // Application Invariant: requires message invariants to be inductive
   predicate VotersVoteOnce(c: Constants, v: Variables) 
     requires v.WF(c)
   {
@@ -73,7 +73,6 @@ module RingLeaderElectionProof {
   
   predicate Inv(c: Constants, v: Variables)
   {
-    && v.WF(c)
     && MessageInv(c, v)
     && VotersVoteOnce(c, v)
     && Safety(c, v)
@@ -107,15 +106,29 @@ module RingLeaderElectionProof {
     requires Next(c, v, v')
     ensures Inv(c, v')
   {
-    assume false;
     MessageInvInductive(c, v, v');
-    assert v.WF(c);
-    assert ValidMessages(c, v');
-    assert LeaderMsgImpliesLocalQuorum(c, v');
-    assert ReceivedVotesValidity(c, v');
-    assert VoteMsgImpliesVoterVoted(c, v');
-    assert VotersVoteOnce(c, v');
-    assert Safety(c, v');
+    SafetyProof(c, v');
+  }
+
+  lemma SafetyProof(c: Constants, v': Variables) 
+    requires MessageInv(c, v')
+    requires VotersVoteOnce(c, v')
+    ensures Safety(c, v')
+  {
+    /* Proof by contradiction: Assume two leaders were elected in v', L1 and L2.
+    * Then by quorum intersection, there is a common rogueId in both L1.receivedVotes and
+    * L2.receivedVotes. This violates VotersVoteOnce, via ReceivedVotesValidity
+    */
+    if !Safety(c, v') {
+      var m1 :| m1 in v'.network.sentMsgs && m1.Leader?;      
+      var m2 :| m2 in v'.network.sentMsgs && m2.Leader? && m1.src != m2.src;
+      var clusterSize := |c.hostConstants|;
+      var allHosts := (set x | 0 <= x < |c.hostConstants|);
+      SetComprehensionSize(|c.hostConstants|);
+      var rv1, rv2 :=  v'.hosts[m1.src].receivedVotes, v'.hosts[m2.src].receivedVotes;
+      var rogueId := QuorumIntersection(allHosts, rv1, rv2);  // witness
+      assert false;
+    }
   }
 }
 
