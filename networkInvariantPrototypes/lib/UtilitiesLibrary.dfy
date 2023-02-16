@@ -87,8 +87,15 @@ module UtilitiesLibrary {
 
   lemma SetComprehensionSize(n: nat) 
     ensures |(set x | 0 <= x < n)| == n
+    decreases n
   {
-    assume false;  // TODO
+    var s := (set x | 0 <= x < n);
+    if n == 0 {
+      assert |s| == 0;
+    } else {
+      SetComprehensionSize(n-1);
+      assert s == (set x | 0 <= x < n-1) + {n-1};  // trigger
+    }
   }
 
   datatype Option<T> = Some(value:T) | None
