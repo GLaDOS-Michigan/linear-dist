@@ -225,6 +225,9 @@ module DistributedSystem {
     predicate ValidActorIdx(idx: nat) {
       idx < |hosts|
     }
+    predicate ValidClientIdx(idx: nat) {
+      idx < |hosts|-1
+    }
   }
 
   datatype Variables = Variables(
