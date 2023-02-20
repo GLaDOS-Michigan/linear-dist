@@ -15,6 +15,6 @@ module Obligations {
   }
 
   predicate SafetySingleClient(v: ClientHost.Variables) {
-    v.requests <= v.responses
+    v.responses <= v.requests 
   }
 }
