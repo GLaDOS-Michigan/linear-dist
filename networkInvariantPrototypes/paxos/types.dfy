@@ -9,7 +9,7 @@ module Types {
   datatype ValBal = VB(v:Value, b:LeaderId)
 
   datatype Message = Prepare(bal:LeaderId)
-                  | Promise(bal:LeaderId, acc:AcceptorId, vbOpt:Option<ValBal>)  //valbal is the value-ballot pair with which the value was accepted
+                  | Promise(bal:LeaderId, acc:AcceptorId,vbOpt:Option<ValBal>)  //valbal is the value-ballot pair with which the value was accepted
                   | Propose(bal:LeaderId, val:Value)
                   | Accept(bal:LeaderId, val:Value)
 

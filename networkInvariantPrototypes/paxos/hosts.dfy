@@ -7,18 +7,16 @@ module LeaderHost {
 
   datatype Constants = Constants(id: LeaderId, f: nat, preferredValue: Value)
 
-  predicate ConstantsValidForLeader(c: Constants, id: LeaderId, f: nat)
-  {
+  predicate ConstantsValidForLeader(c: Constants, id: LeaderId, f: nat) {
     && c.id == id
     && c.f == f
   }
 
-  datatype Variables = Variables(receivedPromises: set<LeaderId>, value: Value, highestHeardBallot: Option<LeaderId>)
-  {
-    predicate WF(c: Constants) {
-      true
-    }
-  }
+  datatype Variables = Variables(
+    receivedPromises: set<LeaderId>, 
+    value: Value, 
+    highestHeardBallot: Option<LeaderId>
+  )
 
   predicate Init(c: Constants, v: Variables) {
     && v.receivedPromises == {}
@@ -61,9 +59,9 @@ module LeaderHost {
           )
         else 
           // this promise is not for me
-          && v' == v
+          NextStutterStep(c, v, v', msgOps)
       case _ =>
-        && v' == v
+        NextStutterStep(c, v, v', msgOps)
   }
 
   predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -75,7 +73,7 @@ module LeaderHost {
 
   predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && v == v'
-    && msgOps.send == msgOps.recv == None
+    && msgOps.send == None
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
@@ -83,3 +81,66 @@ module LeaderHost {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
 }  // end module LeaderHost
+
+
+module AcceptorHost {
+  import opened UtilitiesLibrary
+  import opened Types
+
+  datatype Constants = Constants(id: AcceptorId)
+
+  predicate ConstantsValidForAcceptor(c: Constants, id: AcceptorId) {
+    && c.id == id
+  }
+
+  datatype Variables = Variables(
+    promised: Option<LeaderId>,
+    acceptedVB: Option<ValBal>
+  )
+
+  predicate Init(c: Constants, v: Variables) {
+    && v.promised == None
+    && v.acceptedVB == None
+  }
+
+  datatype Step =
+    ReceiveStep() | StutterStep()
+
+  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  {
+    match step
+      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case StutterStep => NextStutterStep(c, v, v', msgOps)
+  }
+
+  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && match msgOps.recv.value
+      case Prepare(bal) => 
+        if v.promised.None? || (v.promised.Some? && v.promised.value < bal) then
+          && v' == v.(promised := Some(bal))
+          && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
+        else
+          NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
+      case Propose(bal, val) =>
+        if v.promised.None? || (v.promised.Some? && v.promised.value < bal) then
+          && v' == v.(
+                promised := Some(bal), 
+                acceptedVB := Some(VB(val, bal)))
+          && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB))
+        else
+          NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
+      case _ =>
+        NextStutterStep(c, v, v', msgOps)
+  }
+
+  predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && v == v'
+    && msgOps.send == None
+  }
+
+  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  {
+    exists step :: NextStep(c, v, v', step, msgOps)
+  }
+}  // end module AcceptorHost
