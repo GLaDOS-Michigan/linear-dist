@@ -1,0 +1,140 @@
+include "hosts.dfy"
+
+module Network {
+  import opened Types
+
+  datatype Variables = Variables(sentMsgs:set<Message>)
+
+  predicate Init(v: Variables)
+  {
+    && v.sentMsgs == {}
+  }
+
+  predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
+  {
+    && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
+    && v'.sentMsgs ==
+      v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }
+  }
+} // end module Network
+
+
+module DistributedSystem {
+  import opened Types
+  import opened Network
+  import LeaderHost
+  import AcceptorHost
+  import LearnerHost
+
+  datatype Constants = Constants(
+    f: nat,
+    leaderConstants: seq<LeaderHost.Constants>,
+    acceptorConstants: seq<AcceptorHost.Constants>,
+    learnerConstants: seq<LearnerHost.Constants>)
+  {
+    predicate WF() {
+      && 0 < f
+      && UniqueIds()
+    }
+
+    predicate UniqueIds() {
+      && UniqueLeaderIds()
+      && UniqueAcceptorIds()
+    }
+
+    predicate ValidLeaderIdx(id: int) {
+      0 <= id < |leaderConstants|
+    }
+
+    predicate ValidAcceptorIdx(id: int) {
+      0 <= id < |acceptorConstants|
+    }
+
+    predicate ValidLearnerIdx(id: int) {
+      0 <= id < |learnerConstants|
+    }
+    
+    predicate UniqueLeaderIds() {
+      forall i, j | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaderConstants[i].id == leaderConstants[j].id :: i == j
+    }
+
+    predicate UniqueAcceptorIds() {
+      forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptorConstants[i].id == acceptorConstants[j].id :: i == j
+    }
+  }
+
+  datatype Variables = Variables(
+    leaders: seq<LeaderHost.Variables>,
+    acceptors: seq<AcceptorHost.Variables>,
+    learners: seq<LearnerHost.Variables>,
+    network: Network.Variables)
+  {
+    predicate WF(c: Constants) {
+      && c.WF()
+      && LeaderHost.GroupWF(c.leaderConstants, leaders, c.f)
+      && AcceptorHost.GroupWF(c.acceptorConstants, acceptors)
+      && LearnerHost.GroupWF(c.learnerConstants, learners, c.f)
+    }
+  }
+
+  predicate Init(c: Constants, v: Variables)
+  {
+    && v.WF(c)
+    && LeaderHost.GroupInit(c.leaderConstants, v.leaders, c.f)
+    && AcceptorHost.GroupInit(c.acceptorConstants, v.acceptors)
+    && LearnerHost.GroupInit(c.learnerConstants, v.learners, c.f)
+
+    && Network.Init(v.network)
+  }
+  
+  datatype Step = 
+    LeaderStep(actor: nat, msgOps: MessageOps)
+    | AcceptorStep(actor: nat, msgOps: MessageOps)
+    | LearnerStep(actor: nat, msgOps: MessageOps)
+
+  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
+  {
+    match step 
+      case LeaderStep(actor, msgOps) => NextLeaderStep(c, v, v', actor, msgOps)
+      case AcceptorStep(actor, msgOps) => NextAcceptorStep(c, v, v', actor, msgOps)
+      case LearnerStep(actor, msgOps) => NextLearnerStep(c, v, v', actor, msgOps)
+  }
+
+  predicate NextLeaderStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
+    && v.WF(c)
+    && v'.WF(c)
+    && c.ValidLeaderIdx(actor)
+    && LeaderHost.Next(c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor], msgOps)
+    // all other hosts UNCHANGED
+    && (forall other| c.ValidLeaderIdx(other) && other != actor :: v'.leaders[other] == v.leaders[other])
+    && v'.acceptors == v.acceptors
+    && v'.learners == v.learners
+  }
+
+  predicate NextAcceptorStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
+    && v.WF(c)
+    && v'.WF(c)
+    && c.ValidAcceptorIdx(actor)
+    && AcceptorHost.Next(c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor], msgOps)
+    // all other hosts UNCHANGED
+    && v'.leaders == v.leaders
+    && (forall other| c.ValidAcceptorIdx(other) && other != actor :: v'.acceptors[other] == v.acceptors[other])
+    && v'.learners == v.learners
+  }
+
+  predicate NextLearnerStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
+    && v.WF(c)
+    && v'.WF(c)
+    && c.ValidLearnerIdx(actor)
+    && LearnerHost.Next(c.learnerConstants[actor], v.learners[actor], v'.learners[actor], msgOps)
+    // all other hosts UNCHANGED
+    && v'.leaders == v.leaders
+    && v'.acceptors == v.acceptors
+    && (forall other| c.ValidLearnerIdx(other) && other != actor :: v'.learners[other] == v.learners[other])
+  }
+
+  predicate Next(c: Constants, v: Variables, v': Variables)
+  {
+    exists step :: NextStep(c, v, v', step)
+  }
+}  // end module DistributedSystem

@@ -1,0 +1,9 @@
+#!/bin/sh
+
+dafny="/usr/local/lib/dafny/dafny /timeLimit:20 /compile:0 /allowGlobals /vcsCores:4 /noNLarith"
+
+files="../lib/UtilitiesLibrary.dfy types.dfy hosts.dfy distributedSystem.dfy"
+
+echo "Verifying $files"
+
+time $dafny $files

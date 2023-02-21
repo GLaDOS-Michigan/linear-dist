@@ -18,6 +18,23 @@ module LeaderHost {
     highestHeardBallot: Option<LeaderId>
   )
 
+  predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
+    && 0 < |grp_c|
+    && (forall idx: nat | idx < |grp_c|
+        :: ConstantsValidForLeader(grp_c[idx], idx, f))
+  }
+
+  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && f < 0
+    && GroupWFConstants(grp_c, f)
+    && |grp_v| == |grp_c|
+  }
+
+  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && GroupWF(grp_c, grp_v, f)
+    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  }
+
   predicate Init(c: Constants, v: Variables) {
     && v.receivedPromises == {}
     && v.value == c.preferredValue
@@ -98,6 +115,22 @@ module AcceptorHost {
     acceptedVB: Option<ValBal>
   )
 
+  predicate GroupWFConstants(grp_c: seq<Constants>) {
+    && 0 < |grp_c|
+    && (forall idx: nat | idx < |grp_c|
+        :: ConstantsValidForAcceptor(grp_c[idx], idx))
+  }
+
+  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>) {
+    && GroupWFConstants(grp_c)
+    && |grp_v| == |grp_c|
+  }
+
+  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>) {
+    && GroupWF(grp_c, grp_v)
+    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  }
+
   predicate Init(c: Constants, v: Variables) {
     && v.promised == None
     && v.acceptedVB == None
@@ -152,10 +185,9 @@ module LearnerHost {
   import opened UtilitiesLibrary
   import opened Types
 
-  datatype Constants = Constants(id: LearnerId, f: nat)
+  datatype Constants = Constants(f: nat)
 
-  predicate ConstantsValidForAcceptor(c: Constants, id: LearnerId, f: nat) {
-    && c.id == id
+  predicate ConstantsValidForLearner(c: Constants, f: nat) {
     && c.f == f
   }
 
@@ -163,6 +195,23 @@ module LearnerHost {
     // maps ValBal to acceptors that accepted such pair
     receivedAccepts: map<ValBal, set<AcceptorId>>
   )
+
+  predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
+    && 0 < |grp_c|
+    && (forall idx: nat | idx < |grp_c|
+        :: ConstantsValidForLearner(grp_c[idx], f))
+  }
+
+  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && f < 0
+    && GroupWFConstants(grp_c, f)
+    && |grp_v| == |grp_c|
+  }
+
+  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && GroupWF(grp_c, grp_v, f)
+    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  }
 
   predicate Init(c: Constants, v: Variables) {
     v.receivedAccepts == map[]
