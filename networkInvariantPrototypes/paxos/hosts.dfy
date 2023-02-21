@@ -117,17 +117,19 @@ module AcceptorHost {
     && msgOps.recv.Some?
     && match msgOps.recv.value
       case Prepare(bal) => 
-        if v.promised.None? || (v.promised.Some? && v.promised.value < bal) then
+        var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+        if doPromise then
           && v' == v.(promised := Some(bal))
           && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
         else
           NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
       case Propose(bal, val) =>
-        if v.promised.None? || (v.promised.Some? && v.promised.value < bal) then
+        var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+        if doAccept then
           && v' == v.(
                 promised := Some(bal), 
                 acceptedVB := Some(VB(val, bal)))
-          && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB))
+          && msgOps.send == Some(Accept(VB(val, bal), c.id))
         else
           NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
       case _ =>
@@ -144,3 +146,72 @@ module AcceptorHost {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
 }  // end module AcceptorHost
+
+
+module LearnerHost {
+  import opened UtilitiesLibrary
+  import opened Types
+
+  datatype Constants = Constants(id: LearnerId, f: nat)
+
+  predicate ConstantsValidForAcceptor(c: Constants, id: LearnerId, f: nat) {
+    && c.id == id
+    && c.f == f
+  }
+
+  datatype Variables = Variables(
+    // maps ValBal to acceptors that accepted such pair
+    receivedAccepts: map<ValBal, set<AcceptorId>>
+  )
+
+  predicate Init(c: Constants, v: Variables) {
+    v.receivedAccepts == map[]
+  }
+
+  datatype Step =
+    ReceiveStep() | LearnStep(vb: ValBal) | StutterStep()
+
+  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  {
+    match step
+      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case LearnStep(vb) => NextLearnStep(c, v, v', msgOps, vb)
+      case StutterStep => NextStutterStep(c, v, v', msgOps)
+  }
+
+  function updateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
+    vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>) 
+  {
+    if vb in receivedAccepts then 
+      receivedAccepts[vb := receivedAccepts[vb] + {acc}]
+    else 
+      receivedAccepts[vb := {acc}]
+    }
+
+  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && match msgOps.recv.value
+      case Accept(vb, acc) => 
+        v' == v.(receivedAccepts := updateReceivedAccepts(v.receivedAccepts, vb, acc))
+      case _ =>
+        NextStutterStep(c, v, v', msgOps)
+  }
+
+  predicate NextLearnStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, vb: ValBal) {
+    && msgOps.recv.None?
+    && vb in v.receivedAccepts  // enabling
+    && |v.receivedAccepts[vb]| >= c.f + 1  // enabling
+    && msgOps.send == Some(Learn(vb.v))
+  }
+
+  predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && v == v'
+    && msgOps.send == None
+  }
+
+  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  {
+    exists step :: NextStep(c, v, v', step, msgOps)
+  }
+}  // end module LearnerHost
