@@ -25,7 +25,7 @@ module LeaderHost {
   }
 
   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-    && f < 0
+    && 0 < f
     && GroupWFConstants(grp_c, f)
     && |grp_v| == |grp_c|
   }
@@ -203,7 +203,7 @@ module LearnerHost {
   }
 
   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-    && f < 0
+    && 0 < f
     && GroupWFConstants(grp_c, f)
     && |grp_v| == |grp_c|
   }

@@ -5,7 +5,7 @@ module Obligations {
   import opened DistributedSystem
 
   // All Learn messages must be of the same value
-  predicate Safety(c: Constants, v: Variables) 
+  predicate Agreement(c: Constants, v: Variables) 
     requires c.WF()
     requires v.WF(c)
   {
@@ -17,4 +17,7 @@ module Obligations {
   :: 
     m1.val == m2.val
   }
+
+  // Note that I am skipping Validity proof: All learned values are ones that were
+  // proposed by a leader
 }

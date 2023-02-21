@@ -101,8 +101,6 @@ module DistributedSystem {
   }
 
   predicate NextLeaderStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
-    && v.WF(c)
-    && v'.WF(c)
     && c.ValidLeaderIdx(actor)
     && LeaderHost.Next(c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor], msgOps)
     // all other hosts UNCHANGED
@@ -112,8 +110,6 @@ module DistributedSystem {
   }
 
   predicate NextAcceptorStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
-    && v.WF(c)
-    && v'.WF(c)
     && c.ValidAcceptorIdx(actor)
     && AcceptorHost.Next(c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor], msgOps)
     // all other hosts UNCHANGED
@@ -123,8 +119,6 @@ module DistributedSystem {
   }
 
   predicate NextLearnerStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
-    && v.WF(c)
-    && v'.WF(c)
     && c.ValidLearnerIdx(actor)
     && LearnerHost.Next(c.learnerConstants[actor], v.learners[actor], v'.learners[actor], msgOps)
     // all other hosts UNCHANGED
@@ -135,6 +129,8 @@ module DistributedSystem {
 
   predicate Next(c: Constants, v: Variables, v': Variables)
   {
-    exists step :: NextStep(c, v, v', step)
+    && v.WF(c)
+    && v'.WF(c)
+    && exists step :: NextStep(c, v, v', step)
   }
 }  // end module DistributedSystem
