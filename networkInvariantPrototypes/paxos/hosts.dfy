@@ -256,7 +256,7 @@ module LearnerHost {
     && msgOps.recv.None?
     && vb in v.receivedAccepts  // enabling
     && |v.receivedAccepts[vb]| >= c.f + 1  // enabling
-    && msgOps.send == Some(Learn(c.id, vb.v))
+    && msgOps.send == Some(Learn(c.id, vb.b, vb.v))
     && v' == v  // local state unchanged
   }
 

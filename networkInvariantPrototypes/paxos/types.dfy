@@ -13,7 +13,7 @@ module Types {
                   | Promise(bal:LeaderId, acc:AcceptorId, vbOpt:Option<ValBal>)  //valbal is the value-ballot pair with which the value was accepted
                   | Propose(bal:LeaderId, val:Value)
                   | Accept(vb:ValBal, acc:AcceptorId)
-                  | Learn(val:Value)
+                  | Learn(lnr:LearnerId, bal:LeaderId, val:Value)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 }
