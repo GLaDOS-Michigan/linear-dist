@@ -40,6 +40,7 @@ module DistributedSystem {
     predicate UniqueIds() {
       && UniqueLeaderIds()
       && UniqueAcceptorIds()
+      && UniqueLearnerIds()
     }
 
     predicate ValidLeaderIdx(id: int) {
@@ -60,6 +61,10 @@ module DistributedSystem {
 
     predicate UniqueAcceptorIds() {
       forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptorConstants[i].id == acceptorConstants[j].id :: i == j
+    }
+
+    predicate UniqueLearnerIds() {
+      forall i, j | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learnerConstants[i].id == learnerConstants[j].id :: i == j
     }
   }
 
@@ -93,6 +98,7 @@ module DistributedSystem {
     | LearnerStep(actor: nat, msgOps: MessageOps)
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
+    requires v.WF(c) && v'.WF(c)
   {
     && Network.Next(v.network, v'.network, step.msgOps)
     && match step 
@@ -101,7 +107,9 @@ module DistributedSystem {
       case LearnerStep(actor, msgOps) => NextLearnerStep(c, v, v', actor, msgOps)
   }
 
-  predicate NextLeaderStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
+  predicate NextLeaderStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
+    requires v.WF(c) && v'.WF(c)
+  {
     && c.ValidLeaderIdx(actor)
     && LeaderHost.Next(c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor], msgOps)
     // all other hosts UNCHANGED
@@ -110,7 +118,9 @@ module DistributedSystem {
     && v'.learners == v.learners
   }
 
-  predicate NextAcceptorStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
+  predicate NextAcceptorStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
+    requires v.WF(c) && v'.WF(c)
+  {
     && c.ValidAcceptorIdx(actor)
     && AcceptorHost.Next(c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor], msgOps)
     // all other hosts UNCHANGED
@@ -119,7 +129,9 @@ module DistributedSystem {
     && v'.learners == v.learners
   }
 
-  predicate NextLearnerStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) {
+  predicate NextLearnerStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
+    requires v.WF(c) && v'.WF(c)
+  {
     && c.ValidLearnerIdx(actor)
     && LearnerHost.Next(c.learnerConstants[actor], v.learners[actor], v'.learners[actor], msgOps)
     // all other hosts UNCHANGED
