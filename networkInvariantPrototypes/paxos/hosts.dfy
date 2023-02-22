@@ -149,22 +149,22 @@ module AcceptorHost {
   predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && match msgOps.recv.value
-      case Prepare(bal) => 
-        var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
-        if doPromise then
-          && v' == v.(promised := Some(bal))
-          && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
-        else
-          NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
-      case Propose(bal, val) =>
-        var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
-        if doAccept then
-          && v' == v.(
-                promised := Some(bal), 
-                acceptedVB := Some(VB(val, bal)))
-          && msgOps.send == Some(Accept(VB(val, bal), c.id))
-        else
-          NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
+        case Prepare(bal) => 
+          var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+          if doPromise then
+            && v' == v.(promised := Some(bal))
+            && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
+          else
+            NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
+        case Propose(bal, val) =>
+          var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+          if doAccept then
+            && v' == v.(
+                  promised := Some(bal), 
+                  acceptedVB := Some(VB(val, bal)))
+            && msgOps.send == Some(Accept(VB(val, bal), c.id))
+          else
+            NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
       case _ =>
         NextStutterStep(c, v, v', msgOps)
   }

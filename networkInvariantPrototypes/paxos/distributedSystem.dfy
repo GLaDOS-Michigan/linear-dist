@@ -94,7 +94,8 @@ module DistributedSystem {
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   {
-    match step 
+    && Network.Next(v.network, v'.network, step.msgOps)
+    && match step 
       case LeaderStep(actor, msgOps) => NextLeaderStep(c, v, v', actor, msgOps)
       case AcceptorStep(actor, msgOps) => NextAcceptorStep(c, v, v', actor, msgOps)
       case LearnerStep(actor, msgOps) => NextLearnerStep(c, v, v', actor, msgOps)
