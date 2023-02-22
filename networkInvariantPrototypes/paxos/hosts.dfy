@@ -1,6 +1,10 @@
 include "types.dfy"
 
 
+/***************************************************************************************
+*                                      Leader Host                                     *
+***************************************************************************************/
+
 module LeaderHost {
   import opened UtilitiesLibrary
   import opened Types
@@ -102,6 +106,10 @@ module LeaderHost {
 }  // end module LeaderHost
 
 
+/***************************************************************************************
+*                                     Acceptor Host                                    *
+***************************************************************************************/
+
 module AcceptorHost {
   import opened UtilitiesLibrary
   import opened Types
@@ -185,6 +193,10 @@ module AcceptorHost {
 }  // end module AcceptorHost
 
 
+/***************************************************************************************
+*                                     Learner Host                                     *
+***************************************************************************************/
+
 module LearnerHost {
   import opened UtilitiesLibrary
   import opened Types
@@ -234,13 +246,16 @@ module LearnerHost {
   }
 
   function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
-    vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>) 
+    vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>)
+    ensures vb in receivedAccepts ==> vb in out
+    ensures vb in receivedAccepts ==> |receivedAccepts[vb]| <= |out[vb]|
   {
     if vb in receivedAccepts then 
+      UnionIncreasesCardinality(receivedAccepts[vb], {acc});
       receivedAccepts[vb := receivedAccepts[vb] + {acc}]
     else 
       receivedAccepts[vb := {acc}]
-    }
+  }
 
   predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
