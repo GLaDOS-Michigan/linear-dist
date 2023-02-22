@@ -189,9 +189,10 @@ module LearnerHost {
   import opened UtilitiesLibrary
   import opened Types
 
-  datatype Constants = Constants(f: nat)
+  datatype Constants = Constants(id: LearnerId, f: nat)
 
-  predicate ConstantsValidForLearner(c: Constants, f: nat) {
+  predicate ConstantsValidForLearner(c: Constants, id: LearnerId, f: nat) {
+    && c.id == id
     && c.f == f
   }
 
@@ -203,7 +204,7 @@ module LearnerHost {
   predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
     && 0 < |grp_c|
     && (forall idx: nat | idx < |grp_c|
-        :: ConstantsValidForLearner(grp_c[idx], f))
+        :: ConstantsValidForLearner(grp_c[idx], idx, f))
   }
 
   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
@@ -232,7 +233,7 @@ module LearnerHost {
       case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
-  function updateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
+  function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
     vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>) 
   {
     if vb in receivedAccepts then 
@@ -246,7 +247,7 @@ module LearnerHost {
     && msgOps.send.None?
     && match msgOps.recv.value
       case Accept(vb, acc) => 
-        v' == v.(receivedAccepts := updateReceivedAccepts(v.receivedAccepts, vb, acc))
+        v' == Variables(UpdateReceivedAccepts(v.receivedAccepts, vb, acc))
       case _ =>
         NextStutterStep(c, v, v', msgOps)
   }
@@ -255,7 +256,8 @@ module LearnerHost {
     && msgOps.recv.None?
     && vb in v.receivedAccepts  // enabling
     && |v.receivedAccepts[vb]| >= c.f + 1  // enabling
-    && msgOps.send == Some(Learn(vb.v))
+    && msgOps.send == Some(Learn(c.id, vb.v))
+    && v' == v  // local state unchanged
   }
 
   predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
