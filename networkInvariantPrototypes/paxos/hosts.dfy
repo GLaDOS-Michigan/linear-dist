@@ -84,6 +84,8 @@ module LeaderHost {
   predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && |v.receivedPromises| >= c.f+1  // enabling condition
+    // Tony: This is a target for monotonic transformation -- it would allow me to say that
+    // Propose messages are from some value once held by the leader
     && msgOps.send == Some(Propose(c.id, v.value))
     && v' == v
   }
@@ -162,6 +164,8 @@ module AcceptorHost {
             && v' == v.(
                   promised := Some(bal), 
                   acceptedVB := Some(VB(val, bal)))
+            // Tony: This is a target for monotonic transformation -- it would allow me to say that
+            // Accept messages are from some acceptedVB once held by the acceptor
             && msgOps.send == Some(Accept(VB(val, bal), c.id))
           else
             NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots

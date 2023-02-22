@@ -6,7 +6,7 @@ module Types {
   type LeaderId = nat
   type AcceptorId = nat
   type LearnerId = nat
-  type Value
+  type Value(!new)
   datatype ValBal = VB(v:Value, b:LeaderId)
 
   datatype Message = Prepare(bal:LeaderId)
