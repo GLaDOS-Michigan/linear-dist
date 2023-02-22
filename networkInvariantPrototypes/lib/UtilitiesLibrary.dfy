@@ -1,4 +1,6 @@
 module UtilitiesLibrary {
+  datatype Option<T> = Some(value:T) | None
+
   function max(x: int, y: int) : (res: int) 
     ensures res == x || res == y
     ensures res >= x && res >= y
@@ -30,6 +32,26 @@ module UtilitiesLibrary {
     requires idx < mod
   {
     if idx == 0 then mod-1 else idx-1
+  }
+  
+  lemma SetComprehensionSize(n: nat) 
+    ensures |(set x | 0 <= x < n)| == n
+    decreases n
+  {
+    var s := (set x | 0 <= x < n);
+    if n == 0 {
+      assert |s| == 0;
+    } else {
+      SetComprehensionSize(n-1);
+      assert s == (set x | 0 <= x < n-1) + {n-1};  // trigger
+    }
+  }
+
+  lemma UnionIncreasesCardinality<T>(s1: set<T>, s2: set<T>) 
+    ensures |s1 + s2| >= |s1|
+    ensures |s1 + s2| >= |s2|
+  {
+    assume false;  // TODO
   }
 
   function UnionSeqOfSets<T>(theSets: seq<set<T>>) : set<T>
@@ -85,21 +107,6 @@ module UtilitiesLibrary {
     e :| e in S1 && e in S2;
   }
 
-  lemma SetComprehensionSize(n: nat) 
-    ensures |(set x | 0 <= x < n)| == n
-    decreases n
-  {
-    var s := (set x | 0 <= x < n);
-    if n == 0 {
-      assert |s| == 0;
-    } else {
-      SetComprehensionSize(n-1);
-      assert s == (set x | 0 <= x < n-1) + {n-1};  // trigger
-    }
-  }
-
-  datatype Option<T> = Some(value:T) | None
-
   function {:opaque} MapRemoveOne<K,V>(m:map<K,V>, key:K) : (m':map<K,V>)
     ensures forall k :: k in m && k != key ==> k in m'
     ensures forall k :: k in m' ==> k in m && k != key
@@ -111,62 +118,4 @@ module UtilitiesLibrary {
     assert m'.Keys == m.Keys - {key};
     m'
   }
-
-  ////////////// Library code for exercises 12 and 14 /////////////////////
-
-  // This is tagged union, a "sum" datatype.
-  datatype Direction = North() | East() | South() | West()
-
-  function TurnRight(direction:Direction) : Direction
-  {
-    // This function introduces two new bis of syntax.
-    // First, the if-else expression: if <bool> then T else T
-    // Second, the element.Ctor? built-in predicate, which tests whether
-    // the datatype `element` was built by `Ctor`.
-    if direction.North?
-      then East
-    else if direction.East?
-      then South
-    else if direction.South?
-      then West
-    else  // By elimination, West!
-      North
-  }
-
-  lemma Rotation()
-  {
-    assert TurnRight(North) == East;
-  }
-
-  function TurnLeft(direction:Direction) : Direction
-  {
-    // Another nice way to take apart a datatype element is with match-case
-    // construct. Each case argument is a constructor; each body must be of the
-    // same type, which is the type of the entire `match` expression.
-    match direction {
-      case North => West
-      case West => South
-      case South => East  // Try changing "East" to 7.
-      case East => North
-    }
-  }
-
-  ////////////// Library code for exercises 13 and 14 /////////////////////
-
-  // This whole product-sum idea gets clearer when we use both powers
-  // (struct/product, union/sum) at the same time.
-
-  datatype Meat = Salami | Ham
-  datatype Cheese = Provolone | Swiss | Cheddar | Jack
-  datatype Veggie = Olive | Onion | Pepper
-  datatype Order =
-      Sandwich(meat:Meat, cheese:Cheese)
-    | Pizza(meat:Meat, veggie:Veggie)
-    | Appetizer(cheese:Cheese)
-
-  // There are 2 Meats, 4 Cheeses, and 3 Veggies.
-  // Thus there are 8 Sandwiches, 6 Pizzas, and 4 Appetizers.
-  // Thus there are 8+6+4 = 18 Orders.
-  // This is why they're called "algebraic" datatypes.
-
 }
