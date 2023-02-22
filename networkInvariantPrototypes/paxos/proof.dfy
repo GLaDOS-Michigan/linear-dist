@@ -22,7 +22,7 @@ module PaxosProof {
       case Promise(_, acc, _) => c.ValidAcceptorIdx(acc)
       case Propose(bal, _) => c.ValidLeaderIdx(bal)
       case Accept(_, acc) => c.ValidAcceptorIdx(acc)
-      case Learn(_) => true
+      case Learn(lnr, _, _) => c.ValidLearnerIdx(lnr)
   }
 
   // certified self-inductive
@@ -65,6 +65,35 @@ module PaxosProof {
     :: 
       Propose(bal, val) in v.network.sentMsgs
   }
+  
+  // certified self-inductive
+  // Learner updates its receivedAccepts map based on a Accept message carrying that 
+  // accepted ValBal pair
+  predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall idx, vb, acc | 
+      && c.ValidLearnerIdx(idx)
+      && vb in v.learners[idx].receivedAccepts
+      && acc in v.learners[idx].receivedAccepts[vb]
+    ::
+      Accept(vb, acc) in v.network.sentMsgs
+  }
+
+  // certified self-inductive, modulo ValidMessageSrc(c, v)
+  // For every Learn(lnr, val) message in the network, the learner must have a quorum of
+  // accepts for that val, at some common ballot
+  predicate LearnMsgsValid(c: Constants, v: Variables)
+    requires v.WF(c)
+    requires ValidMessageSrc(c, v)
+  {
+    forall lnr:LearnerId, bal, val | 
+      Learn(lnr, bal, val) in v.network.sentMsgs
+    :: 
+      && var vb := VB(val, bal);
+      && vb in v.learners[lnr].receivedAccepts
+      && |v.learners[lnr].receivedAccepts[vb]| >= c.f+1
+  }
 
   predicate MessageInv(c: Constants, v: Variables) 
   {
@@ -73,6 +102,8 @@ module PaxosProof {
     && LeaderValidHighestHeard(c, v)
     && AcceptorValidPromised(c, v)
     && AcceptorValidAcceptedVB(c, v)
+    && LearnerValidReceivedAccepts(c, v)
+    && LearnMsgsValid(c, v)
   }
 
   lemma InitImpliesMessageInv(c: Constants, v: Variables)
@@ -84,9 +115,7 @@ module PaxosProof {
     requires MessageInv(c, v)
     requires Next(c, v, v')
     ensures MessageInv(c, v')
-  {
-    // assert false;
-  }
+  {}
 
 
   /***************************************************************************************
