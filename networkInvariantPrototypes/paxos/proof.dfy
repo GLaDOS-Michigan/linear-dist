@@ -95,6 +95,7 @@ module PaxosProof {
       && |v.learners[lnr].receivedAccepts[vb]| >= c.f+1
   }
 
+  // Message bundle
   predicate MessageInv(c: Constants, v: Variables) 
   {
     && v.WF(c)
@@ -127,8 +128,20 @@ module PaxosProof {
   2. chosen implies that is the only thing that can be chosen in all ballots.
   */
 
-  // Util
-  // A quorum of Accept messages of the same vb
+  // Inv: An acceptor's promised ballot is at least as large as its accepted ballot, if any.
+  predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall acc | 
+      && c.ValidAcceptorIdx(acc)
+      && v.acceptors[acc].acceptedVB.Some?
+    ::
+      && v.acceptors[acc].promised.Some?
+      && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
+  }
+
+
+  // Util: A quorum of Accept messages of the same vb
   // Tony: Using monotonic transformations, I can push this to an acceptor host property,
   // rather than a network property.
   predicate Chosen(c: Constants, v: Variables, vb: ValBal) {
@@ -146,11 +159,76 @@ module PaxosProof {
     :: vb1.v == vb2.v
   }
 
+  // Inv: If vb is chosen, then for all acceptors that have acceptedVB.b >= vb.b, they have
+  // acceptedVB.v == vb.v
+  predicate ChosenValImpliesLargerAcceptedVBHoldsVal(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall vb, acc | 
+      && Chosen(c, v, vb) 
+      && c.ValidAcceptorIdx(acc)
+      && v.acceptors[acc].acceptedVB.Some?
+      && v.acceptors[acc].acceptedVB.value.b >= vb.b
+    ::
+      v.acceptors[acc].acceptedVB.value.v == vb.v
+  }
 
+  // Inv: If vb is chosen, then for all leaders that have highestHeard >= vb.b, they must have 
+  // value == vb.v
+  predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall vb, ldr | 
+      && Chosen(c, v, vb) 
+      && c.ValidLeaderIdx(ldr)
+      && v.leaders[ldr].highestHeardBallot.Some?
+      && v.leaders[ldr].highestHeardBallot.value >= vb.b
+    ::
+      v.leaders[ldr].value == vb.v
+  }
+
+  // Inv: If vb is chosen, then for all Propose messages that have bal >= vb.b, they must have 
+  // value == vb.v
+  // Tony: Using monotonic transformations, by recording the entire history of leader 
+  // (value, highestHeardBallot) pairs, this becomes implicit from ChosenValImpliesLeaderOnlyHearsVal,
+  // rather than a network property as an application invariant.
+  predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) {
+    forall vb, propose | 
+      && Chosen(c, v, vb)
+      && propose in v.network.sentMsgs
+      && propose.Propose?
+      && propose.bal >= vb.b
+    ::
+      propose.val == vb.v
+  }
+
+  // Inv: If vb is chosen, then for all Promise messages that reflect a prior accepted (bal, val)
+  // such that bal >= b, they must have val == vb.v
+  // Tony: Using monotonic transformations, by recording the entire history of accepted 
+  // pairs at each acceptor, this can be written as a property on acceptor local states,
+  // and the corresponding constraint on Promise message becomes a trivial message invariant. 
+  predicate ChosenImpliesPromiseVBOnlyVal(c: Constants, v: Variables)
+  {
+    forall vb, promise | 
+      && Chosen(c, v, vb)
+      && promise in v.network.sentMsgs
+      && promise.Promise?
+      && promise.vbOpt.Some?
+      && promise.vbOpt.value.b >= vb.b
+    ::
+      promise.vbOpt.value.v == vb.v
+  }
+
+  // Application bundle
   predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
+    && AcceptorPromisedLargerThanAccepted(c, v)
     && AtMostOneChosenVal(c, v)
+    && ChosenValImpliesLargerAcceptedVBHoldsVal(c, v)
+    && ChosenValImpliesLeaderOnlyHearsVal(c, v)
+    && ChosenValImpliesProposeOnlyVal(c, v)
+    && ChosenImpliesPromiseVBOnlyVal(c, v)
   }
 
   predicate Inv(c: Constants, v: Variables)
@@ -183,9 +261,9 @@ module PaxosProof {
     ensures Inv(c, v')
   {
     MessageInvInductive(c, v, v');
+    // assume false;
 
-
-    assume AtMostOneChosenVal(c, v');
+    // assume AtMostOneChosenVal(c, v');
     AtMostOneChosenImpliesAgreement(c, v');
     assert Agreement(c, v');
   }

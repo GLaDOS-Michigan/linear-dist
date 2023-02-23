@@ -88,6 +88,10 @@ module LeaderHost {
   predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && |v.receivedPromises| >= c.f+1  // enabling condition
+    // TODO(Tony): it is possible to add an enabling condition saying that my hightest heard 
+    // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
+    // It is equivalent to being preempted
+    
     // Tony: This is a target for monotonic transformation -- it would allow me to say that
     // Propose messages are from some value once held by the leader
     && msgOps.send == Some(Propose(c.id, v.value))
