@@ -171,7 +171,7 @@ module AcceptorHost {
           else
             NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
         case Propose(bal, val) =>
-          var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+          var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
           if doAccept then
             && v' == v.(
                   promised := Some(bal), 
