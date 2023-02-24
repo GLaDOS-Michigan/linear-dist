@@ -129,16 +129,16 @@ module PaxosProof {
   */
 
   // Inv: An acceptor's promised ballot is at least as large as its accepted ballot, if any.
-  predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
-    requires v.WF(c)
-  {
-    forall acc | 
-      && c.ValidAcceptorIdx(acc)
-      && v.acceptors[acc].acceptedVB.Some?
-    ::
-      && v.acceptors[acc].promised.Some?
-      && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
-  }
+  // predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
+  //   requires v.WF(c)
+  // {
+  //   forall acc | 
+  //     && c.ValidAcceptorIdx(acc)
+  //     && v.acceptors[acc].acceptedVB.Some?
+  //   ::
+  //     && v.acceptors[acc].promised.Some?
+  //     && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
+  // }
 
 
   // Util: A quorum of Accept messages of the same vb
@@ -161,7 +161,7 @@ module PaxosProof {
 
   // Inv: If vb is chosen, then for all acceptors that have acceptedVB.b >= vb.b, they have
   // acceptedVB.v == vb.v
-  predicate ChosenValImpliesLargerAcceptedVBHoldsVal(c: Constants, v: Variables) 
+  predicate ChosenValImpliesLargerAcceptorsHoldsVal(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     forall vb, acc | 
@@ -171,6 +171,20 @@ module PaxosProof {
       && v.acceptors[acc].acceptedVB.value.b >= vb.b
     ::
       v.acceptors[acc].acceptedVB.value.v == vb.v
+  }
+
+  // Inv: If vb is chosen, then for all Accept messages that have msg.vb.b >= vb.b, they have
+  // msg.vb.v == vb.v
+  predicate ChosenValImpliesLargerAcceptMsgsHoldsVal(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall vb, msg | 
+      && Chosen(c, v, vb) 
+      && msg in v.network.sentMsgs
+      && msg.Accept?
+      && msg.vb.b >= vb.b
+    ::
+      msg.vb.v == vb.v
   }
 
   // Inv: If vb is chosen, then for all leaders that have highestHeard >= vb.b, they must have 
@@ -207,7 +221,7 @@ module PaxosProof {
   // Tony: Using monotonic transformations, by recording the entire history of accepted 
   // pairs at each acceptor, this can be written as a property on acceptor local states,
   // and the corresponding constraint on Promise message becomes a trivial message invariant. 
-  predicate ChosenImpliesPromiseVBOnlyVal(c: Constants, v: Variables)
+  predicate ChosenValImpliesPromiseVBOnlyVal(c: Constants, v: Variables)
   {
     forall vb, promise | 
       && Chosen(c, v, vb)
@@ -223,12 +237,13 @@ module PaxosProof {
   predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && AcceptorPromisedLargerThanAccepted(c, v)
-    && AtMostOneChosenVal(c, v)
-    && ChosenValImpliesLargerAcceptedVBHoldsVal(c, v)
+    // && AcceptorPromisedLargerThanAccepted(c, v)
+    && ChosenValImpliesLargerAcceptorsHoldsVal(c, v)
+    && ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v)
     && ChosenValImpliesLeaderOnlyHearsVal(c, v)
     && ChosenValImpliesProposeOnlyVal(c, v)
-    && ChosenImpliesPromiseVBOnlyVal(c, v)
+    && ChosenValImpliesPromiseVBOnlyVal(c, v)
+    && AtMostOneChosenVal(c, v)
   }
 
   predicate Inv(c: Constants, v: Variables)
@@ -261,11 +276,15 @@ module PaxosProof {
     ensures Inv(c, v')
   {
     MessageInvInductive(c, v, v');
-    // assume false;
 
-    // assume AtMostOneChosenVal(c, v');
+    // assume AcceptorPromisedLargerThanAccepted(c, v');
+    assert ChosenValImpliesLargerAcceptorsHoldsVal(c, v');
+    assert ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
+    assert ChosenValImpliesLeaderOnlyHearsVal(c, v');
+    assert ChosenValImpliesProposeOnlyVal(c, v');
+    assert ChosenValImpliesPromiseVBOnlyVal(c, v');
+    AtMostOneChosenValNext(c, v, v');
     AtMostOneChosenImpliesAgreement(c, v');
-    assert Agreement(c, v');
   }
 
   // Lemma: For any Learn message, that learned value must have been chosen
@@ -307,6 +326,15 @@ module PaxosProof {
       assert false;
     }
   }
+
+  // Lemma: Invariant AtMostOneChosenVal is inductive
+  lemma AtMostOneChosenValNext(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    requires ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v')
+    ensures AtMostOneChosenVal(c, v')
+  {}
 
   
 
