@@ -111,7 +111,7 @@ tokenized_state_machine!{ Net
                 msg_inv(self.valid_msg.index(i), self.user_ghosts.index(i))
         )
     }
-}}
+}
 
 // Message type that the wrapper library uses
 //
@@ -153,8 +153,8 @@ struct UserReceiver {
 
 impl UserSender {
     fn wf(&self) -> bool {
-        self.token@.value == seq as int,
-        self.token@.instance == instance
+        &&& self.token@.value == seq as int
+        &&& self.token@.instance == instance
     }
 
     fn do_send(&mut self, m: Msg, #[proof] mg: MsgGhost)
@@ -181,8 +181,8 @@ impl UserSender {
 
 impl UserReceiver {
     fn wf(&self) -> bool {
-        self.token@.value == seq as int,
-        self.token@.instance == instance
+        &&& self.token@.value == seq as int
+        &&& self.token@.instance == instance
     }
 
     fn do_recv(&mut self) -> (pair: (Msg, Tracked<MsgGhost>))
