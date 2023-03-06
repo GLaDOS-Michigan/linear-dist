@@ -233,15 +233,30 @@ module PaxosProof {
       promise.vbOpt.value.v == vb.v
   }
 
+  // Inv: If vb is chosen, and the leader has a quorum of receivedPromises, then its 
+  // highestHeardBallot must be >= vb.b. This ensures that they can only propose vb.v
+  predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall vb, ldr | 
+      && Chosen(c, v, vb) 
+      && c.ValidLeaderIdx(ldr)
+      && |v.leaders[ldr].receivedPromises| >= c.f+1
+    ::
+      && v.leaders[ldr].highestHeardBallot.Some?
+      && v.leaders[ldr].highestHeardBallot.value >= vb.b
+  }
+
   // Application bundle
   predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
     // && AcceptorPromisedLargerThanAccepted(c, v)
+    && ChosenValImpliesPromiseQuorumSeesBal(c, v)
+    && ChosenValImpliesProposeOnlyVal(c, v)
     && ChosenValImpliesLargerAcceptorsHoldsVal(c, v)
     && ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v)
     && ChosenValImpliesLeaderOnlyHearsVal(c, v)
-    && ChosenValImpliesProposeOnlyVal(c, v)
     && ChosenValImpliesPromiseVBOnlyVal(c, v)
     && AtMostOneChosenVal(c, v)
   }
@@ -278,10 +293,11 @@ module PaxosProof {
     MessageInvInductive(c, v, v');
 
     // assume AcceptorPromisedLargerThanAccepted(c, v');
+    assume ChosenValImpliesPromiseQuorumSeesBal(c, v');
+    assert ChosenValImpliesProposeOnlyVal(c, v');
     assert ChosenValImpliesLargerAcceptorsHoldsVal(c, v');
     assert ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
     assert ChosenValImpliesLeaderOnlyHearsVal(c, v');
-    assert ChosenValImpliesProposeOnlyVal(c, v');
     assert ChosenValImpliesPromiseVBOnlyVal(c, v');
     AtMostOneChosenValNext(c, v, v');
     AtMostOneChosenImpliesAgreement(c, v');
