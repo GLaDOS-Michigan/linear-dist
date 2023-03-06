@@ -285,7 +285,7 @@ module PaxosProof {
     InitImpliesMessageInv(c, v);
   }
 
-  lemma InvInductive(c: Constants, v: Variables, v': Variables)
+  lemma {:timeLimitMultiplier 2} InvInductive(c: Constants, v: Variables, v': Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures Inv(c, v')
@@ -294,6 +294,10 @@ module PaxosProof {
 
     // assume AcceptorPromisedLargerThanAccepted(c, v');
     assume ChosenValImpliesPromiseQuorumSeesBal(c, v');
+
+
+
+    InvImpliesChosenValImpliesProposeOnlyVal(c, v, v');
     assert ChosenValImpliesProposeOnlyVal(c, v');
     assert ChosenValImpliesLargerAcceptorsHoldsVal(c, v');
     assert ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
@@ -301,6 +305,52 @@ module PaxosProof {
     assert ChosenValImpliesPromiseVBOnlyVal(c, v');
     AtMostOneChosenValNext(c, v, v');
     AtMostOneChosenImpliesAgreement(c, v');
+  }
+
+  lemma InvImpliesChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    ensures ChosenValImpliesProposeOnlyVal(c, v')
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.LeaderStep? {
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      assert LeaderHost.NextStep(lc, l, l', step, msgOps);
+      assert ChosenValImpliesProposeOnlyVal(c, v');
+    } else if dsStep.AcceptorStep? {
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
+      var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+      if step.ReceiveStep? {
+        if msgOps.recv.value.Propose? {
+          var bal := msgOps.recv.value.bal;
+          var doAccept := a.promised.None? || (a.promised.Some? && a.promised.value <= bal);
+          if doAccept {
+            forall msg | msg in v'.network.sentMsgs && msg.Propose?
+            ensures msg in v.network.sentMsgs {}
+           
+            // TODO: This part is failing because this is a point where something can 
+            // suddenly be chosen
+            /* Proof by contradiction. Suppose vb is newly chosen in this step, and vb' 
+            * was proposed in the pre state, such that vb'.b > vb.b and vb'.v != vb.v. 
+            * Then there is a quorum of acceptors that promised vb'.b. 
+            * There are two cases
+            * 1. vb' acceptor quorum has seen vb accepted. Because vb.v != vb'.v, it must
+            * have saw some vb'' such that vb < vb'' <= vb'. Then we keep recursing down
+            * until we get a contradiction??? I.e. by the finite ballots lemma.
+            * 2. vb' acceptor quorum has not seen vb accepted. Then the current acceptor
+            *    must have aready promised b', but accepted v in this step. Contradiction.
+            */
+            assume false;
+
+            assert ChosenValImpliesProposeOnlyVal(c, v');
+          }
+        }
+      }
+    }
   }
 
   // Lemma: For any Learn message, that learned value must have been chosen
