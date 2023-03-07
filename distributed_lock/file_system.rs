@@ -74,7 +74,9 @@ transition! {
 }
 
 pub fn global_main(parties: usize) {
-    let resource = FileSystem::data;
+    // TRUSTED
+    let instance = // make instance
+    let resource = FileSystem::data; // for instance
     let channels = // set up pair-wise channels
     spawn(move || {
         let node = DistributedLockNode {
@@ -85,10 +87,15 @@ pub fn global_main(parties: usize) {
     });
     for i in 1..parties {
         spawn(|| {
-            let node = DistributedLockNode {
-                channels: ...,
-                id: ghost(i),
+            
+            let node = DistributedLockNode::instance::initialize; // hopefully untrusted
+
+            let file_system_client = FileSystemClient {
+                lock: node,
+                instance: // same as resource's instance
             };
+            // FileSystemClient has an invariant that attaches the resource id
+            // to the node instance
             node_main(node, None);
         });
     }

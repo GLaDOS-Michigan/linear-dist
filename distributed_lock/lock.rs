@@ -33,7 +33,10 @@ struct NodeChannel {
 // establishes that there is only one resource
 // parties, and their pair-wise channels
 pub fn global_main(parties: usize) {
-    let resource = Resource::new();
+    // TRUSTED
+    let resource = Resource::new(); // requires false?
+
+    //
     let channels = // set up pair-wise channels
     spawn(move || {
         let node = DistributedLockNode {
