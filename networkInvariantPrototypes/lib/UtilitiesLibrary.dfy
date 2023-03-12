@@ -33,6 +33,21 @@ module UtilitiesLibrary {
   {
     if idx == 0 then mod-1 else idx-1
   }
+
+  predicate StrictOrdering(s: seq<nat>) {
+    forall i , j | 
+      && 0 <= i < |s| 
+      && 0 <= j < |s| 
+      && i < j
+    :: s[i] < s[j]
+  }
+
+  predicate SeqIsComplete(s: seq<nat>, x: nat, y: nat) {
+    && 2 <= |s|
+    && s[0] == x
+    && s[|s|-1] == y
+    && (forall n | x <= n <= y :: n in s)
+  }
   
   lemma SetComprehensionSize(n: nat) 
     ensures |(set x | 0 <= x < n)| == n

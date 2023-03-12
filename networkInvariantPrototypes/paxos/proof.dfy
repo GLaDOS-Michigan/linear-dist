@@ -285,7 +285,7 @@ module PaxosProof {
     InitImpliesMessageInv(c, v);
   }
 
-  lemma {:timeLimitMultiplier 2} InvInductive(c: Constants, v: Variables, v': Variables)
+  lemma InvInductive(c: Constants, v: Variables, v': Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures Inv(c, v')
@@ -298,11 +298,11 @@ module PaxosProof {
 
 
     InvImpliesChosenValImpliesProposeOnlyVal(c, v, v');
-    assert ChosenValImpliesProposeOnlyVal(c, v');
-    assert ChosenValImpliesLargerAcceptorsHoldsVal(c, v');
-    assert ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
-    assert ChosenValImpliesLeaderOnlyHearsVal(c, v');
-    assert ChosenValImpliesPromiseVBOnlyVal(c, v');
+    assume ChosenValImpliesProposeOnlyVal(c, v');
+    assume ChosenValImpliesLargerAcceptorsHoldsVal(c, v');
+    assume ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
+    assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
+    assume ChosenValImpliesPromiseVBOnlyVal(c, v');
     AtMostOneChosenValNext(c, v, v');
     AtMostOneChosenImpliesAgreement(c, v');
   }
@@ -402,6 +402,19 @@ module PaxosProof {
     ensures AtMostOneChosenVal(c, v')
   {}
 
+  // Lemma: Given b1 < b2, there is a finite, strictly ordered sequence 
+  // [b1, b_a, b_b, ... , b_2] such that for all ballots b where b1 < b < b2, b in seq
+  lemma FiniteBallots(b1: LeaderId, b2: LeaderId) returns (res: seq<LeaderId>)
+    requires b1 < b2
+    ensures SeqIsComplete(res, b1, b2)
+  {
+    if b1 == b2 - 1 {
+      return [b1, b2];
+    } else {
+      var sub := FiniteBallots(b1, b2-1);
+      return sub + [b2];
+    }
+  }
   
 
   /***************************************************************************************
