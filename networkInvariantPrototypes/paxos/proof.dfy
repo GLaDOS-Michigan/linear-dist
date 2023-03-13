@@ -40,6 +40,18 @@ module PaxosProof {
   }
 
   // certified self-inductive
+  // Leader updates receivedPromises based on Promise messages
+  predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    forall idx, src | c.ValidLeaderIdx(idx) && src in v.leaders[idx].receivedPromises
+    :: (exists prom: Message ::
+          && prom.Promise? && prom in v.network.sentMsgs 
+          && prom.bal == idx
+      )
+  } 
+
+  // certified self-inductive
   // Acceptor updates its promised ballot based on a Prepare/Propose message carrying 
   // that ballot
   predicate AcceptorValidPromised(c: Constants, v: Variables)
@@ -101,6 +113,7 @@ module PaxosProof {
     && v.WF(c)
     && ValidMessageSrc(c, v)
     && LeaderValidHighestHeard(c, v)
+    && LeaderValidReceivedPromises(c, v)
     && AcceptorValidPromised(c, v)
     && AcceptorValidAcceptedVB(c, v)
     && LearnerValidReceivedAccepts(c, v)
@@ -157,6 +170,15 @@ module PaxosProof {
   predicate AtMostOneChosenVal(c: Constants, v: Variables) {
     forall vb1, vb2 | Chosen(c, v, vb1) && Chosen(c, v, vb2) 
     :: vb1.v == vb2.v
+  }
+
+  // Tony: Using monotonic transformations, this should say that every propose message is
+  // backed by 
+  predicate ProposeBackedByPromiseQuorum(c: Constants, v: Variables) {
+    forall bal, val | Propose(bal, val) in v.network.sentMsgs
+    ::
+      true
+      // exists 
   }
 
   // Inv: If vb is chosen, then for all acceptors that have acceptedVB.b >= vb.b, they have
@@ -307,6 +329,58 @@ module PaxosProof {
     AtMostOneChosenImpliesAgreement(c, v');
   }
 
+  lemma InvImpliesChosenValImpliesProposeOnlyValAcceptorRecvStep(
+    c: Constants, v: Variables, v': Variables, dsStep: Step, step: AcceptorHost.Step)
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    requires NextStep(c, v, v', dsStep)
+    requires dsStep.AcceptorStep?
+    requires AcceptorHost.NextStep(
+              c.acceptorConstants[dsStep.actor], 
+              v.acceptors[dsStep.actor], v'.acceptors[dsStep.actor],
+              step, dsStep.msgOps)
+    requires step.ReceiveStep?
+    requires dsStep.msgOps.recv.value.Propose?
+    ensures ChosenValImpliesProposeOnlyVal(c, v')
+  {
+    var ac, a, a' := c.acceptorConstants[dsStep.actor], v.acceptors[dsStep.actor], v'.acceptors[dsStep.actor];
+    var propVal, propBal := dsStep.msgOps.recv.value.val, dsStep.msgOps.recv.value.bal;
+    var doAccept := a.promised.None? || (a.promised.Some? && a.promised.value <= propBal);
+    if doAccept {
+      /* This is a point where something can suddenly be chosen.
+      * Proof by contradiction. Suppose vb is newly chosen in this step, and there 
+      * is a Propose message p in the pre state such that p.bal 
+      * >= vb.b and p.val != vb.v. 
+      * There are two cases:
+      * 1. p's promise quorum has seen vb accepted. Because vb.v != p.val, it must
+      * have saw some vb' such that vb.b < vb'.b < p.b. Then we keep recursing down
+      * until we get a contradiction??? I.e. by the finite ballots lemma.
+      * 2. p's promise quorum has not seen vb accepted. Then the current acceptor
+      *    must have aready promised b', but accepted v in this step. Contradiction.
+      */
+      var vb := VB(propVal, propBal);
+      if Chosen(c, v', vb) && !Chosen(c, v, vb) {
+        if !ChosenValImpliesProposeOnlyVal(c, v') {
+          var p :|
+            && p in v'.network.sentMsgs
+            && p.Propose?
+            && p.bal >= vb.b
+            && p.val != vb.v;
+          assert p in v.network.sentMsgs;
+
+          assume false;
+          
+
+
+          assert false;
+        }
+        assert ChosenValImpliesProposeOnlyVal(c, v');
+      }
+    }
+  }
+
+
   lemma InvImpliesChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
     requires Inv(c, v)
     requires Next(c, v, v')
@@ -315,40 +389,18 @@ module PaxosProof {
   {
     var dsStep :| NextStep(c, v, v', dsStep);
     if dsStep.LeaderStep? {
+      /* This case is trivial. This is because if something has already been chosen, then
+      * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
+      * Otherwise, the post-condition is vacuously true */
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
       var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-      assert LeaderHost.NextStep(lc, l, l', step, msgOps);
-      assert ChosenValImpliesProposeOnlyVal(c, v');
     } else if dsStep.AcceptorStep? {
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
       var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-      if step.ReceiveStep? {
-        if msgOps.recv.value.Propose? {
-          var bal := msgOps.recv.value.bal;
-          var doAccept := a.promised.None? || (a.promised.Some? && a.promised.value <= bal);
-          if doAccept {
-            forall msg | msg in v'.network.sentMsgs && msg.Propose?
-            ensures msg in v.network.sentMsgs {}
-           
-            // TODO: This part is failing because this is a point where something can 
-            // suddenly be chosen
-            /* Proof by contradiction. Suppose vb is newly chosen in this step, and vb' 
-            * was proposed in the pre state, such that vb'.b > vb.b and vb'.v != vb.v. 
-            * Then there is a quorum of acceptors that promised vb'.b. 
-            * There are two cases
-            * 1. vb' acceptor quorum has seen vb accepted. Because vb.v != vb'.v, it must
-            * have saw some vb'' such that vb < vb'' <= vb'. Then we keep recursing down
-            * until we get a contradiction??? I.e. by the finite ballots lemma.
-            * 2. vb' acceptor quorum has not seen vb accepted. Then the current acceptor
-            *    must have aready promised b', but accepted v in this step. Contradiction.
-            */
-            assume false;
-
-            assert ChosenValImpliesProposeOnlyVal(c, v');
-          }
-        }
+      if step.ReceiveStep? && msgOps.recv.value.Propose? {
+        InvImpliesChosenValImpliesProposeOnlyValAcceptorRecvStep(c, v, v', dsStep, step);
       }
     }
   }
@@ -436,5 +488,68 @@ module PaxosProof {
       return subq + {Accept(vb, acc)};
     }
   }
+
+  predicate IsPromiseQuorum(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId) {
+    && |quorum| >= c.f+1
+    && (forall m | m in quorum ::
+          && m.Promise?
+          && m in v.network.sentMsgs
+          && m.bal == bal
+    )
+  }
+
+  predicate PromiseQuorumSupportsVal(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId, val: Value) {
+    && IsPromiseQuorum(c, v, quorum, bal)
+    && (
+      || PromiseQuorumEmptyVBOpt(c, v, quorum, bal)
+      || PromiseQuorumHighestVBOptVal(c, v, quorum, bal, val)
+    )
+  }
+
+  predicate PromiseQuorumEmptyVBOpt(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId)
+    requires IsPromiseQuorum(c, v, quorum, bal)
+  {
+    forall m | m in quorum :: m.vbOpt == None
+  }
+
+  predicate PromiseQuorumHighestVBOptVal(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId, val: Value)
+    requires IsPromiseQuorum(c, v, quorum, bal)
+    requires !PromiseQuorumEmptyVBOpt(c, v, quorum, bal)
+  {
+    exists m ::
+      && m in quorum 
+      && m.vbOpt.Some?
+      && m.vbOpt.value.v == val
+      && (forall other | 
+            && other in quorum 
+            && other.vbOpt.Some?
+          ::
+            other.vbOpt.value.b <= m.vbOpt.value.b
+        )
+  }
+
+  // predicate OnlyOneBallotChosen(c: Constants, v: Variables, vb: ValBal) {
+  //   && Chosen(c, v, vb)
+  //   && forall vb' | Chosen(c, v, vb') :: vb' == vb
+  // }
+
+  // lemma NotChosenValImpliesProposeOnlyValImpliesBadProposal(c: Constants, v: Variables, vb: ValBal) 
+  // returns (p: Message)
+  //   requires v.WF(c)
+  //   requires Chosen(c, v, vb)
+  //   requires !ChosenValImpliesProposeOnlyVal(c, v)
+  //   requires OnlyOneBallotChosen(c, v, vb)
+  //   ensures p in v.network.sentMsgs
+  //   ensures p.Propose?
+  //   ensures p.bal >= vb.b
+  //   ensures p.val != vb.v
+  // {
+  //   p :|
+  //     && p in v.network.sentMsgs
+  //     && p.Propose?
+  //     && p.bal >= vb.b
+  //     && p.val != vb.v;
+  //   return p;
+  // }
 }  // end module PaxosProof
 
