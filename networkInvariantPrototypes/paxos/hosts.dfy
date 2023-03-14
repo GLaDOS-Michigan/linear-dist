@@ -68,16 +68,17 @@ module LeaderHost {
     && msgOps.send.None?
     && match msgOps.recv.value
       case Promise(bal, acc, vbOpt) => 
-        if bal == c.id then
-          var doUpdate := 
-            && vbOpt.Some? 
-            && (|| v.highestHeardBallot.None?
-                || (v.highestHeardBallot.Some? && vbOpt.value.b > v.highestHeardBallot.value));
-          v' == v.(
-            receivedPromises := v.receivedPromises + {acc},
-            value :=  if doUpdate then vbOpt.value.v else v.value,
-            highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
-          )
+        && acc !in v.receivedPromises
+        && if bal == c.id then
+            var doUpdate := 
+              && vbOpt.Some? 
+              && (|| v.highestHeardBallot.None?
+                  || (v.highestHeardBallot.Some? && vbOpt.value.b > v.highestHeardBallot.value));
+            v' == v.(
+              receivedPromises := v.receivedPromises + {acc},
+              value :=  if doUpdate then vbOpt.value.v else v.value,
+              highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
+            )
         else 
           // this promise is not for me
           NextStutterStep(c, v, v', msgOps)

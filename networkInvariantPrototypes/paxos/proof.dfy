@@ -182,6 +182,17 @@ module PaxosProof {
     :: vb1.v == vb2.v
   }
 
+  predicate OneValuePerProposeBallot(c: Constants, v: Variables)
+  {
+    forall p1, p2 | 
+      && p1 in v.network.sentMsgs
+      && p2 in v.network.sentMsgs
+      && p1.Propose? && p2.Propose?
+      && p1.bal == p2.bal
+    ::
+      p1.val == p2.val
+  }
+
   // Tony: If receivedPromises remembers whole messages rather than the source, this 
   // need not mention the network (monotonic transformation)
   // Every leader's HighestHeard is backed by a set of Promise messages.
@@ -205,17 +216,17 @@ module PaxosProof {
     && IsPromiseSet(c, v, pset, cldr.id)
     && (hbal.Some? ==> PromiseSetHighestVBOptVal(c, v, pset, cldr.id, hbal.value, ldr.value))
     && (hbal.None? ==> PromiseSetEmptyVBOpt(c, v, pset, cldr.id))
+    && |pset| == |ldr.receivedPromises|
     && (forall p: Message | p in pset :: p.acc in ldr.receivedPromises)
   }
 
-  // Tony: Using monotonic transformations, this should say that every propose message is
-  // backed by 
-  // predicate ProposeBackedByPromiseQuorum(c: Constants, v: Variables) {
-  //   forall bal, val | Propose(bal, val) in v.network.sentMsgs
-  //   ::
-  //     true
-  //     // exists 
-  // }
+  // Tony: If receivedPromises remembers whole messages rather than the source, this 
+  // need not mention the network (monotonic transformation)
+  // Every Propose message is backed by a quorum of Promise messages
+  predicate ProposeBackedByPromiseQuorum(c: Constants, v: Variables) {
+    forall p | p in v.network.sentMsgs && p.Propose?
+    :: (exists quorum :: PromiseQuorumSupportsVal(c, v, quorum, p.bal, p.val))
+  }
 
   // Inv: If vb is chosen, then for all acceptors that have acceptedVB.b >= vb.b, they have
   // acceptedVB.v == vb.v
@@ -310,7 +321,9 @@ module PaxosProof {
     requires v.WF(c)
   {
     // && AcceptorPromisedLargerThanAccepted(c, v)
+    && OneValuePerProposeBallot(c, v)
     && HighestHeardBackedByReceivedPromises(c, v)
+    && ProposeBackedByPromiseQuorum(c, v)
     && ChosenValImpliesProposeOnlyVal(c, v)
     && ChosenValImpliesPromiseQuorumSeesBal(c, v)
     && ChosenValImpliesLeaderOnlyHearsVal(c, v)
@@ -352,7 +365,11 @@ module PaxosProof {
     MessageInvInductive(c, v, v');
 
     // assume AcceptorPromisedLargerThanAccepted(c, v');
+    assume OneValuePerProposeBallot(c, v');
     InvNextHighestHeardBackedByReceivedPromises(c, v, v');
+    InvNextProposeBackedByPromiseQuorum(c, v, v');
+
+
     InvNextChosenValImpliesProposeOnlyVal(c, v, v');
     assume ChosenValImpliesPromiseQuorumSeesBal(c, v');
     assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
@@ -361,6 +378,52 @@ module PaxosProof {
     // assume ChosenValImpliesPromiseVBOnlyVal(c, v');
     AtMostOneChosenValNext(c, v, v');
     AtMostOneChosenImpliesAgreement(c, v');
+  }
+  
+  lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    ensures ProposeBackedByPromiseQuorum(c, v')
+  {
+    forall p | p in v'.network.sentMsgs && p.Propose?
+    ensures exists quorum :: PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val)
+    {
+      var dsStep :| NextStep(c, v, v', dsStep);
+      if dsStep.LeaderStep? {
+        var actor, msgOps := dsStep.actor, dsStep.msgOps;
+        var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+        if step.ProposeStep? && p !in v.network.sentMsgs {
+          var quorum :| LeaderPromiseSetProperties(c, v, actor, quorum);  // witness
+          if l.highestHeardBallot.Some? {
+            assert PromiseSetHighestVBOptVal(c, v', quorum, actor, l.highestHeardBallot.value, l.value);  // trigger
+          }
+          assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
+        } else {
+          InvNextProposeBackedByPromiseQuorumNoNewPropose(c, v, v', p);
+        }
+      } else {
+        InvNextProposeBackedByPromiseQuorumNoNewPropose(c, v, v', p);
+      }
+    }
+  }
+
+  lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables, v': Variables, p: Message) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    requires p in v.network.sentMsgs
+    requires p in v'.network.sentMsgs
+    requires p.Propose?
+    ensures exists quorum :: PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val)
+  {
+    var quorum :| PromiseQuorumSupportsVal(c, v, quorum, p.bal, p.val);  // witness
+    if !PromiseSetEmptyVBOpt(c, v, quorum, p.bal) {
+      var hsbal :| PromiseSetHighestVBOptVal(c, v, quorum, p.bal, hsbal, p.val);  // witness
+      assert PromiseSetHighestVBOptVal(c, v', quorum, p.bal, hsbal, p.val);  // trigger
+    }
+    assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
   }
 
   lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
@@ -422,7 +485,7 @@ module PaxosProof {
       * is a Propose message p in the pre state such that p.bal 
       * >= vb.b and p.val != vb.v. 
       * There are two cases:
-      * 1. p's promise quorum has seen vb accepted. Because vb.v != p.val, it must
+      * 1. p's promise quorum has seen vb accepted. Because vb.v != p.val, it must (need promised implies proposed here)
       * have saw some vb' such that vb.b < vb'.b < p.b. Then we keep recursing down
       * until we get a contradiction??? I.e. by the finite ballots lemma.
       * 2. p's promise quorum has not seen vb accepted. Then the current acceptor
@@ -437,6 +500,9 @@ module PaxosProof {
             && p.bal >= vb.b
             && p.val != vb.v;
           assert p in v.network.sentMsgs;
+          assert p.bal > vb.b;
+
+
 
           assume false;
           
@@ -565,22 +631,18 @@ module PaxosProof {
       && m.bal == bal
   }
 
-  // predicate IsPromiseQuorum(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId) {
-  //   && |quorum| >= c.f+1
-  //   && (forall m | m in quorum ::
-  //         && m.Promise?
-  //         && m in v.network.sentMsgs
-  //         && m.bal == bal
-  //   )
-  // }
+  predicate IsPromiseQuorum(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId) {
+    && |quorum| >= c.f+1
+    && IsPromiseSet(c, v, quorum, bal)
+  }
 
-  // predicate PromiseQuorumSupportsVal(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId, val: Value) {
-  //   && IsPromiseQuorum(c, v, quorum, bal)
-  //   && (
-  //     || PromiseQuorumEmptyVBOpt(c, v, quorum, bal)
-  //     || PromiseQuorumHighestVBOptVal(c, v, quorum, bal, val)
-  //   )
-  // }
+  predicate PromiseQuorumSupportsVal(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId, val: Value) {
+    && IsPromiseQuorum(c, v, quorum, bal)
+    && (
+      || PromiseSetEmptyVBOpt(c, v, quorum, bal)
+      || (exists hsbal :: PromiseSetHighestVBOptVal(c, v, quorum, bal, hsbal, val))
+    )
+  }
 
   predicate PromiseSetEmptyVBOpt(c: Constants, v: Variables, pset: set<Message>, qbal: LeaderId)
     requires IsPromiseSet(c, v, pset, qbal)
@@ -603,29 +665,5 @@ module PaxosProof {
             other.vbOpt.value.b <= hsBal
         )
   }
-
-  // predicate OnlyOneBallotChosen(c: Constants, v: Variables, vb: ValBal) {
-  //   && Chosen(c, v, vb)
-  //   && forall vb' | Chosen(c, v, vb') :: vb' == vb
-  // }
-
-  // lemma NotChosenValImpliesProposeOnlyValImpliesBadProposal(c: Constants, v: Variables, vb: ValBal) 
-  // returns (p: Message)
-  //   requires v.WF(c)
-  //   requires Chosen(c, v, vb)
-  //   requires !ChosenValImpliesProposeOnlyVal(c, v)
-  //   requires OnlyOneBallotChosen(c, v, vb)
-  //   ensures p in v.network.sentMsgs
-  //   ensures p.Propose?
-  //   ensures p.bal >= vb.b
-  //   ensures p.val != vb.v
-  // {
-  //   p :|
-  //     && p in v.network.sentMsgs
-  //     && p.Propose?
-  //     && p.bal >= vb.b
-  //     && p.val != vb.v;
-  //   return p;
-  // }
 }  // end module PaxosProof
 
