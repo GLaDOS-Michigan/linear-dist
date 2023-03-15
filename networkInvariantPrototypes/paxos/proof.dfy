@@ -193,6 +193,42 @@ module PaxosProof {
       p1.val == p2.val
   }
 
+  // For every Accept(vb, src) in the network, the source acceptor must have accepted 
+  // some ballot >= vb.b. This is not a message invariant because it depends on the fact
+  // that at every acceptor, accepted bal <= promised bal. I.e. once I accept a ballot, 
+  // I cannot accept a smaller ballot
+  // Tony: This can be broken down via monotonic transformation. The Accept message says 
+  // that leader state had the specific bal at some point in time, and this is a message
+  // invariant. Another application invariant then says that this accepted seq is monotone
+  // increasing. 
+  predicate AcceptMessagesValid(c: Constants, v: Variables)
+    requires v.WF(c)
+    requires ValidMessageSrc(c, v)
+  {
+    forall acc | acc in v.network.sentMsgs && acc.Accept?
+    ::  && v.acceptors[acc.acc].acceptedVB.Some?
+        && acc.vb.b <= v.acceptors[acc.acc].acceptedVB.value.b
+  }
+
+  // For every acceptor that accepted some vb, every promise p with p.bal >= vb.b must
+  // carry a non-None vbOpt. This is not a message invariant because it depends on the fact
+  // that at every acceptor, accepted bal <= promised bal. I.e. once I accept a ballot, 
+  // I cannot accept a smaller ballot
+  // Tony: This can be broken down via monotonic transformation
+  predicate AcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall idx, prom | 
+      && c.ValidAcceptorIdx(idx) 
+      && v.acceptors[idx].acceptedVB.Some?
+      && prom in v.network.sentMsgs
+      && prom.Promise?
+      && prom.acc == c.acceptorConstants[idx].id
+      && v.acceptors[idx].acceptedVB.value.b <= prom.bal
+    :: 
+      prom.vbOpt.Some?
+  }
+
   // Tony: If receivedPromises remembers whole messages rather than the source, this 
   // need not mention the network (monotonic transformation)
   // Every leader's HighestHeard is backed by a set of Promise messages.
@@ -319,9 +355,12 @@ module PaxosProof {
   // Application bundle
   predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
+    requires MessageInv(c, v)
   {
     // && AcceptorPromisedLargerThanAccepted(c, v)
     && OneValuePerProposeBallot(c, v)
+    && AcceptMessagesValid(c, v)
+    && AcceptedImpliesLargerPromiseCarriesVb(c, v)
     && HighestHeardBackedByReceivedPromises(c, v)
     && ProposeBackedByPromiseQuorum(c, v)
     && ChosenValImpliesProposeOnlyVal(c, v)
@@ -366,6 +405,8 @@ module PaxosProof {
 
     // assume AcceptorPromisedLargerThanAccepted(c, v');
     assume OneValuePerProposeBallot(c, v');
+    assume AcceptMessagesValid(c, v');
+    assume AcceptedImpliesLargerPromiseCarriesVb(c, v');
     InvNextHighestHeardBackedByReceivedPromises(c, v, v');
     InvNextProposeBackedByPromiseQuorum(c, v, v');
 
@@ -474,23 +515,17 @@ module PaxosProof {
               step, dsStep.msgOps)
     requires step.ReceiveStep?
     requires dsStep.msgOps.recv.value.Propose?
+    requires AcceptMessagesValid(c, v')
+    requires ProposeBackedByPromiseQuorum(c, v')
+    requires OneValuePerProposeBallot(c, v')
     ensures ChosenValImpliesProposeOnlyVal(c, v')
   {
+    // TODO: This body can be merged into caller body.
     var ac, a, a' := c.acceptorConstants[dsStep.actor], v.acceptors[dsStep.actor], v'.acceptors[dsStep.actor];
     var propVal, propBal := dsStep.msgOps.recv.value.val, dsStep.msgOps.recv.value.bal;
     var doAccept := a.promised.None? || (a.promised.Some? && a.promised.value <= propBal);
     if doAccept {
-      /* This is a point where something can suddenly be chosen.
-      * Proof by contradiction. Suppose vb is newly chosen in this step, and there 
-      * is a Propose message p in the pre state such that p.bal 
-      * >= vb.b and p.val != vb.v. 
-      * There are two cases:
-      * 1. p's promise quorum has seen vb accepted. Because vb.v != p.val, it must (need promised implies proposed here)
-      * have saw some vb' such that vb.b < vb'.b < p.b. Then we keep recursing down
-      * until we get a contradiction??? I.e. by the finite ballots lemma.
-      * 2. p's promise quorum has not seen vb accepted. Then the current acceptor
-      *    must have aready promised b', but accepted v in this step. Contradiction.
-      */
+      /* This is a point where something can suddenly be chosen.*/
       var vb := VB(propVal, propBal);
       if Chosen(c, v', vb) && !Chosen(c, v, vb) {
         if !ChosenValImpliesProposeOnlyVal(c, v') {
@@ -499,19 +534,47 @@ module PaxosProof {
             && p.Propose?
             && p.bal >= vb.b
             && p.val != vb.v;
-          assert p in v.network.sentMsgs;
           assert p.bal > vb.b;
-
-
-
-          assume false;
-          
-
-
+          ChosenAndConflictingProposeImpliesFalse(c, v', vb, p);
           assert false;
         }
         assert ChosenValImpliesProposeOnlyVal(c, v');
       }
+    }
+  }
+
+  lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosenVb: ValBal, p: Message) 
+    requires MessageInv(c, v)
+    requires AcceptMessagesValid(c, v)
+    requires ProposeBackedByPromiseQuorum(c, v)
+    requires p.Propose?
+    requires p in v.network.sentMsgs
+    requires p.bal > chosenVb.b
+    requires p.val != chosenVb.v
+    requires Chosen(c, v, chosenVb)
+    ensures false
+  {
+    var pquorum :| PromiseQuorumSupportsVal(c, v, pquorum, p.bal, p.val); // promise quorum supporting p
+    /* Proof by contradiction. There are two cases */
+    if PromiseSetEmptyVBOpt(c, v, pquorum, p.bal) {
+      /* Case 1: p's promise quorum has not seen vb accepted. Then there is some acc source
+      *  in both the promise quorum, and the chosen Accept quorum. Hence, this acc accepted
+      *  >= chosenVb.b, by AcceptMessagesValid. However, it also sent a promise >= chosenVb.b 
+      * that carried no prior vbOpt value. This contradicts AcceptedImpliesLargerPromiseCarriesVb */
+
+      // new invariant: accept message implies acceptor accepted >= m.bal
+      // new invariant: accepted implies larger ballots promise carries some vbOpt.
+
+      assume false;
+      assert false;
+    } else {
+      /* Proof by contradiction. There are two cases:
+      * 2. p's promise quorum has seen vb accepted. Because vb.v != p.val, it must (need promised implies proposed here)
+      *    have saw some vb' such that vb.b < vb'.b < p.b. Then we keep recursing down
+      *    until we get a contradiction??? I.e. by the finite ballots lemma.
+      */
+      assume false;
+      assert false;
     }
   }
 
@@ -520,6 +583,9 @@ module PaxosProof {
     requires Inv(c, v)
     requires Next(c, v, v')
     requires MessageInv(c, v')
+    requires AcceptMessagesValid(c, v')
+    requires ProposeBackedByPromiseQuorum(c, v')
+    requires OneValuePerProposeBallot(c, v')
     ensures ChosenValImpliesProposeOnlyVal(c, v')
   {
     var dsStep :| NextStep(c, v, v', dsStep);
