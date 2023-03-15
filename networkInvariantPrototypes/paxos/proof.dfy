@@ -264,6 +264,18 @@ module PaxosProof {
     :: (exists quorum :: PromiseQuorumSupportsVal(c, v, quorum, p.bal, p.val))
   }
 
+  // If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
+  predicate AcceptorAcceptedBalLessThanPromised(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall idx | 
+      && c.ValidAcceptorIdx(idx) 
+      && v.acceptors[idx].acceptedVB.Some?
+    :: 
+      && v.acceptors[idx].promised.Some?
+      && v.acceptors[idx].acceptedVB.value.b <= v.acceptors[idx].promised.value
+  }
+
   // Inv: If vb is chosen, then for all acceptors that have acceptedVB.b >= vb.b, they have
   // acceptedVB.v == vb.v
   predicate ChosenValImpliesLargerAcceptorsHoldsVal(c: Constants, v: Variables) 
@@ -363,6 +375,7 @@ module PaxosProof {
     && AcceptedImpliesLargerPromiseCarriesVb(c, v)
     && HighestHeardBackedByReceivedPromises(c, v)
     && ProposeBackedByPromiseQuorum(c, v)
+    && AcceptorAcceptedBalLessThanPromised(c, v)
     && ChosenValImpliesProposeOnlyVal(c, v)
     && ChosenValImpliesPromiseQuorumSeesBal(c, v)
     && ChosenValImpliesLeaderOnlyHearsVal(c, v)
@@ -405,13 +418,15 @@ module PaxosProof {
 
     // assume AcceptorPromisedLargerThanAccepted(c, v');
     assume OneValuePerProposeBallot(c, v');
-    assume AcceptMessagesValid(c, v');
-    assume AcceptedImpliesLargerPromiseCarriesVb(c, v');
+    InvNextAcceptMessagesValid(c, v, v');
+    InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');
     InvNextHighestHeardBackedByReceivedPromises(c, v, v');
     InvNextProposeBackedByPromiseQuorum(c, v, v');
 
 
     InvNextChosenValImpliesProposeOnlyVal(c, v, v');
+
+    assume AcceptorAcceptedBalLessThanPromised(c, v');
     assume ChosenValImpliesPromiseQuorumSeesBal(c, v');
     assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
     assume ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
@@ -420,7 +435,59 @@ module PaxosProof {
     AtMostOneChosenValNext(c, v, v');
     AtMostOneChosenImpliesAgreement(c, v');
   }
-  
+
+  lemma InvNextAcceptMessagesValid(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    ensures AcceptMessagesValid(c, v')
+  {}
+
+  lemma InvNextAcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
+  {
+    assume false;
+  }
+
+  lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    ensures HighestHeardBackedByReceivedPromises(c, v')
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.LeaderStep? {
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      forall idx | c.ValidLeaderIdx(idx)
+      ensures exists pset' :: LeaderPromiseSetProperties(c, v', idx, pset')
+      {
+        if && step.ReceiveStep? && actor == idx 
+          && msgOps.recv.value.Promise? && msgOps.recv.value.bal == lc.id 
+        {
+          var pset :| LeaderPromiseSetProperties(c, v, idx, pset);
+          var pset' := pset + {msgOps.recv.value};  // witness
+          assert LeaderPromiseSetProperties(c, v', idx, pset');  // trigger
+        } else {
+          var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
+          assert LeaderPromiseSetProperties(c, v', idx, pset);  // trigger
+        }
+      }
+    } else {
+      forall idx | c.ValidLeaderIdx(idx)
+      ensures exists pset' :: LeaderPromiseSetProperties(c, v', idx, pset')
+      {
+        var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
+        assert LeaderPromiseSetProperties(c, v', idx, pset);  // trigger
+      }
+    }
+  }
+
+
   lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variables) 
     requires Inv(c, v)
     requires Next(c, v, v')
@@ -465,41 +532,6 @@ module PaxosProof {
       assert PromiseSetHighestVBOptVal(c, v', quorum, p.bal, hsbal, p.val);  // trigger
     }
     assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
-  }
-
-  lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
-    requires Inv(c, v)
-    requires Next(c, v, v')
-    requires MessageInv(c, v')
-    ensures HighestHeardBackedByReceivedPromises(c, v')
-  {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    if dsStep.LeaderStep? {
-      var actor, msgOps := dsStep.actor, dsStep.msgOps;
-      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
-      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-      forall idx | c.ValidLeaderIdx(idx)
-      ensures exists pset' :: LeaderPromiseSetProperties(c, v', idx, pset')
-      {
-        if && step.ReceiveStep? && actor == idx 
-          && msgOps.recv.value.Promise? && msgOps.recv.value.bal == lc.id 
-        {
-          var pset :| LeaderPromiseSetProperties(c, v, idx, pset);
-          var pset' := pset + {msgOps.recv.value};  // witness
-          assert LeaderPromiseSetProperties(c, v', idx, pset');  // trigger
-        } else {
-          var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
-          assert LeaderPromiseSetProperties(c, v', idx, pset);  // trigger
-        }
-      }
-    } else {
-      forall idx | c.ValidLeaderIdx(idx)
-      ensures exists pset' :: LeaderPromiseSetProperties(c, v', idx, pset')
-      {
-        var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
-        assert LeaderPromiseSetProperties(c, v', idx, pset);  // trigger
-      }
-    }
   }
 
   lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
