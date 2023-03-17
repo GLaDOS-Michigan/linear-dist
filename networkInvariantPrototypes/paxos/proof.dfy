@@ -146,24 +146,6 @@ module PaxosProof {
   *                                Application Invariants                                *
   ***************************************************************************************/
 
-  /*
-  1. Learn implies chosen.
-  2. chosen implies that is the only thing that can be chosen in all ballots.
-  */
-
-  // Inv: An acceptor's promised ballot is at least as large as its accepted ballot, if any.
-  // predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
-  //   requires v.WF(c)
-  // {
-  //   forall acc | 
-  //     && c.ValidAcceptorIdx(acc)
-  //     && v.acceptors[acc].acceptedVB.Some?
-  //   ::
-  //     && v.acceptors[acc].promised.Some?
-  //     && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
-  // }
-
-
   // Util: A quorum of Accept messages of the same vb
   // Tony: Using monotonic transformations, I can push this to an acceptor host property,
   // rather than a network property.
@@ -265,7 +247,7 @@ module PaxosProof {
   }
 
   // If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
-  predicate AcceptorAcceptedBalLessThanPromised(c: Constants, v: Variables) 
+  predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     forall idx | 
@@ -369,19 +351,18 @@ module PaxosProof {
     requires v.WF(c)
     requires MessageInv(c, v)
   {
-    // && AcceptorPromisedLargerThanAccepted(c, v)
     && OneValuePerProposeBallot(c, v)
     && AcceptMessagesValid(c, v)
     && AcceptedImpliesLargerPromiseCarriesVb(c, v)
     && HighestHeardBackedByReceivedPromises(c, v)
     && ProposeBackedByPromiseQuorum(c, v)
-    && AcceptorAcceptedBalLessThanPromised(c, v)
+    && AcceptorPromisedLargerThanAccepted(c, v)
     && ChosenValImpliesProposeOnlyVal(c, v)
     && ChosenValImpliesPromiseQuorumSeesBal(c, v)
     && ChosenValImpliesLeaderOnlyHearsVal(c, v)
     && ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v)
-    // && ChosenValImpliesLargerAcceptorsHoldsVal(c, v)
-    // && ChosenValImpliesPromiseVBOnlyVal(c, v)
+    // && ChosenValImpliesLargerAcceptorsHoldsVal(c, v)   // not sure if needed
+    // && ChosenValImpliesPromiseVBOnlyVal(c, v)          // not sure if needed
     && AtMostOneChosenVal(c, v)
   }
 
@@ -416,7 +397,6 @@ module PaxosProof {
   {
     MessageInvInductive(c, v, v');
 
-    // assume AcceptorPromisedLargerThanAccepted(c, v');
     assume OneValuePerProposeBallot(c, v');
     InvNextAcceptMessagesValid(c, v, v');
     InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');
@@ -426,12 +406,12 @@ module PaxosProof {
 
     InvNextChosenValImpliesProposeOnlyVal(c, v, v');
 
-    assume AcceptorAcceptedBalLessThanPromised(c, v');
+    assume AcceptorPromisedLargerThanAccepted(c, v');
     assume ChosenValImpliesPromiseQuorumSeesBal(c, v');
     assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
     assume ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
-    // assume ChosenValImpliesLargerAcceptorsHoldsVal(c, v');
-    // assume ChosenValImpliesPromiseVBOnlyVal(c, v');
+    // assume ChosenValImpliesLargerAcceptorsHoldsVal(c, v');  // not sure if needed
+    // assume ChosenValImpliesPromiseVBOnlyVal(c, v');  // not sure if needed
     AtMostOneChosenValNext(c, v, v');
     AtMostOneChosenImpliesAgreement(c, v');
   }
