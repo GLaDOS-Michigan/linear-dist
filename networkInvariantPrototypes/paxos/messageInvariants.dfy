@@ -73,6 +73,25 @@ module PaxosMessageInvariants {
     :: 
       Propose(bal, val) in v.network.sentMsgs
   }
+
+  // TODO: This is self-inductive, but doesn't feel to be in the spirit of message invariants.
+  // It feels like an application invariant, but leaving this here for now. 
+  // I think in the full monotonic protocol, this would become an invariant on the acceptor 
+  //local state.
+  // Every Promise message in the network has a ballot upper-bounded by the promised ballot
+  // of the source acceptor
+  predicate AcceptorPromisedMonotonic(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall idx, prom | 
+      && c.ValidAcceptorIdx(idx) 
+      && prom in v.network.sentMsgs
+      && prom.Promise?
+      && prom.acc == c.acceptorConstants[idx].id
+    ::
+      && v.acceptors[idx].promised.Some?
+      && prom.bal <= v.acceptors[idx].promised.value
+  }
   
   // certified self-inductive
   // Learner updates its receivedAccepts map based on a Accept message carrying that 
@@ -112,6 +131,7 @@ module PaxosMessageInvariants {
     && LeaderValidReceivedPromises(c, v)
     && AcceptorValidPromised(c, v)
     && AcceptorValidAcceptedVB(c, v)
+    && AcceptorPromisedMonotonic(c, v)
     && LearnerValidReceivedAccepts(c, v)
     && LearnMsgsValid(c, v)
   }

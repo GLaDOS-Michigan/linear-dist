@@ -58,10 +58,10 @@ module PaxosProof {
         && acc.vb.b <= v.acceptors[acc.acc].acceptedVB.value.b
   }
 
-  // For every acceptor that accepted some vb, every promise p with p.bal >= vb.b must
-  // carry a non-None vbOpt. This is not a message invariant because it depends on the fact
-  // that at every acceptor, accepted bal <= promised bal. I.e. once I accept a ballot, 
-  // I cannot accept a smaller ballot
+  // For every acceptor that accepted some vb, every Promise p with p.bal > vb.b from that 
+  // acceptor must carry a non-None vbOpt. This is not a message invariant because it depends
+  // on the fact that at every acceptor, accepted bal <= promised bal. I.e. once I accept 
+  // a ballot, I cannot accept a smaller ballot
   // Tony: This can be broken down via monotonic transformation
   predicate AcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables) 
     requires v.WF(c)
@@ -72,7 +72,7 @@ module PaxosProof {
       && prom in v.network.sentMsgs
       && prom.Promise?
       && prom.acc == c.acceptorConstants[idx].id
-      && v.acceptors[idx].acceptedVB.value.b <= prom.bal
+      && v.acceptors[idx].acceptedVB.value.b < prom.bal
     :: 
       prom.vbOpt.Some?
   }
@@ -303,9 +303,7 @@ module PaxosProof {
     requires Next(c, v, v')
     requires MessageInv(c, v')
     ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
-  {
-    assume false;
-  }
+  {}
 
   lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
     requires Inv(c, v)
