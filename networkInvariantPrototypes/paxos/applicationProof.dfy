@@ -314,7 +314,9 @@ module PaxosProof {
       ensures exists pset' :: LeaderPromiseSetProperties(c, v', idx, pset')
       {
         if && step.ReceiveStep? && actor == idx 
-          && msgOps.recv.value.Promise? && msgOps.recv.value.bal == lc.id 
+          && msgOps.recv.value.Promise? 
+          && msgOps.recv.value.acc !in l.receivedPromises
+          && msgOps.recv.value.bal == lc.id 
         {
           var pset :| LeaderPromiseSetProperties(c, v, idx, pset);
           var pset' := pset + {msgOps.recv.value};  // witness
@@ -667,10 +669,18 @@ module PaxosProof {
   }
 
   predicate IsPromiseSet(c: Constants, v: Variables, pset: set<Message>, bal: LeaderId) {
-    forall m | m in pset ::
+    && (forall m | m in pset ::
       && m.Promise?
       && m in v.network.sentMsgs
-      && m.bal == bal
+      && m.bal == bal)
+    && PromiseSetDistinctAccs(c, v, pset)
+  }
+
+  predicate PromiseSetDistinctAccs(c: Constants, v: Variables, pset: set<Message>) 
+    requires forall m | m in pset :: m.Promise?
+  {
+    forall m1, m2 | m1 in pset && m2 in pset && m1.acc == m2.acc
+        :: m1 == m2
   }
 
   predicate IsPromiseQuorum(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId) {
