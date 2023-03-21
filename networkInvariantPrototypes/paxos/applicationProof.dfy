@@ -443,22 +443,23 @@ module PaxosProof {
     requires MessageInv(c, v)
     requires AcceptMessagesValid(c, v)
     requires ProposeBackedByPromiseQuorum(c, v)
+    requires AcceptedImpliesLargerPromiseCarriesVb(c, v)
+    requires Chosen(c, v, chosenVb)
     requires p.Propose?
     requires p in v.network.sentMsgs
     requires p.bal > chosenVb.b
     requires p.val != chosenVb.v
-    requires Chosen(c, v, chosenVb)
     ensures false
   {
-    var pquorum :| PromiseQuorumSupportsVal(c, v, pquorum, p.bal, p.val); // promise quorum supporting p
+    var prQuorum :| PromiseQuorumSupportsVal(c, v, prQuorum, p.bal, p.val); // promise quorum supporting p
     /* Proof by contradiction. There are two cases */
-    if PromiseSetEmptyVBOpt(c, v, pquorum, p.bal) {
+    if PromiseSetEmptyVBOpt(c, v, prQuorum, p.bal) {
       /* Case 1: p's promise quorum has not seen vb accepted. Then there is some acc source
       *  in both the promise quorum, and the chosen Accept quorum. Hence, this acc accepted
-      *  >= chosenVb.b, by AcceptMessagesValid. However, it also sent a promise >= chosenVb.b 
+      *  >= chosenVb.b, by AcceptMessagesValid. However, it also sent a promise > chosenVb.b 
       * that carried no prior vbOpt value. This contradicts AcceptedImpliesLargerPromiseCarriesVb */
-
-      // var aquorum :|
+      var acQuorum :| IsAcceptQuorum(c, v, acQuorum, chosenVb);
+      var acc := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, p.bal, acQuorum, chosenVb);
 
       // new invariant: accept message implies acceptor accepted >= m.bal
       // new invariant: accepted implies larger ballots promise carries some vbOpt.
@@ -612,6 +613,57 @@ module PaxosProof {
       var subq := QuorumFromReceivedAccepts(s-{acc}, vb);
       return subq + {Accept(vb, acc)};
     }
+  }
+
+  lemma AcceptorsFromPromiseSet(c: Constants, v: Variables, prSet: set<Message>, prBal: LeaderId) 
+  returns (accs: set<AcceptorId>)  
+    requires IsPromiseSet(c, v, prSet, prBal)
+    ensures forall a | a in accs 
+      :: (exists pr :: pr in prSet && pr.acc == a)
+    ensures |accs| == |prSet|
+  {
+    if |prSet| == 0 {
+      accs := {};
+    } else {
+      var p :| p in prSet;
+      var accs' := AcceptorsFromPromiseSet(c, v, prSet-{p}, prBal);
+      accs := accs' + {p.acc};
+    }
+  }
+
+  lemma AcceptorsFromAcceptSet(c: Constants, v: Variables, acSet: set<Message>, vb: ValBal)
+  returns (accs: set<AcceptorId>)  
+    requires IsAcceptSet(c, v, acSet, vb)
+    ensures forall a | a in accs 
+      :: (exists ac :: ac in acSet && ac.acc == a)
+    ensures |accs| == |acSet|
+  {
+    if |acSet| == 0 {
+      accs := {};
+    } else {
+      var a :| a in acSet;
+      var accs' := AcceptorsFromAcceptSet(c, v, acSet-{a}, vb);
+      accs := accs' + {a.acc};
+    }
+  }
+
+  lemma IntersectingAcceptorInPromiseAndAcceptQuorum(c: Constants, v: Variables,
+     prQuorum: set<Message>, prBal: LeaderId, acQuorum: set<Message>, vb: ValBal) 
+  returns (accId: AcceptorId)
+    requires IsPromiseQuorum(c, v, prQuorum, prBal)
+    requires IsAcceptQuorum(c, v, acQuorum, vb)
+    ensures exists promise, accept :: 
+      && promise in prQuorum
+      && accept in acQuorum
+      && promise.acc == accId
+      && accept.acc == accId
+  {
+    var prAccs := AcceptorsFromPromiseSet(c, v, prQuorum, prBal);
+    assert |prAccs| >= c.f+1;
+    var acAccs := AcceptorsFromAcceptSet(c, v, acQuorum, vb);
+    assert |acAccs| >= c.f+1;
+    // TODO
+    assume false;
   }
 
   predicate IsPromiseSet(c: Constants, v: Variables, pset: set<Message>, bal: LeaderId) {
