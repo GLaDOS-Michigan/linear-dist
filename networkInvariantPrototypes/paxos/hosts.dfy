@@ -68,6 +68,10 @@ module LeaderHost {
     && msgOps.send.None?
     && match msgOps.recv.value
       case Promise(bal, acc, vbOpt) => 
+        // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
+        // probably simplify proof, preventing the leader from potentially equivocating
+        // on its proposed value after receiving extraneous straggling promises.
+        && |v.receivedPromises| <= c.f
         && acc !in v.receivedPromises
         && if bal == c.id then
             var doUpdate := 
