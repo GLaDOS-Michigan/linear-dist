@@ -16,13 +16,7 @@ module PaxosProof {
   // Tony: Using monotonic transformations, I can push this to an acceptor host property,
   // rather than a network property.
   predicate Chosen(c: Constants, v: Variables, vb: ValBal) {
-    exists quorum: set<Message> :: 
-    && |quorum| >= c.f+1
-    && (forall m | m in quorum ::
-          && m.Accept?
-          && m in v.network.sentMsgs
-          && m.vb == vb
-    )
+    exists quorum: set<Message> :: IsAcceptQuorum(c, v, quorum, vb)
   }
 
   predicate AtMostOneChosenVal(c: Constants, v: Variables) {
@@ -405,25 +399,42 @@ module PaxosProof {
     requires OneValuePerProposeBallot(c, v')
     ensures ChosenValImpliesProposeOnlyVal(c, v')
   {
-    // TODO: This body can be merged into caller body.
-    var ac, a, a' := c.acceptorConstants[dsStep.actor], v.acceptors[dsStep.actor], v'.acceptors[dsStep.actor];
-    var propVal, propBal := dsStep.msgOps.recv.value.val, dsStep.msgOps.recv.value.bal;
-    var doAccept := a.promised.None? || (a.promised.Some? && a.promised.value <= propBal);
-    if doAccept {
-      /* This is a point where something can suddenly be chosen.*/
-      var vb := VB(propVal, propBal);
-      if Chosen(c, v', vb) && !Chosen(c, v, vb) {
-        if !ChosenValImpliesProposeOnlyVal(c, v') {
-          var p :|
+    forall vb, propose | 
+      && Chosen(c, v', vb)
+      && propose in v'.network.sentMsgs
+      && propose.Propose?
+      && propose.bal >= vb.b
+    ensures propose.val == vb.v
+    {
+      if !Chosen(c, v, vb) {
+        /* This is a point where something can suddenly be chosen.*/
+        var ac, a, a' := c.acceptorConstants[dsStep.actor], v.acceptors[dsStep.actor], v'.acceptors[dsStep.actor];
+        var propVal, propBal := dsStep.msgOps.recv.value.val, dsStep.msgOps.recv.value.bal;
+        var doAccept := a.promised.None? || (a.promised.Some? && a.promised.value <= propBal);
+        if doAccept && vb == VB(propVal, propBal) {
+          if exists p :: 
             && p in v'.network.sentMsgs
             && p.Propose?
             && p.bal >= vb.b
-            && p.val != vb.v;
-          assert p.bal > vb.b;
-          ChosenAndConflictingProposeImpliesFalse(c, v', vb, p);
-          assert false;
+            && p.val != vb.v 
+          {
+            var p :|
+              && p in v'.network.sentMsgs
+              && p.Propose?
+              && p.bal >= vb.b
+              && p.val != vb.v;
+            assert p.bal > vb.b;
+            ChosenAndConflictingProposeImpliesFalse(c, v', vb, p);
+            assert false;
+          }
+        } else {
+          if exists quorum: set<Message> :: IsAcceptQuorum(c, v', quorum, vb) {
+            var q :| IsAcceptQuorum(c, v', q, vb);
+            assert IsAcceptQuorum(c, v, q, vb);  // trigger
+            assert false;
+          }
+          assert !Chosen(c, v', vb);
         }
-        assert ChosenValImpliesProposeOnlyVal(c, v');
       }
     }
   }
@@ -446,6 +457,8 @@ module PaxosProof {
       *  in both the promise quorum, and the chosen Accept quorum. Hence, this acc accepted
       *  >= chosenVb.b, by AcceptMessagesValid. However, it also sent a promise >= chosenVb.b 
       * that carried no prior vbOpt value. This contradicts AcceptedImpliesLargerPromiseCarriesVb */
+
+      // var aquorum :|
 
       // new invariant: accept message implies acceptor accepted >= m.bal
       // new invariant: accepted implies larger ballots promise carries some vbOpt.
@@ -477,18 +490,26 @@ module PaxosProof {
     if dsStep.LeaderStep? {
       /* This case is trivial. This is because if something has already been chosen, then
       * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
-      * Otherwise, the post-condition is vacuously true */
-      var actor, msgOps := dsStep.actor, dsStep.msgOps;
-      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
-      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
     } else if dsStep.AcceptorStep? {
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
       var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
       if step.ReceiveStep? && msgOps.recv.value.Propose? {
         InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(c, v, v', dsStep, step);
+      } else {
+        forall vb | Chosen(c, v', vb)
+        ensures Chosen(c, v, vb)
+        {
+          var quorum :| IsAcceptQuorum(c, v', quorum, vb);  // witness
+          assert IsAcceptQuorum(c, v, quorum, vb);  // trigger
+        }
       }
-    }
+    } else {
+      // Nothing new chosen
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+    } 
   }
 
   // Lemma: For any Learn message, that learned value must have been chosen
@@ -504,8 +525,26 @@ module PaxosProof {
       there is a corresponding set of Accept(vb, _) messages in the network. */
     var l := v.learners[learnMsg.lnr];
     var vb := VB(learnMsg.val, learnMsg.bal);
-    var accQuorum := QuorumFromReceivedAccepts(l.receivedAccepts[vb], vb);  // witness
+    var quorum := QuorumFromReceivedAccepts(l.receivedAccepts[vb], vb);  // witness
+    assert IsAcceptQuorum(c, v, quorum, vb);  // trigger
   }
+
+  // Lemma: No new values can be chosen during Leader and Learner steps
+  lemma NoNewChosenInLeaderOrLearnerSteps(c: Constants, v: Variables, v': Variables, dsStep: Step) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires NextStep(c, v, v', dsStep)
+    requires dsStep.LeaderStep? || dsStep.LearnerStep?
+    ensures forall vb | Chosen(c, v', vb) :: Chosen(c, v, vb)
+  {
+    forall vb | Chosen(c, v', vb)
+    ensures Chosen(c, v, vb)
+    {
+      var quorum :| IsAcceptQuorum(c, v', quorum, vb);  // witness
+      assert IsAcceptQuorum(c, v, quorum, vb);  // trigger
+    }
+  }
+
 
 
   // Lemma: If at most one value can be chosen, then the Agreement property is true
@@ -616,5 +655,18 @@ module PaxosProof {
             other.vbOpt.value.b <= hsBal
         )
   }
+
+  predicate IsAcceptSet(c: Constants, v: Variables, aset: set<Message>, vb: ValBal) {
+    forall m | m in aset ::
+      && m.Accept?
+      && m in v.network.sentMsgs
+      && m.vb == vb
+  }
+
+  predicate IsAcceptQuorum(c: Constants, v: Variables, aset: set<Message>, vb: ValBal) {
+    && |aset| >= c.f+1
+    && IsAcceptSet(c, v, aset, vb)
+  }
+
 }  // end module PaxosProof
 
