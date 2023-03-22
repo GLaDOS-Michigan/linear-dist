@@ -57,18 +57,34 @@ module PaxosProof {
   // on the fact that at every acceptor, accepted bal <= promised bal. I.e. once I accept 
   // a ballot, I cannot accept a smaller ballot
   // Tony: This can be broken down via monotonic transformation
-  predicate AcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables) 
+  // predicate AcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables) 
+  //   requires v.WF(c)
+  // {
+  //   forall idx, prom | 
+  //     && c.ValidAcceptorIdx(idx) 
+  //     && v.acceptors[idx].acceptedVB.Some?
+  //     && prom in v.network.sentMsgs
+  //     && prom.Promise?
+  //     && prom.acc == c.acceptorConstants[idx].id
+  //     && v.acceptors[idx].acceptedVB.value.b < prom.bal
+  //   :: 
+  //     prom.vbOpt.Some?
+  // }
+
+  // For every Accept that accepted some vb, every Promise p with p.bal > vb.b from that 
+  // Accept must carry a non-None vbOpt.
+  // Tony: This can be broken down via monotonic transformation. 
+  predicate AcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Variables) 
     requires v.WF(c)
   {
-    forall idx, prom | 
-      && c.ValidAcceptorIdx(idx) 
-      && v.acceptors[idx].acceptedVB.Some?
-      && prom in v.network.sentMsgs
-      && prom.Promise?
-      && prom.acc == c.acceptorConstants[idx].id
-      && v.acceptors[idx].acceptedVB.value.b < prom.bal
+    forall accMsg, promMsg | 
+      && accMsg in v.network.sentMsgs
+      && promMsg in v.network.sentMsgs
+      && accMsg.Accept? && promMsg.Promise?
+      && promMsg.acc == accMsg.acc
+      && accMsg.vb.b < promMsg.bal
     :: 
-      prom.vbOpt.Some?
+      promMsg.vbOpt.Some?
   }
 
   // Tony: If receivedPromises remembers whole messages rather than the source, this 
@@ -213,7 +229,8 @@ module PaxosProof {
   {
     && OneValuePerProposeBallot(c, v)
     && AcceptMessagesValid(c, v)
-    && AcceptedImpliesLargerPromiseCarriesVb(c, v)
+    // && AcceptedImpliesLargerPromiseCarriesVb(c, v)    // not sure if needed 
+    && AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
     && HighestHeardBackedByReceivedPromises(c, v)
     && ProposeBackedByPromiseQuorum(c, v)
     && AcceptorPromisedLargerThanAccepted(c, v)
@@ -268,7 +285,8 @@ module PaxosProof {
 
     assume OneValuePerProposeBallot(c, v');
     InvNextAcceptMessagesValid(c, v, v');
-    InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');
+    // InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');
+    assume AcceptMsgImpliesLargerPromiseCarriesVb(c, v);
     InvNextHighestHeardBackedByReceivedPromises(c, v, v');
     InvNextProposeBackedByPromiseQuorum(c, v, v');
 
@@ -292,12 +310,12 @@ module PaxosProof {
     ensures AcceptMessagesValid(c, v')
   {}
 
-  lemma InvNextAcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
-    requires Inv(c, v)
-    requires Next(c, v, v')
-    requires MessageInv(c, v')
-    ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
-  {}
+  // lemma InvNextAcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
+  //   requires Inv(c, v)
+  //   requires Next(c, v, v')
+  //   requires MessageInv(c, v')
+  //   ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
+  // {}
 
   lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
     requires Inv(c, v)
@@ -399,6 +417,8 @@ module PaxosProof {
     requires AcceptMessagesValid(c, v')
     requires ProposeBackedByPromiseQuorum(c, v')
     requires OneValuePerProposeBallot(c, v')
+    // requires AcceptedImpliesLargerPromiseCarriesVb(c, v')
+    requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
     ensures ChosenValImpliesProposeOnlyVal(c, v')
   {
     forall vb, propose | 
@@ -445,7 +465,8 @@ module PaxosProof {
     requires MessageInv(c, v)
     requires AcceptMessagesValid(c, v)
     requires ProposeBackedByPromiseQuorum(c, v)
-    requires AcceptedImpliesLargerPromiseCarriesVb(c, v)
+    // requires AcceptedImpliesLargerPromiseCarriesVb(c, v)
+    requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
     requires Chosen(c, v, chosenVb)
     requires p.Propose?
     requires p in v.network.sentMsgs
@@ -459,14 +480,9 @@ module PaxosProof {
       /* Case 1: p's promise quorum has not seen vb accepted. Then there is some acc source
       *  in both the promise quorum, and the chosen Accept quorum. Hence, this acc accepted
       *  >= chosenVb.b, by AcceptMessagesValid. However, it also sent a promise > chosenVb.b 
-      * that carried no prior vbOpt value. This contradicts AcceptedImpliesLargerPromiseCarriesVb */
+      * that carried no prior vbOpt value. This contradicts AcceptMsgImpliesLargerPromiseCarriesVb */
       var acQuorum :| IsAcceptQuorum(c, v, acQuorum, chosenVb);
-      var acc := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, p.bal, acQuorum, chosenVb);
-
-      // new invariant: accept message implies acceptor accepted >= m.bal
-      // new invariant: accepted implies larger ballots promise carries some vbOpt.
-
-      assume false;
+      var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, p.bal, acQuorum, chosenVb);  // witness
       assert false;
     } else {
       /* Proof by contradiction. There are two cases:
