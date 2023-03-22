@@ -135,17 +135,17 @@ predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables)
 
 // Inv: If vb is chosen, then for all acceptors that have acceptedVB.b >= vb.b, they have
 // acceptedVB.v == vb.v
-predicate ChosenValImpliesLargerAcceptorsHoldsVal(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall vb, acc | 
-    && Chosen(c, v, vb) 
-    && c.ValidAcceptorIdx(acc)
-    && v.acceptors[acc].acceptedVB.Some?
-    && v.acceptors[acc].acceptedVB.value.b >= vb.b
-  ::
-    v.acceptors[acc].acceptedVB.value.v == vb.v
-}
+// predicate ChosenValImpliesLargerAcceptorsHoldsVal(c: Constants, v: Variables) 
+//   requires v.WF(c)
+// {
+//   forall vb, acc | 
+//     && Chosen(c, v, vb) 
+//     && c.ValidAcceptorIdx(acc)
+//     && v.acceptors[acc].acceptedVB.Some?
+//     && v.acceptors[acc].acceptedVB.value.b >= vb.b
+//   ::
+//     v.acceptors[acc].acceptedVB.value.v == vb.v
+// }
 
 // Inv: If vb is chosen, then for all Accept messages that have msg.vb.b >= vb.b, they have
 // msg.vb.v == vb.v
@@ -193,16 +193,16 @@ predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) {
 // Tony: Using monotonic transformations, by recording the entire history of accepted 
 // pairs at each acceptor, this can be written as a property on acceptor local states,
 // and the corresponding constraint on Promise message becomes a trivial message invariant. 
-predicate ChosenValImpliesPromiseVBOnlyVal(c: Constants, v: Variables)
-{
-  forall vb, promise | 
-    && Chosen(c, v, vb)
-    && IsPromiseMessage(v, promise)
-    && promise.vbOpt.Some?
-    && promise.vbOpt.value.b >= vb.b
-  ::
-    promise.vbOpt.value.v == vb.v
-}
+// predicate ChosenValImpliesPromiseVBOnlyVal(c: Constants, v: Variables)
+// {
+//   forall vb, promise | 
+//     && Chosen(c, v, vb)
+//     && IsPromiseMessage(v, promise)
+//     && promise.vbOpt.Some?
+//     && promise.vbOpt.value.b >= vb.b
+//   ::
+//     promise.vbOpt.value.v == vb.v
+// }
 
 // Inv: If vb is chosen, and the leader has a quorum of receivedPromises, then its 
 // highestHeardBallot must be >= vb.b. This ensures that they can only propose vb.v
@@ -281,7 +281,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
   assume OneValuePerProposeBallot(c, v');
   InvNextAcceptMessagesValid(c, v, v');
-  // InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');
+  // InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');  // not sure if needed
   InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c, v, v');
   InvNextHighestHeardBackedByReceivedPromises(c, v, v');
   InvNextProposeBackedByPromiseQuorum(c, v, v');
@@ -319,17 +319,7 @@ lemma InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Vari
   requires MessageInv(c, v')
   ensures AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
 {
-  // I have a feeling this will require AcceptedImpliesLargerPromiseCarriesVb as an invariant
-  forall accMsg, promMsg | 
-    && IsAcceptMessage(v', accMsg)
-    && IsPromiseMessage(v', promMsg)
-    && promMsg.acc == accMsg.acc
-    && accMsg.vb.b < promMsg.bal
-  ensures 
-    promMsg.vbOpt.Some?
-  {
-    assume false;
-  }
+  // Tony: I find it really sketchy that this lemma requires no proof
 }
 
 lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
