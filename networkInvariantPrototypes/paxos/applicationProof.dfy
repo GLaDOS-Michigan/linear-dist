@@ -35,6 +35,21 @@ predicate OneValuePerProposeBallot(c: Constants, v: Variables)
     p1.val == p2.val
 }
 
+// For all Promise messages with a non-None vbOpt, the accepted vb must be from a 
+// prior Propose message
+// Tony: This can be turned into two message invariants. Promise message vbOpt being
+// non-None means that the acceptor accepted that value at some point in time.
+// Then the value being accepted at some point also means that there is some corresponding
+// Propose message.
+predicate PromiseVbImpliesProposed(c: Constants, v: Variables) {
+  forall prom | 
+    && IsPromiseMessage(v, prom)
+    && prom.vbOpt.Some?
+  ::
+    Propose(prom.vbOpt.value.b, prom.vbOpt.value.v) in v.network.sentMsgs
+}
+
+
 // For every Accept(vb, src) in the network, the source acceptor must have accepted 
 // some ballot >= vb.b. This is not a message invariant because it depends on the fact
 // that at every acceptor, accepted bal <= promised bal. I.e. once I accept a ballot, 
@@ -224,6 +239,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires MessageInv(c, v)
 {
   && OneValuePerProposeBallot(c, v)
+  && PromiseVbImpliesProposed(c, v)
   && AcceptMessagesValid(c, v)
   // && AcceptedImpliesLargerPromiseCarriesVb(c, v)    // not sure if needed 
   && AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
@@ -280,6 +296,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   MessageInvInductive(c, v, v');
 
   assume OneValuePerProposeBallot(c, v');
+  InvNextPromiseVbImpliesProposed(c, v, v');
   InvNextAcceptMessagesValid(c, v, v');
   // InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');  // not sure if needed
   InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c, v, v');
@@ -299,24 +316,27 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   AtMostOneChosenImpliesAgreement(c, v');
 }
 
+lemma InvNextPromiseVbImpliesProposed(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures PromiseVbImpliesProposed(c, v')
+{}
+
 lemma InvNextAcceptMessagesValid(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   ensures AcceptMessagesValid(c, v')
 {}
 
 // lemma InvNextAcceptedImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
 //   requires Inv(c, v)
 //   requires Next(c, v, v')
-//   requires MessageInv(c, v')
 //   ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
 // {}
 
 lemma InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   ensures AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
 {
   // Tony: I find it really sketchy that this lemma requires no proof
@@ -325,7 +345,6 @@ lemma InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Vari
 lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   ensures HighestHeardBackedByReceivedPromises(c, v')
 {
   var dsStep :| NextStep(c, v, v', dsStep);
@@ -363,7 +382,6 @@ lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v'
 lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   ensures ProposeBackedByPromiseQuorum(c, v')
 {
   forall p | p in v'.network.sentMsgs && p.Propose?
@@ -392,7 +410,6 @@ lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variab
 lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables, v': Variables, p: Message) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   requires IsProposeMessage(v, p)
   requires IsProposeMessage(v', p)
   ensures exists quorum :: PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val)
@@ -409,7 +426,6 @@ lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
   c: Constants, v: Variables, v': Variables, dsStep: Step, step: AcceptorHost.Step)
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   requires NextStep(c, v, v', dsStep)
   requires dsStep.AcceptorStep?
   requires AcceptorHost.NextStep(
@@ -423,6 +439,7 @@ lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
   requires OneValuePerProposeBallot(c, v')
   // requires AcceptedImpliesLargerPromiseCarriesVb(c, v')
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+  requires PromiseVbImpliesProposed(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
   forall vb, propose | 
@@ -450,6 +467,7 @@ lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
             && p.bal >= vb.b
             && p.val != vb.v;
           assert p.bal > vb.b;
+          MessageInvInductive(c, v, v');
           ChosenAndConflictingProposeImpliesFalse(c, v', vb, p);
           assert false;
         }
@@ -471,6 +489,7 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   requires ProposeBackedByPromiseQuorum(c, v)
   // requires AcceptedImpliesLargerPromiseCarriesVb(c, v)
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
+  requires PromiseVbImpliesProposed(c, v)
   requires Chosen(c, v, chosenVb)
   requires IsProposeMessage(v, p)
   requires p.bal > chosenVb.b
@@ -502,10 +521,11 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
 lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   requires AcceptMessagesValid(c, v')
   requires ProposeBackedByPromiseQuorum(c, v')
   requires OneValuePerProposeBallot(c, v')
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+  requires PromiseVbImpliesProposed(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
   var dsStep :| NextStep(c, v, v', dsStep);
@@ -593,7 +613,6 @@ lemma AtMostOneChosenImpliesAgreement(c: Constants, v: Variables)
 lemma AtMostOneChosenValNext(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires MessageInv(c, v')
   requires ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v')
   ensures AtMostOneChosenVal(c, v')
 {}
