@@ -87,7 +87,7 @@ predicate AcceptMessagesValid(c: Constants, v: Variables)
 // }
 
 // For every Accept that accepted some vb, every Promise p with p.bal > vb.b from that 
-// Accept must carry a non-None vbOpt.
+// Accept must carry a non-None vbOpt, and vbOpt.value.b >= vb.b
 // Tony: This can be broken down via monotonic transformation. 
 predicate AcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Variables) 
   requires v.WF(c)
@@ -98,7 +98,8 @@ predicate AcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Variables)
     && promMsg.acc == accMsg.acc
     && accMsg.vb.b < promMsg.bal
   :: 
-    promMsg.vbOpt.Some?
+    && promMsg.vbOpt.Some?
+    && accMsg.vb.b <= promMsg.vbOpt.value.b
 }
 
 // Tony: If receivedPromises remembers whole messages rather than the source, this 
@@ -146,6 +147,16 @@ predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables)
   :: 
     && v.acceptors[idx].promised.Some?
     && v.acceptors[idx].acceptedVB.value.b <= v.acceptors[idx].promised.value
+}
+
+// For all Promise messages prom, prom.bal > prom.vbOpt.value.b
+// TODO: This may supersede AcceptorPromisedLargerThanAccepted
+predicate PromiseBalLargerThanAccepted(c: Constants, v: Variables) {
+  forall prom | 
+    && IsPromiseMessage(v, prom)
+    && prom.vbOpt.Some?
+  ::
+    prom.vbOpt.value.b < prom.bal
 }
 
 // Inv: If vb is chosen, then for all acceptors that have acceptedVB.b >= vb.b, they have
@@ -246,6 +257,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   && HighestHeardBackedByReceivedPromises(c, v)
   && ProposeBackedByPromiseQuorum(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
+  && PromiseBalLargerThanAccepted(c, v)
   && ChosenValImpliesProposeOnlyVal(c, v)
   && ChosenValImpliesPromiseQuorumSeesBal(c, v)
   && ChosenValImpliesLeaderOnlyHearsVal(c, v)
@@ -302,7 +314,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c, v, v');
   InvNextHighestHeardBackedByReceivedPromises(c, v, v');
   InvNextProposeBackedByPromiseQuorum(c, v, v');
-
+  InvNextPromiseBalLargerThanAccepted(c, v, v');
 
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
 
@@ -333,6 +345,12 @@ lemma InvNextAcceptMessagesValid(c: Constants, v: Variables, v': Variables)
 //   requires Next(c, v, v')
 //   ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
 // {}
+
+lemma InvNextPromiseBalLargerThanAccepted(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures PromiseBalLargerThanAccepted(c, v')
+{}
 
 lemma InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
@@ -440,6 +458,7 @@ lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
   // requires AcceptedImpliesLargerPromiseCarriesVb(c, v')
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
   requires PromiseVbImpliesProposed(c, v')
+  requires PromiseBalLargerThanAccepted(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
   forall vb, propose | 
@@ -490,6 +509,7 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   // requires AcceptedImpliesLargerPromiseCarriesVb(c, v)
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
   requires PromiseVbImpliesProposed(c, v)
+  requires PromiseBalLargerThanAccepted(c, v)
   requires Chosen(c, v, chosenVb)
   requires IsProposeMessage(v, p)
   requires p.bal > chosenVb.b
@@ -507,11 +527,34 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
     var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, p.bal, acQuorum, chosenVb);  // witness
     assert false;
   } else {
-    /* Proof by contradiction. There are two cases:
-    * 2. p's promise quorum has seen vb accepted. Because vb.v != p.val, it must (need promised implies proposed here)
-    *    have saw some vb' such that vb.b < vb'.b < p.b. Then we keep recursing down
-    *    until we get a contradiction??? I.e. by the finite ballots lemma.
+    // TODO: Given this second case, the first case may not be necessary
+
+    /* Case 2: p's promise quorum, prQuorum, has an intersecting accId with the choosing 
+    * quorum acQuorum. Because p.bal > chosenVb.b, by AcceptMsgImpliesLargerPromiseCarriesVb
+    * we know that the Promise msg prom from accId has prom.vbOpt.Some?. Furthermore, 
+    * prom.vbOpt.b >= chosenVb.b.
+    * Because prQuorum supports proposal p, there must be a prom' with 
+    * PromiseSetHighestVBOptVal(c, v, prQ, p.bal, prom'.vbOpt.bal, p.val), and 
+    * chosenVb.b <= prom'.vbOpt.bal < p.b.
+
+      PromiseBalLargerThanAccepted gives prom'.vbOpt.bal < p.b.
+
+    * And because Because vb.v != p.val, it must
+    *  have saw some proposed vb' such that vb.b < vb'.b < p.b, by PromiseVbImpliesProposed. 
+    *  Then we keep recursing down until we get a contradiction??? 
+    * I.e. by the finite ballots lemma.
     */
+
+    var acQuorum :| IsAcceptQuorum(c, v, acQuorum, chosenVb);
+    var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, p.bal, acQuorum, chosenVb);  // witness
+    var prom: Message :| prom in prQuorum && prom.acc == accId;
+    assert prom.bal == p.bal;
+    assert prom.vbOpt.Some?;  // by AcceptMsgImpliesLargerPromiseCarriesVb
+    assert prom.vbOpt.value.b >= chosenVb.b;
+
+    assert prom.vbOpt.value.b >= chosenVb.b;
+
+
     assume false;
     assert false;
   }
@@ -526,6 +569,7 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   requires OneValuePerProposeBallot(c, v')
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
   requires PromiseVbImpliesProposed(c, v')
+  requires PromiseBalLargerThanAccepted(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
   var dsStep :| NextStep(c, v, v', dsStep);
@@ -617,6 +661,11 @@ lemma AtMostOneChosenValNext(c: Constants, v: Variables, v': Variables)
   ensures AtMostOneChosenVal(c, v')
 {}
 
+
+/***************************************************************************************
+*                                        Utils                                         *
+***************************************************************************************/
+
 // Lemma: Given b1 < b2, there is a finite, strictly ordered sequence 
 // [b1, b_a, b_b, ... , b_2] such that for all ballots b where b1 < b < b2, b in seq
 lemma FiniteBallots(b1: LeaderId, b2: LeaderId) returns (res: seq<LeaderId>)
@@ -630,11 +679,6 @@ lemma FiniteBallots(b1: LeaderId, b2: LeaderId) returns (res: seq<LeaderId>)
     return sub + [b2];
   }
 }
-
-
-/***************************************************************************************
-*                                        Utils                                         *
-***************************************************************************************/
 
 lemma QuorumFromReceivedAccepts(s: set<AcceptorId>, vb: ValBal) returns (q: set<Message>)
   decreases s
