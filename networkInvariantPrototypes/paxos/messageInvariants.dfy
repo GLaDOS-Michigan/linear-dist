@@ -29,7 +29,7 @@ module PaxosMessageInvariants {
   {
     forall idx, b| c.ValidLeaderIdx(idx) && v.leaders[idx].highestHeardBallot == Some(b)
     :: (exists prom: Message ::
-          && prom.Promise? && prom in v.network.sentMsgs 
+          && IsPromiseMessage(v, prom)
           && prom.bal == idx
           && prom.vbOpt == Some(VB(v.leaders[idx].value, b))
       )
@@ -42,7 +42,7 @@ module PaxosMessageInvariants {
   {
     forall idx, src | c.ValidLeaderIdx(idx) && src in v.leaders[idx].receivedPromises
     :: (exists prom: Message ::
-          && prom.Promise? && prom in v.network.sentMsgs 
+          && IsPromiseMessage(v, prom)
           && prom.bal == idx
       )
   } 
@@ -55,8 +55,7 @@ module PaxosMessageInvariants {
   {
     forall idx, b | c.ValidAcceptorIdx(idx) && v.acceptors[idx].promised == Some(b)
     :: (exists m: Message ::
-          && m in v.network.sentMsgs 
-          && (m.Promise? || m.Propose?)
+          && (IsPromiseMessage(v, m) || IsProposeMessage(v, m))
           && m.bal == b
       )
   }
@@ -85,8 +84,7 @@ module PaxosMessageInvariants {
   {
     forall idx, prom | 
       && c.ValidAcceptorIdx(idx) 
-      && prom in v.network.sentMsgs
-      && prom.Promise?
+      && IsPromiseMessage(v, prom)
       && prom.acc == c.acceptorConstants[idx].id
     ::
       && v.acceptors[idx].promised.Some?
@@ -147,5 +145,34 @@ module PaxosMessageInvariants {
     requires Next(c, v, v')
     ensures MessageInv(c, v')
   {}
+
+  /***************************************************************************************
+  *                                        Utils                                         *
+  ***************************************************************************************/
+
+  predicate IsPrepareMessage(v: Variables, m: Message) {
+    && m.Prepare?
+    && m in v.network.sentMsgs
+  }
+  
+  predicate IsPromiseMessage(v: Variables, m: Message) {
+    && m.Promise?
+    && m in v.network.sentMsgs
+  }
+
+  predicate IsProposeMessage(v: Variables, m: Message) {
+    && m.Propose?
+    && m in v.network.sentMsgs
+  }
+
+  predicate IsAcceptMessage(v: Variables, m: Message) {
+    && m.Accept?
+    && m in v.network.sentMsgs
+  }
+
+  predicate IsLearnMessage(v: Variables, m: Message) {
+    && m.Learn?
+    && m in v.network.sentMsgs
+  } 
 }  // end module PaxosProof
 

@@ -27,9 +27,8 @@ module PaxosProof {
   predicate OneValuePerProposeBallot(c: Constants, v: Variables)
   {
     forall p1, p2 | 
-      && p1 in v.network.sentMsgs
-      && p2 in v.network.sentMsgs
-      && p1.Propose? && p2.Propose?
+      && IsProposeMessage(v, p1)
+      && IsProposeMessage(v, p2)
       && p1.bal == p2.bal
     ::
       p1.val == p2.val
@@ -47,7 +46,7 @@ module PaxosProof {
     requires v.WF(c)
     requires ValidMessageSrc(c, v)
   {
-    forall acc | acc in v.network.sentMsgs && acc.Accept?
+    forall acc | IsAcceptMessage(v, acc)
     ::  && v.acceptors[acc.acc].acceptedVB.Some?
         && acc.vb.b <= v.acceptors[acc.acc].acceptedVB.value.b
   }
@@ -78,9 +77,8 @@ module PaxosProof {
     requires v.WF(c)
   {
     forall accMsg, promMsg | 
-      && accMsg in v.network.sentMsgs
-      && promMsg in v.network.sentMsgs
-      && accMsg.Accept? && promMsg.Promise?
+      && IsAcceptMessage(v, accMsg)
+      && IsPromiseMessage(v, promMsg)
       && promMsg.acc == accMsg.acc
       && accMsg.vb.b < promMsg.bal
     :: 
@@ -118,7 +116,7 @@ module PaxosProof {
   // need not mention the network (monotonic transformation)
   // Every Propose message is backed by a quorum of Promise messages
   predicate ProposeBackedByPromiseQuorum(c: Constants, v: Variables) {
-    forall p | p in v.network.sentMsgs && p.Propose?
+    forall p | IsProposeMessage(v, p)
     :: (exists quorum :: PromiseQuorumSupportsVal(c, v, quorum, p.bal, p.val))
   }
 
@@ -155,8 +153,7 @@ module PaxosProof {
   {
     forall vb, msg | 
       && Chosen(c, v, vb) 
-      && msg in v.network.sentMsgs
-      && msg.Accept?
+      && IsAcceptMessage(v, msg)
       && msg.vb.b >= vb.b
     ::
       msg.vb.v == vb.v
@@ -184,8 +181,7 @@ module PaxosProof {
   predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) {
     forall vb, propose | 
       && Chosen(c, v, vb)
-      && propose in v.network.sentMsgs
-      && propose.Propose?
+      && IsProposeMessage(v, propose)
       && propose.bal >= vb.b
     ::
       propose.val == vb.v
@@ -200,8 +196,7 @@ module PaxosProof {
   {
     forall vb, promise | 
       && Chosen(c, v, vb)
-      && promise in v.network.sentMsgs
-      && promise.Promise?
+      && IsPromiseMessage(v, promise)
       && promise.vbOpt.Some?
       && promise.vbOpt.value.b >= vb.b
     ::
@@ -286,7 +281,7 @@ module PaxosProof {
     assume OneValuePerProposeBallot(c, v');
     InvNextAcceptMessagesValid(c, v, v');
     // InvNextAcceptedImpliesLargerPromiseCarriesVb(c, v, v');
-    assume AcceptMsgImpliesLargerPromiseCarriesVb(c, v);
+    InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c, v, v');
     InvNextHighestHeardBackedByReceivedPromises(c, v, v');
     InvNextProposeBackedByPromiseQuorum(c, v, v');
 
@@ -316,6 +311,25 @@ module PaxosProof {
   //   requires MessageInv(c, v')
   //   ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
   // {}
+
+  lemma InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
+    requires Inv(c, v)
+    requires Next(c, v, v')
+    requires MessageInv(c, v')
+    ensures AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+  {
+    // I have a feeling this will require AcceptedImpliesLargerPromiseCarriesVb as an invariant
+    forall accMsg, promMsg | 
+      && IsAcceptMessage(v', accMsg)
+      && IsPromiseMessage(v', promMsg)
+      && promMsg.acc == accMsg.acc
+      && accMsg.vb.b < promMsg.bal
+    ensures 
+      promMsg.vbOpt.Some?
+    {
+      assume false;
+    }
+  }
 
   lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables) 
     requires Inv(c, v)
@@ -388,9 +402,8 @@ module PaxosProof {
     requires Inv(c, v)
     requires Next(c, v, v')
     requires MessageInv(c, v')
-    requires p in v.network.sentMsgs
-    requires p in v'.network.sentMsgs
-    requires p.Propose?
+    requires IsProposeMessage(v, p)
+    requires IsProposeMessage(v', p)
     ensures exists quorum :: PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val)
   {
     var quorum :| PromiseQuorumSupportsVal(c, v, quorum, p.bal, p.val);  // witness
@@ -468,8 +481,7 @@ module PaxosProof {
     // requires AcceptedImpliesLargerPromiseCarriesVb(c, v)
     requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
     requires Chosen(c, v, chosenVb)
-    requires p.Propose?
-    requires p in v.network.sentMsgs
+    requires IsProposeMessage(v, p)
     requires p.bal > chosenVb.b
     requires p.val != chosenVb.v
     ensures false
@@ -535,8 +547,7 @@ module PaxosProof {
   lemma LearnedImpliesChosen(c: Constants, v: Variables, learnMsg: Message)
     requires v.WF(c)
     requires MessageInv(c, v)
-    requires learnMsg.Learn?
-    requires learnMsg in v.network.sentMsgs
+    requires IsLearnMessage(v, learnMsg)
     ensures Chosen(c, v, VB(learnMsg.val, learnMsg.bal))
   {
     /* Suppose learnMsg(lnr, bal, val) in network. Then by LearnMsgsValid, lnr has a 
@@ -578,10 +589,8 @@ module PaxosProof {
       values are chosen, thus violating AtMostOneChosenVal */
     if !Agreement(c, v) {
       var m1, m2 :| 
-        && m1 in v.network.sentMsgs 
-        && m2 in v.network.sentMsgs 
-        && m1.Learn?
-        && m2.Learn?
+        && IsLearnMessage(v, m1)
+        && IsLearnMessage(v, m2)
         && m1.val != m2.val;
       LearnedImpliesChosen(c, v, m1);
       LearnedImpliesChosen(c, v, m2);
@@ -686,8 +695,7 @@ module PaxosProof {
 
   predicate IsPromiseSet(c: Constants, v: Variables, pset: set<Message>, bal: LeaderId) {
     && (forall m | m in pset ::
-      && m.Promise?
-      && m in v.network.sentMsgs
+      && IsPromiseMessage(v, m)
       && m.bal == bal)
     && PromiseSetDistinctAccs(c, v, pset)
   }
@@ -736,8 +744,7 @@ module PaxosProof {
 
   predicate IsAcceptSet(c: Constants, v: Variables, aset: set<Message>, vb: ValBal) {
     forall m | m in aset ::
-      && m.Accept?
-      && m in v.network.sentMsgs
+      && IsAcceptMessage(v, m)
       && m.vb == vb
   }
 
@@ -745,6 +752,5 @@ module PaxosProof {
     && |aset| >= c.f+1
     && IsAcceptSet(c, v, aset, vb)
   }
-
 }  // end module PaxosProof
 
