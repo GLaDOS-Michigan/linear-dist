@@ -1,6 +1,13 @@
 #!/bin/sh
 
-dafny="/Users/nudzhang/installations/dafny/dafny /timeLimit:20 /compile:0 /allowGlobals /vcsCores:8 /noNLarith"
+if uname -a | grep -q Darwin; then
+    dafny="/Users/nudzhang/installations/dafny/dafny /timeLimit:20 /compile:0 /allowGlobals /vcsCores:8 /noNLarith"
+elif uname -a | grep -q Linux; then
+    dafny="/home/nudzhang/dafny/dafny /timeLimit:20 /compile:0 /allowGlobals /vcsCores:8 /noNLarith"
+else
+    echo "Failed"
+    exit 1
+fi
 
 files="../lib/UtilitiesLibrary.dfy types.dfy hosts.dfy distributedSystem.dfy spec.dfy messageInvariants.dfy"
 
