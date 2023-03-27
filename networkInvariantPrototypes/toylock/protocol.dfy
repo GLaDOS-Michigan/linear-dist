@@ -91,7 +91,8 @@ module Host {
     && msgOps.send.None?
     && msgOps.recv.Some?
     && msgOps.recv.value.epoch > v.myEpoch
-    && msgOps.recv.value.dst > c.hostId
+    && msgOps.recv.value.dst == c.hostId
+    && !v.hasLock
     && v' == v.(hasLock := true, myEpoch := msgOps.recv.value.epoch)
   }
 
