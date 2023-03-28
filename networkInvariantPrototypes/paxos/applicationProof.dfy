@@ -133,8 +133,8 @@ predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int, pset:
   var cldr := c.leaderConstants[idx];
   var hbal := ldr.highestHeardBallot;
   && IsPromiseSet(c, v, pset, cldr.id)
-  && (hbal.Some? ==> PromiseSetHighestVBOptVal(c, v, pset, cldr.id, hbal.value, ldr.value))
-  && (hbal.None? ==> PromiseSetEmptyVBOpt(c, v, pset, cldr.id))
+  && (hbal.Some? ==> PromiseSetHighestVB(c, v, pset, cldr.id, VB(ldr.value, hbal.value)))
+  && (hbal.None? ==> PromiseSetEmptyVB(c, v, pset, cldr.id))
   && |pset| == |ldr.receivedPromises|
   && (forall p: Message | p in pset :: p.acc in ldr.receivedPromises)
 }
@@ -433,7 +433,7 @@ lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variab
       if step.ProposeStep? && p !in v.network.sentMsgs {
         var quorum :| LeaderPromiseSetProperties(c, v, actor, quorum);  // witness
         if l.highestHeardBallot.Some? {
-          assert PromiseSetHighestVBOptVal(c, v', quorum, actor, l.highestHeardBallot.value, l.value);  // trigger
+          assert PromiseSetHighestVB(c, v', quorum, actor, VB(l.value, l.highestHeardBallot.value));  // trigger
         }
         assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
       } else {
@@ -454,9 +454,9 @@ lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables
 {
   assume false;  // Timeout from WinningPromiseMessageInQuorum
   var quorum :| PromiseQuorumSupportsVal(c, v, quorum, p.bal, p.val);  // witness
-  if !PromiseSetEmptyVBOpt(c, v, quorum, p.bal) {
-    var hsbal :| PromiseSetHighestVBOptVal(c, v, quorum, p.bal, hsbal, p.val);  // witness
-    assert PromiseSetHighestVBOptVal(c, v', quorum, p.bal, hsbal, p.val);  // trigger
+  if !PromiseSetEmptyVB(c, v, quorum, p.bal) {
+    var hsbal :| PromiseSetHighestVB(c, v, quorum, p.bal, VB(p.val, hsbal));  // witness
+    assert PromiseSetHighestVB(c, v', quorum, p.bal, VB(p.val, hsbal));  // trigger
   }
   assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
 }
@@ -548,7 +548,7 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   * prom.vbOpt.b >= chosenVb.b.
   *
   * Because prQuorum supports proposal p, there must be a b' such that 
-  * PromiseSetHighestVBOptVal(c, v, prQ, p.bal, b', p.val), and 
+  * PromiseSetHighestVB(c, v, prQ, p.bal, b', p.val), and 
   * chosenVb.b <= b'. By PromiseVbImpliesProposed and OneValuePerProposeBallot,
   * we have chosenVb.b < b'.
   * Moreover, PromiseBalLargerThanAccepted gives prom'.vbOpt.bal < p.b.
@@ -562,8 +562,8 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, p.bal, acQuorum, chosenVb);  // witness
   var prom: Message :| prom in prQuorum && prom.acc == accId;  // witness
 
-  var b' :| PromiseSetHighestVBOptVal(c, v, prQuorum, p.bal, b', p.val);
-  var prom' :| WinningPromiseMessageInQuorum(c, v, prQuorum, p.bal, b', p.val, prom');
+  var b' :| PromiseSetHighestVB(c, v, prQuorum, p.bal, VB(p.val, b'));
+  var prom' :| WinningPromiseMessageInQuorum(c, v, prQuorum, p.bal, VB(p.val, b'),  prom');
 
   // Corresponding Propose to prom', by PromiseVbImpliesProposed
   var prop' := Propose(b', p.val);
@@ -783,34 +783,33 @@ predicate IsPromiseQuorum(c: Constants, v: Variables, quorum: set<Message>, bal:
 predicate PromiseQuorumSupportsVal(c: Constants, v: Variables, quorum: set<Message>, bal: LeaderId, val: Value) {
   && IsPromiseQuorum(c, v, quorum, bal)
   && (
-    || PromiseSetEmptyVBOpt(c, v, quorum, bal)
-    || (exists hsbal :: PromiseSetHighestVBOptVal(c, v, quorum, bal, hsbal, val))
+    || PromiseSetEmptyVB(c, v, quorum, bal)
+    || (exists hsbal :: PromiseSetHighestVB(c, v, quorum, bal, VB(val, hsbal)))
   )
 }
 
-predicate PromiseSetEmptyVBOpt(c: Constants, v: Variables, pset: set<Message>, qbal: LeaderId)
+predicate PromiseSetEmptyVB(c: Constants, v: Variables, pset: set<Message>, qbal: LeaderId)
   requires IsPromiseSet(c, v, pset, qbal)
 {
   forall m | m in pset :: m.vbOpt == None
 }
 
-predicate PromiseSetHighestVBOptVal(c: Constants, v: Variables, pset: set<Message>, qbal: LeaderId, hsBal: LeaderId, val: Value)
+predicate PromiseSetHighestVB(c: Constants, v: Variables, pset: set<Message>, qbal: LeaderId, vb: ValBal)
   requires IsPromiseSet(c, v, pset, qbal)
 {
-  exists m :: WinningPromiseMessageInQuorum(c, v, pset, qbal, hsBal, val, m)
+  exists m :: WinningPromiseMessageInQuorum(c, v, pset, qbal, vb, m)
 }
 
-predicate WinningPromiseMessageInQuorum(c: Constants, v: Variables, pset: set<Message>, qbal: LeaderId, hsBal: LeaderId, val: Value, m: Message)
+predicate WinningPromiseMessageInQuorum(c: Constants, v: Variables, pset: set<Message>, qbal: LeaderId, vb: ValBal, m: Message)
   requires IsPromiseSet(c, v, pset, qbal)
 {
     && m in pset 
-    && m.vbOpt.Some?
-    && m.vbOpt.value == VB(val, hsBal)
+    && m.vbOpt == Some(vb)
     && (forall other | 
           && other in pset 
           && other.vbOpt.Some?
         ::
-          other.vbOpt.value.b <= hsBal
+          other.vbOpt.value.b <= vb.b
       )
 }
 
