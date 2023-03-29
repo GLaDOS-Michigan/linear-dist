@@ -455,7 +455,6 @@ lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variab
   requires Next(c, v, v')
   ensures ProposeBackedByPromiseQuorum(c, v')
 {
-  assume false;  // Timeout from WinningPromiseMessageInQuorum
   forall p | p in v'.network.sentMsgs && p.Propose?
   ensures exists quorum :: PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val)
   {
@@ -467,7 +466,10 @@ lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variab
       if step.ProposeStep? && p !in v.network.sentMsgs {
         var quorum :| LeaderPromiseSetProperties(c, v, actor, quorum);  // witness
         if l.highestHeardBallot.Some? {
-          assert PromiseSetHighestVB(c, v', quorum, actor, VB(l.value, l.highestHeardBallot.value));  // trigger
+          // This is where HighestHeardBackedByReceivedPromises comes in
+          var leaderVB := VB(l.value, l.highestHeardBallot.value);
+          var m :| WinningPromiseMessageInQuorum(c, v, quorum, lc.id, leaderVB, m);  // witness
+          assert WinningPromiseMessageInQuorum(c, v', quorum, lc.id, leaderVB, m);  // trigger
         }
         assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
       } else {
