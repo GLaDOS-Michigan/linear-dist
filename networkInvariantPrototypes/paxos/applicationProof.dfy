@@ -341,7 +341,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextPromiseBalLargerThanAccepted(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
-  assume ChosenValImpliesPromiseQuorumSeesBal(c, v');
+  InvNextChosenValImpliesPromiseQuorumSeesBal(c, v, v');
   assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
   assume ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
   // assume ChosenValImpliesLargerAcceptorsHoldsVal(c, v');  // not sure if needed
@@ -677,6 +677,32 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     // Nothing new chosen
     NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
   } 
+}
+
+lemma InvNextChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+  ensures ChosenValImpliesPromiseQuorumSeesBal(c, v')
+{
+  forall chosenVb, prQuorum, pbal | 
+    && Chosen(c, v', chosenVb)
+    && IsPromiseQuorum(c, v', prQuorum, pbal)
+    && chosenVb.b < pbal
+  ensures
+    exists m: Message :: m in prQuorum && m.vbOpt.Some? && chosenVb.b <= m.vbOpt.value.b
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.LeaderStep? || dsStep.LearnerStep? {
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+      assert IsPromiseQuorum(c, v, prQuorum, pbal);  // trigger
+    } else {
+      var acQuorum :| IsAcceptQuorum(c, v', acQuorum, chosenVb);
+      var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v', prQuorum, pbal, acQuorum, chosenVb);
+      var m: Message :| m in prQuorum && m.acc == accId;  // witness
+      // m satisfies postcondition via AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+    }
+  }
 }
 
 // Lemma: For any Learn message, that learned value must have been chosen
