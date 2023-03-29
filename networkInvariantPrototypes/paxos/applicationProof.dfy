@@ -326,11 +326,9 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c, v, v');
   InvNextHighestHeardBackedByReceivedPromises(c, v, v');
   InvNextProposeBackedByPromiseQuorum(c, v, v');
+  InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextPromiseBalLargerThanAccepted(c, v, v');
-
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
-
-  assume AcceptorPromisedLargerThanAccepted(c, v');
   assume ChosenValImpliesPromiseQuorumSeesBal(c, v');
   assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
   assume ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
@@ -363,6 +361,12 @@ lemma InvNextAcceptMessagesValid(c: Constants, v: Variables, v': Variables)
 //   requires Next(c, v, v')
 //   ensures AcceptedImpliesLargerPromiseCarriesVb(c, v')
 // {}
+
+lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures AcceptorPromisedLargerThanAccepted(c, v')
+{}
 
 lemma InvNextPromiseBalLargerThanAccepted(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -514,7 +518,6 @@ lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
   requires AcceptMessagesValid(c, v')
   requires ProposeBackedByPromiseQuorum(c, v')
   requires OneValuePerProposeBallot(c, v')
-  // requires AcceptedImpliesLargerPromiseCarriesVb(c, v')
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
   requires PromiseVbImpliesProposed(c, v')
   requires PromiseBalLargerThanAccepted(c, v')
