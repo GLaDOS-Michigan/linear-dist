@@ -210,7 +210,7 @@ predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
     v.leaders[ldr].value == vb.v
 }
 
-// Inv: If vb is chosen, then for all Propose messages that have bal >= vb.b, they must have 
+// Inv: If vb is chosen, then for all Propose messages that have bal > vb.b, they must have 
 // value == vb.v
 // Tony: Using monotonic transformations, by recording the entire history of leader 
 // (value, highestHeardBallot) pairs, this becomes implicit from ChosenValImpliesLeaderOnlyHearsVal,
@@ -219,7 +219,7 @@ predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) {
   forall vb, propose | 
     && Chosen(c, v, vb)
     && IsProposeMessage(v, propose)
-    && propose.bal >= vb.b
+    && propose.bal > vb.b
   ::
     propose.val == vb.v
 }
@@ -242,16 +242,28 @@ predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) {
 
 // Inv: If vb is chosen, and the leader has a quorum of receivedPromises, then its 
 // highestHeardBallot must be >= vb.b. This ensures that they can only propose vb.v
+// predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+//   requires v.WF(c)
+// {
+//   forall vb, ldr | 
+//     && Chosen(c, v, vb) 
+//     && c.ValidLeaderIdx(ldr)
+//     && |v.leaders[ldr].receivedPromises| >= c.f+1
+//   ::
+//     && v.leaders[ldr].highestHeardBallot.Some?
+//     && v.leaders[ldr].highestHeardBallot.value >= vb.b
+// }
+
+// Inv: If vb is chosen, then all Promise quorums > vb.b must observe a ballot >= vb.b
 predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall vb, ldr | 
-    && Chosen(c, v, vb) 
-    && c.ValidLeaderIdx(ldr)
-    && |v.leaders[ldr].receivedPromises| >= c.f+1
+  forall vb, quorum, pbal | 
+    && Chosen(c, v, vb)
+    && IsPromiseQuorum(c, v, quorum, pbal)
+    && vb.b < pbal
   ::
-    && v.leaders[ldr].highestHeardBallot.Some?
-    && v.leaders[ldr].highestHeardBallot.value >= vb.b
+    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
 }
 
 // Application bundle
@@ -627,13 +639,28 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
   var dsStep :| NextStep(c, v, v', dsStep);
+  var actor, msgOps := dsStep.actor, dsStep.msgOps;
   if dsStep.LeaderStep? {
     /* This case is trivial. This is because if something has already been chosen, then
     * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
     * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
-    NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+    forall vb, propose | 
+      && Chosen(c, v', vb)
+      && IsProposeMessage(v', propose)
+      && propose.bal > vb.b
+    ensures
+      propose.val == vb.v
+    {
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+      assert Chosen(c, v, vb);
+      var l := v.leaders[actor];
+      if |l.receivedPromises| >= c.f+1 && propose !in v.network.sentMsgs {
+        var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
+        assert IsPromiseQuorum(c, v, pquorum, actor);  // trigger 
+        // remaining proof is true by ChosenValImpliesPromiseQuorumSeesBal
+      }
+    }
   } else if dsStep.AcceptorStep? {
-    var actor, msgOps := dsStep.actor, dsStep.msgOps;
     var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
     var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
     if step.ReceiveStep? && msgOps.recv.value.Propose? {
