@@ -383,7 +383,6 @@ lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v'
   requires Next(c, v, v')
   ensures HighestHeardBackedByReceivedPromises(c, v')
 {
-  assume false;  // Timeout from WinningPromiseMessageInQuorum
   var dsStep :| NextStep(c, v, v', dsStep);
   if dsStep.LeaderStep? {
     var actor, msgOps := dsStep.actor, dsStep.msgOps;
@@ -394,27 +393,62 @@ lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v'
     {
       if && step.ReceiveStep? && actor == idx 
         && msgOps.recv.value.Promise? 
+        && |l.receivedPromises| <= c.f
         && msgOps.recv.value.acc !in l.receivedPromises
         && msgOps.recv.value.bal == lc.id 
       {
         var pset :| LeaderPromiseSetProperties(c, v, idx, pset);
-        var pset' := pset + {msgOps.recv.value};  // witness
-        assert LeaderPromiseSetProperties(c, v', idx, pset');  // trigger
+        var newM := msgOps.recv.value;
+        var doUpdate := && newM.vbOpt.Some? 
+                        && (|| l.highestHeardBallot.None?
+                            || (l.highestHeardBallot.Some? && newM.vbOpt.value.b > l.highestHeardBallot.value));
+        if doUpdate {
+          var pset' := pset + {msgOps.recv.value};  // witness
+          // trigger them triggers
+          assert WinningPromiseMessageInQuorum(c, v', pset', idx, newM.vbOpt.value, newM);  
+          assert LeaderPromiseSetProperties(c, v', idx, pset');
+        } else {
+          var pset' := pset + {msgOps.recv.value};  // witness
+          if l.highestHeardBallot.Some? {
+            var highestheard := VB(l.value, l.highestHeardBallot.value);
+            var winningProm :| WinningPromiseMessageInQuorum(c, v, pset, idx, highestheard, winningProm);  // witness
+            assert WinningPromiseMessageInQuorum(c, v', pset', idx, highestheard, winningProm);  // trigger
+          }
+          assert LeaderPromiseSetProperties(c, v', idx, pset');  // trigger
+        }
       } else {
-        var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
-        assert LeaderPromiseSetProperties(c, v', idx, pset);  // trigger
+        InvNextHighestHeardBackedByReceivedPromisesHelper(c, v, v', dsStep, idx);
       }
     }
   } else {
     forall idx | c.ValidLeaderIdx(idx)
     ensures exists pset' :: LeaderPromiseSetProperties(c, v', idx, pset')
     {
-      var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
-      assert LeaderPromiseSetProperties(c, v', idx, pset);  // trigger
+      InvNextHighestHeardBackedByReceivedPromisesHelper(c, v, v', dsStep, idx);
     }
   }
 }
 
+// Helper lemma for InvNextHighestHeardBackedByReceivedPromises in the case where the 
+// leader stutters. Basically tickling triggers in Dafny
+lemma InvNextHighestHeardBackedByReceivedPromisesHelper(c: Constants, v: Variables, v': Variables,
+  dsStep: Step, idx: nat) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires NextStep(c, v, v', dsStep)
+  requires c.ValidLeaderIdx(idx)
+  requires v'.leaders[idx] == v.leaders[idx]
+  ensures exists pset' :: LeaderPromiseSetProperties(c, v', idx, pset')
+{
+  var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
+  var l := v.leaders[idx];
+  if l.highestHeardBallot.Some? {
+    var highestheard := VB(l.value, l.highestHeardBallot.value);
+    var winningProm :| WinningPromiseMessageInQuorum(c, v, pset, idx, highestheard, winningProm);  // witness
+    assert WinningPromiseMessageInQuorum(c, v', pset, idx, highestheard, winningProm);  // trigger
+  }
+  assert LeaderPromiseSetProperties(c, v', idx, pset);  // trigger
+}
 
 lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)

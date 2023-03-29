@@ -83,9 +83,9 @@ module LeaderHost {
               value :=  if doUpdate then vbOpt.value.v else v.value,
               highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
             )
-        else 
-          // this promise is not for me
-          NextStutterStep(c, v, v', msgOps)
+          else 
+            // this promise is not for me
+            NextStutterStep(c, v, v', msgOps)
       case _ =>
         NextStutterStep(c, v, v', msgOps)
   }
