@@ -486,11 +486,12 @@ lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables
   requires IsProposeMessage(v', p)
   ensures exists quorum :: PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val)
 {
-  assume false;  // Timeout from WinningPromiseMessageInQuorum
   var quorum :| PromiseQuorumSupportsVal(c, v, quorum, p.bal, p.val);  // witness
   if !PromiseSetEmptyVB(c, v, quorum, p.bal) {
     var hsbal :| PromiseSetHighestVB(c, v, quorum, p.bal, VB(p.val, hsbal));  // witness
-    assert PromiseSetHighestVB(c, v', quorum, p.bal, VB(p.val, hsbal));  // trigger
+    var vb := VB(p.val, hsbal);
+    var m :| WinningPromiseMessageInQuorum(c, v, quorum, p.bal, vb, m); // witness
+    assert WinningPromiseMessageInQuorum(c, v', quorum, p.bal, vb, m); // trigger
   }
   assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
 }
