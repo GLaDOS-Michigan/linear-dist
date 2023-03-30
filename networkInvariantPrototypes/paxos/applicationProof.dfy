@@ -293,6 +293,9 @@ predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorPromisedLargerThanAccepted(c, v)
   && PromiseBalLargerThanAccepted(c, v)
   && ChosenValImpliesProposeOnlyVal(c, v)
+
+  // TODO: Can all the ChosenImplies- below be proven as lemmas rather than stated as invariants?
+  // It seems that they can all be proven from ChosenValImpliesProposeOnlyVal
   && ChosenValImpliesPromiseQuorumSeesBal(c, v)
   && ChosenValImpliesLeaderOnlyHearsVal(c, v)
   && ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v)
@@ -355,9 +358,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
   InvNextChosenValImpliesPromiseQuorumSeesBal(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
-
-
-  assume ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
+  InvNextChosenValImpliesLargerAcceptMsgsHoldsVal(c, v, v');
   // assume ChosenValImpliesLargerAcceptorsHoldsVal(c, v');  // not sure if needed
   // assume ChosenValImpliesPromiseVBOnlyVal(c, v');  // not sure if needed
   AtMostOneChosenValNext(c, v, v');
@@ -766,6 +767,35 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
   }
 }
 
+lemma InvNextChosenValImpliesLargerAcceptMsgsHoldsVal(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires OneValuePerProposeBallot(c, v')
+  requires AcceptMessageImpliesProposed(c, v')
+  requires ChosenValImpliesProposeOnlyVal(c, v')
+  ensures ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v')
+{
+  forall chosenVb, acc | 
+    && Chosen(c, v', chosenVb) 
+    && IsAcceptMessage(v', acc)
+    && acc.vb.b >= chosenVb.b
+  ensures
+    acc.vb.v == chosenVb.v
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.LeaderStep? || dsStep.LearnerStep? {
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+    } else {
+      if acc.vb.v != chosenVb.v {
+      /* Note that acc.vb.b != chosenVb.b by OneValuePerAcceptBallotLemma.
+      * By AcceptMessageImpliesProposed, there is a Propose for acc.vb
+      * This violates ChosenValImpliesProposeOnlyVal. */ 
+        OneValuePerAcceptBallotLemma(c, v');
+        assert false;
+      }
+    }
+  }
+}
 
 
 // Lemma: For any Learn message, that learned value must have been chosen
