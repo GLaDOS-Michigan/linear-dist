@@ -35,6 +35,16 @@ predicate OneValuePerProposeBallot(c: Constants, v: Variables)
     p1.val == p2.val
 }
 
+predicate PromiseVbImpliesAccepted(c: Constants, v: Variables) {
+  forall prom | 
+    && IsPromiseMessage(v, prom)
+    && prom.vbOpt.Some?
+  ::
+    Accept(prom.vbOpt.value, prom.acc) in v.network.sentMsgs
+}
+
+// TODO: This is implied by PromiseVbImpliesProposed and AcceptMessageImpliesProposed, and
+// should be removed
 // For all Promise messages with a non-None vbOpt, the accepted vb must be from a 
 // prior Propose message
 // Tony: This can be turned into two message invariants. Promise message vbOpt being
@@ -272,6 +282,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires MessageInv(c, v)
 {
   && OneValuePerProposeBallot(c, v)
+  && PromiseVbImpliesAccepted(c, v)
   && PromiseVbImpliesProposed(c, v)
   && AcceptMessageImpliesProposed(c, v)
   && AcceptMessagesValid(c, v)
@@ -331,6 +342,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   MessageInvInductive(c, v, v');
 
   assume OneValuePerProposeBallot(c, v');
+  InvNextPromiseVbImpliesAccepted(c, v, v');
   InvNextPromiseVbImpliesProposed(c, v, v');
   InvNextAcceptMessageImpliesProposed(c, v, v');
   InvNextAcceptMessagesValid(c, v, v');
@@ -342,13 +354,21 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextPromiseBalLargerThanAccepted(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
   InvNextChosenValImpliesPromiseQuorumSeesBal(c, v, v');
-  assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
+  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
+
+
   assume ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v');
   // assume ChosenValImpliesLargerAcceptorsHoldsVal(c, v');  // not sure if needed
   // assume ChosenValImpliesPromiseVBOnlyVal(c, v');  // not sure if needed
   AtMostOneChosenValNext(c, v, v');
   AtMostOneChosenImpliesAgreement(c, v');
 }
+
+lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures PromiseVbImpliesAccepted(c, v')
+{}
 
 lemma InvNextPromiseVbImpliesProposed(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -704,6 +724,43 @@ lemma InvNextChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables, v'
     }
   }
 }
+
+
+lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
+{
+  forall chosenVb, idx | 
+    && Chosen(c, v', chosenVb) 
+    && c.ValidLeaderIdx(idx)
+    && v'.leaders[idx].highestHeardBallot.Some?
+    && v'.leaders[idx].highestHeardBallot.value >= chosenVb.b
+  ensures
+    v'.leaders[idx].value == chosenVb.v
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.LeaderStep? || dsStep.LearnerStep? {
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+    } else {
+      /* Suppose leader l has l.value != chosenVb.v. By LeaderValidHighestHeard, there is
+      * is a Promise message carrying VB(l.value, l.highestHeard). 
+      * By PromiseVbImpliesAccepted, there is an Accept message for VB(l.value, l.highestHeard).
+      * This violates AcceptedImpliesLargerPromiseCarriesVb.
+      */ 
+
+
+      assume false;
+
+
+    }
+  }
+
+
+  // may need AcceptedImpliesLargerPromiseCarriesVb
+}
+
+
 
 // Lemma: For any Learn message, that learned value must have been chosen
 lemma LearnedImpliesChosen(c: Constants, v: Variables, learnMsg: Message)

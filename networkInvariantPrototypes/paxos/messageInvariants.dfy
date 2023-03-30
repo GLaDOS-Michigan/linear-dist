@@ -63,7 +63,7 @@ predicate AcceptorValidPromised(c: Constants, v: Variables)
 
 // certified self-inductive
 // Acceptor updates its acceptedVB based on a Propose message carrying that ballot 
-// and value
+// and value, and there is also a corresponding Accept message
 predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
   requires v.WF(c)
 {
@@ -71,7 +71,8 @@ predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
     && c.ValidAcceptorIdx(idx) 
     && v.acceptors[idx].acceptedVB == Some(VB(val, bal))
   :: 
-    Propose(bal, val) in v.network.sentMsgs
+    && Propose(bal, val) in v.network.sentMsgs
+    && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
 }
 
 // TODO: This is self-inductive, but doesn't feel to be in the spirit of message invariants.
