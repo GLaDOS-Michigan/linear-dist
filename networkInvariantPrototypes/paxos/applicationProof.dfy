@@ -729,6 +729,11 @@ lemma InvNextChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables, v'
 lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
+  requires MessageInv(c, v')
+  requires OneValuePerProposeBallot(c, v')
+  requires AcceptMessageImpliesProposed(c, v')
+  requires PromiseVbImpliesAccepted(c, v')
+  requires ChosenValImpliesProposeOnlyVal(c, v')
   ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
 {
   forall chosenVb, idx | 
@@ -746,18 +751,19 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
       /* Suppose leader l has l.value != chosenVb.v. By LeaderValidHighestHeard, there is
       * is a Promise message carrying VB(l.value, l.highestHeard). 
       * By PromiseVbImpliesAccepted, there is an Accept message for VB(l.value, l.highestHeard).
-      * This violates AcceptedImpliesLargerPromiseCarriesVb.
-      */ 
-
-
-      assume false;
-
-
+      * Note that l.highestHeard != chosenVb.b by OneValuePerAcceptBallotLemma.
+      * By AcceptMessageImpliesProposed, there is a Propose for VB(l.value, l.highestHeard)
+      * This violates ChosenValImpliesProposeOnlyVal. */ 
+      var lc, l, l' := c.leaderConstants[idx], v.leaders[idx], v'.leaders[idx];
+      if l'.value != chosenVb.v {
+        var prom :| && IsPromiseMessage(v', prom)  // by LeaderValidHighestHeard
+                    && prom.bal == lc.id
+                    && prom.vbOpt == Some(VB(l'.value, l'.highestHeardBallot.value));
+        OneValuePerAcceptBallotLemma(c, v');
+        assert false;  // violates ChosenValImpliesProposeOnlyVal
+      }
     }
   }
-
-
-  // may need AcceptedImpliesLargerPromiseCarriesVb
 }
 
 
@@ -829,6 +835,23 @@ lemma AtMostOneChosenValNext(c: Constants, v: Variables, v': Variables)
 /***************************************************************************************
 *                                        Utils                                         *
 ***************************************************************************************/
+
+// This is a consequence of OneValuePerProposeBallot, and AcceptMessageImpliesProposed
+predicate OneValuePerAcceptBallot(c: Constants, v: Variables)
+{
+  forall a1, a2 | 
+    && IsAcceptMessage(v, a1)
+    && IsAcceptMessage(v, a2)
+    && a1.vb.b == a2.vb.b
+  ::
+    a1.vb.v == a2.vb.v
+}
+
+lemma OneValuePerAcceptBallotLemma(c: Constants, v: Variables)
+  requires OneValuePerProposeBallot(c, v)
+  requires AcceptMessageImpliesProposed(c, v)
+  ensures OneValuePerAcceptBallot(c, v)
+{}
 
 // Lemma: Given b1 < b2, there is a finite, strictly ordered sequence 
 // [b1, b_a, b_b, ... , b_2] such that for all ballots b where b1 < b < b2, b in seq
