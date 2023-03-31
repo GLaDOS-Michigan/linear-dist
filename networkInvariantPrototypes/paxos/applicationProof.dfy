@@ -156,19 +156,6 @@ predicate PromiseBalLargerThanAccepted(c: Constants, v: Variables) {
     prom.vbOpt.value.b < prom.bal
 }
 
-// Inv: If vb is chosen, then for all Accept messages that have msg.vb.b >= vb.b, they have
-// msg.vb.v == vb.v
-predicate ChosenValImpliesLargerAcceptMsgsHoldsVal(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall vb, msg | 
-    && Chosen(c, v, vb) 
-    && IsAcceptMessage(v, msg)
-    && msg.vb.b >= vb.b
-  ::
-    msg.vb.v == vb.v
-}
-
 // Inv: If vb is chosen, then for all leaders that have highestHeard >= vb.b, they must have 
 // value == vb.v
 predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables) 
@@ -229,7 +216,6 @@ predicate ApplicationInv(c: Constants, v: Variables)
   // It seems that they can all be proven from ChosenValImpliesProposeOnlyVal
   && ChosenValImpliesPromiseQuorumSeesBal(c, v)
   && ChosenValImpliesLeaderOnlyHearsVal(c, v)
-  && ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v)
   && AtMostOneChosenVal(c, v)
 }
 
@@ -284,8 +270,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
   InvNextChosenValImpliesPromiseQuorumSeesBal(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
-  InvNextChosenValImpliesLargerAcceptMsgsHoldsVal(c, v, v');
-  AtMostOneChosenValNext(c, v, v');
+  InvNextAtMostOneChosenVal(c, v, v');
   AtMostOneChosenImpliesAgreement(c, v');
 }
 
@@ -695,35 +680,15 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
   }
 }
 
-lemma InvNextChosenValImpliesLargerAcceptMsgsHoldsVal(c: Constants, v: Variables, v': Variables) 
+lemma InvNextAtMostOneChosenVal(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   requires OneValuePerProposeBallot(c, v')
   requires AcceptMessageImpliesProposed(c, v')
   requires ChosenValImpliesProposeOnlyVal(c, v')
-  ensures ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v')
-{
-  forall chosenVb, acc | 
-    && Chosen(c, v', chosenVb) 
-    && IsAcceptMessage(v', acc)
-    && acc.vb.b >= chosenVb.b
-  ensures
-    acc.vb.v == chosenVb.v
-  {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    if dsStep.LeaderStep? || dsStep.LearnerStep? {
-      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-    } else {
-      if acc.vb.v != chosenVb.v {
-      /* Note that acc.vb.b != chosenVb.b by OneValuePerAcceptBallotLemma.
-      * By AcceptMessageImpliesProposed, there is a Propose for acc.vb
-      * This violates ChosenValImpliesProposeOnlyVal. */ 
-        OneValuePerAcceptBallotLemma(c, v');
-        assert false;
-      }
-    }
-  }
-}
+  ensures AtMostOneChosenVal(c, v')
+{}
+
 
 
 // Lemma: For any Learn message, that learned value must have been chosen
@@ -780,15 +745,6 @@ lemma AtMostOneChosenImpliesAgreement(c: Constants, v: Variables)
     assert false;
   }
 }
-
-// Lemma: Invariant AtMostOneChosenVal is inductive
-lemma AtMostOneChosenValNext(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires ChosenValImpliesLargerAcceptMsgsHoldsVal(c, v')
-  ensures AtMostOneChosenVal(c, v')
-{}
-
 
 /***************************************************************************************
 *                                        Utils                                         *
