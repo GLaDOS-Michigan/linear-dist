@@ -55,22 +55,6 @@ predicate PromiseVbImpliesAccepted(c: Constants, v: Variables) {
     Accept(prom.vbOpt.value, prom.acc) in v.network.sentMsgs
 }
 
-// TODO: This is implied by PromiseVbImpliesProposed and AcceptMessageImpliesProposed, and
-// should be removed
-// For all Promise messages with a non-None vbOpt, the accepted vb must be from a 
-// prior Propose message
-// Tony: This can be turned into two message invariants. Promise message vbOpt being
-// non-None means that the acceptor accepted that value at some point in time.
-// Then the value being accepted at some point also means that there is some corresponding
-// Propose message.
-predicate PromiseVbImpliesProposed(c: Constants, v: Variables) {
-  forall prom | 
-    && IsPromiseMessage(v, prom)
-    && prom.vbOpt.Some?
-  ::
-    Propose(prom.vbOpt.value.b, prom.vbOpt.value.v) in v.network.sentMsgs
-}
-
 // For every Accept message in the network, there is a corresponding Propose message
 // Tony: This can be turned into two message invariants. Accept message in the network
 // means that the acceptor accepted that value at some point in time.
@@ -232,7 +216,6 @@ predicate ApplicationInv(c: Constants, v: Variables)
 {
   && ProposeImpliesLeaderState(c, v)
   && PromiseVbImpliesAccepted(c, v)
-  && PromiseVbImpliesProposed(c, v)
   && AcceptMessageImpliesProposed(c, v)
   && AcceptMessagesValid(c, v)
   && AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
@@ -291,7 +274,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   MessageInvInductive(c, v, v');
   InvNextProposeImpliesLeaderState(c, v, v');
   InvNextPromiseVbImpliesAccepted(c, v, v');
-  InvNextPromiseVbImpliesProposed(c, v, v');
   InvNextAcceptMessageImpliesProposed(c, v, v');
   InvNextAcceptMessagesValid(c, v, v');
   InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c, v, v');
@@ -327,12 +309,6 @@ lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
     Accept(prom.vbOpt.value, prom.acc) in v'.network.sentMsgs
   {}  // trigger
 }
-
-lemma InvNextPromiseVbImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures PromiseVbImpliesProposed(c, v')
-{}
 
 lemma InvNextAcceptMessageImpliesProposed(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
@@ -503,7 +479,7 @@ lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
   requires ProposeBackedByPromiseQuorum(c, v')
   requires OneValuePerProposeBallot(c, v')
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
-  requires PromiseVbImpliesProposed(c, v')
+  requires PromiseVbImpliesAccepted(c, v')
   requires PromiseBalLargerThanAccepted(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
@@ -556,7 +532,8 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   requires AcceptMessagesValid(c, v)
   requires ProposeBackedByPromiseQuorum(c, v)
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
-  requires PromiseVbImpliesProposed(c, v)
+  requires PromiseVbImpliesAccepted(c, v)
+  requires AcceptMessageImpliesProposed(c, v)
   requires PromiseBalLargerThanAccepted(c, v)
   requires Chosen(c, v, chosenVb)
   requires IsProposeMessage(v, p)
@@ -573,12 +550,12 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   *
   * Because prQuorum supports proposal p, there must be a b' such that 
   * PromiseSetHighestVB(c, v, prQ, p.bal, b', p.val), and 
-  * chosenVb.b <= b'. By PromiseVbImpliesProposed and OneValuePerProposeBallot,
-  * we have chosenVb.b < b'.
+  * chosenVb.b <= b'. By PromiseVbImpliesAccepted and AcceptMessageImpliesProposed and 
+  * OneValuePerProposeBallot, we have chosenVb.b < b'.
   * Moreover, PromiseBalLargerThanAccepted gives prom'.vbOpt.bal < p.b.
   * As such, we have chosenVb.b < prom'.vbOpt.bal < prom'.vbOpt.bal < p.b.
-  * By PromiseVbImpliesProposed, prom' is supported by a corresponding prop'. 
-  *
+  * By PromiseVbImpliesAccepted and AcceptMessageImpliesProposed, prom' is supported by 
+  * a corresponding prop'. 
   * Finally, we make recursive call using prop' */
 
   var prQuorum :| PromiseQuorumSupportsVal(c, v, prQuorum, p.bal, p.val); // promise quorum supporting p
@@ -589,7 +566,7 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   var b' :| PromiseSetHighestVB(c, v, prQuorum, p.bal, VB(p.val, b'));
   var prom' :| WinningPromiseMessageInQuorum(c, v, prQuorum, p.bal, VB(p.val, b'),  prom');
 
-  // Corresponding Propose to prom', by PromiseVbImpliesProposed
+  // Corresponding Propose to prom', by PromiseVbImpliesAccepted and AcceptMessageImpliesProposed
   var prop' := Propose(b', p.val);
   assert prop' in v.network.sentMsgs;
 
@@ -606,7 +583,7 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   requires ProposeBackedByPromiseQuorum(c, v')
   requires OneValuePerProposeBallot(c, v')
   requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
-  requires PromiseVbImpliesProposed(c, v')
+  requires PromiseVbImpliesAccepted(c, v')
   requires PromiseBalLargerThanAccepted(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
