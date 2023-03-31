@@ -147,7 +147,7 @@ predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables)
 }
 
 // For all Promise messages prom, prom.bal > prom.vbOpt.value.b
-// TODO: This may supersede AcceptorPromisedLargerThanAccepted
+// Tony: This becomes pure application invariant when acceptor keeps history of its entire state
 predicate PromiseBalLargerThanAccepted(c: Constants, v: Variables) {
   forall prom | 
     && IsPromiseMessage(v, prom)
