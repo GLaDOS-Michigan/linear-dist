@@ -107,6 +107,8 @@ predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
     Accept(vb, acc) in v.network.sentMsgs
 }
 
+// TODO: This is self-inductive, but doesn't feel to be in the spirit of message invariants.
+// It is based on application knowledge that receivedAccepts is a monotonic set.
 // certified self-inductive, modulo ValidMessageSrc(c, v)
 // For every Learn(lnr, val) message in the network, the learner must have a quorum of
 // accepts for that val, at some common ballot

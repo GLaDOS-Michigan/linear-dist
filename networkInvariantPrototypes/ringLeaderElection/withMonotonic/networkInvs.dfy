@@ -23,6 +23,8 @@ module NetworkInvariants {
   }
 
   // Every message's val less than or eq max(highest seen of nodes[msg.src], hostid of nodes[mag.src])
+  // TODO: This is not a network invariant. It relies on the application knowledge that 
+  // the RHS of the inequality is monotonically increasing
   predicate payloadLeqSenderMax(c: Constants, v: Variables) 
     requires v.WF(c)
   {
