@@ -75,23 +75,7 @@ predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
     && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
 }
 
-// TODO: This is self-inductive, but doesn't feel to be in the spirit of message invariants.
-// It feels like an application invariant, but leaving this here for now. 
-// I think in the full monotonic protocol, this would become an invariant on the acceptor 
-//local state.
-// Every Promise message in the network has a ballot upper-bounded by the promised ballot
-// of the source acceptor
-predicate AcceptorPromisedMonotonic(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall idx, prom | 
-    && c.ValidAcceptorIdx(idx) 
-    && IsPromiseMessage(v, prom)
-    && prom.acc == c.acceptorConstants[idx].id
-  ::
-    && v.acceptors[idx].promised.Some?
-    && prom.bal <= v.acceptors[idx].promised.value
-}
+
 
 // certified self-inductive
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
@@ -107,23 +91,6 @@ predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
     Accept(vb, acc) in v.network.sentMsgs
 }
 
-// TODO: This is self-inductive, but doesn't feel to be in the spirit of message invariants.
-// It is based on application knowledge that receivedAccepts is a monotonic set.
-// certified self-inductive, modulo ValidMessageSrc(c, v)
-// For every Learn(lnr, val) message in the network, the learner must have a quorum of
-// accepts for that val, at some common ballot
-predicate LearnMsgsValid(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
-{
-  forall lnr:LearnerId, bal, val | 
-    Learn(lnr, bal, val) in v.network.sentMsgs
-  :: 
-    && var vb := VB(val, bal);
-    && vb in v.learners[lnr].receivedAccepts
-    && |v.learners[lnr].receivedAccepts[vb]| >= c.f+1
-}
-
 // Message bundle
 predicate MessageInv(c: Constants, v: Variables) 
 {
@@ -133,9 +100,7 @@ predicate MessageInv(c: Constants, v: Variables)
   && LeaderValidReceivedPromises(c, v)
   && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB(c, v)
-  && AcceptorPromisedMonotonic(c, v)
   && LearnerValidReceivedAccepts(c, v)
-  && LearnMsgsValid(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
