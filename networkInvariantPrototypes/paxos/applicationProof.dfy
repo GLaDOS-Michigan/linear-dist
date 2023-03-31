@@ -156,20 +156,6 @@ predicate PromiseBalLargerThanAccepted(c: Constants, v: Variables) {
     prom.vbOpt.value.b < prom.bal
 }
 
-// Inv: If vb is chosen, then for all leaders that have highestHeard >= vb.b, they must have 
-// value == vb.v
-predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall vb, ldr | 
-    && Chosen(c, v, vb) 
-    && c.ValidLeaderIdx(ldr)
-    && v.leaders[ldr].highestHeardBallot.Some?
-    && v.leaders[ldr].highestHeardBallot.value >= vb.b
-  ::
-    v.leaders[ldr].value == vb.v
-}
-
 // Inv: If vb is chosen, then for all Propose messages that have bal > vb.b, they must have 
 // value == vb.v
 // Tony: Using monotonic transformations, by recording the entire history of leader 
@@ -202,7 +188,6 @@ predicate ApplicationInv(c: Constants, v: Variables)
 
   // TODO: Can all the ChosenImplies- below be proven as lemmas rather than stated as invariants?
   // It seems that they can all be proven from ChosenValImpliesProposeOnlyVal
-  && ChosenValImpliesLeaderOnlyHearsVal(c, v)
   && AtMostOneChosenVal(c, v)
 }
 
@@ -255,7 +240,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextPromiseBalLargerThanAccepted(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
-  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextAtMostOneChosenVal(c, v, v');
   AtMostOneChosenImpliesAgreement(c, v');
 }
@@ -598,46 +582,6 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     // Nothing new chosen
     NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
   } 
-}
-
-lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires MessageInv(c, v')
-  requires OneValuePerProposeBallot(c, v')
-  requires AcceptMessageImpliesProposed(c, v')
-  requires PromiseVbImpliesAccepted(c, v')
-  requires ChosenValImpliesProposeOnlyVal(c, v')
-  ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
-{
-  forall chosenVb, idx | 
-    && Chosen(c, v', chosenVb) 
-    && c.ValidLeaderIdx(idx)
-    && v'.leaders[idx].highestHeardBallot.Some?
-    && v'.leaders[idx].highestHeardBallot.value >= chosenVb.b
-  ensures
-    v'.leaders[idx].value == chosenVb.v
-  {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    if dsStep.LeaderStep? || dsStep.LearnerStep? {
-      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-    } else {
-      /* Suppose leader l has l.value != chosenVb.v. By LeaderValidHighestHeard, there is
-      * is a Promise message carrying VB(l.value, l.highestHeard). 
-      * By PromiseVbImpliesAccepted, there is an Accept message for VB(l.value, l.highestHeard).
-      * Note that l.highestHeard != chosenVb.b by OneValuePerAcceptBallotLemma.
-      * By AcceptMessageImpliesProposed, there is a Propose for VB(l.value, l.highestHeard)
-      * This violates ChosenValImpliesProposeOnlyVal. */ 
-      var lc, l, l' := c.leaderConstants[idx], v.leaders[idx], v'.leaders[idx];
-      if l'.value != chosenVb.v {
-        var prom :| && IsPromiseMessage(v', prom)  // by LeaderValidHighestHeard
-                    && prom.bal == lc.id
-                    && prom.vbOpt == Some(VB(l'.value, l'.highestHeardBallot.value));
-        OneValuePerAcceptBallotLemma(c, v');
-        assert false;  // violates ChosenValImpliesProposeOnlyVal
-      }
-    }
-  }
 }
 
 lemma InvNextAtMostOneChosenVal(c: Constants, v: Variables, v': Variables) 
