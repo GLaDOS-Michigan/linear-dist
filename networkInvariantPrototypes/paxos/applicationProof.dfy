@@ -191,8 +191,9 @@ predicate Inv(c: Constants, v: Variables)
 
 
 /***************************************************************************************
-*                                        Proof                                         *
+*                                Top-level Obligations                                 *
 ***************************************************************************************/
+
 
 lemma InvImpliesSafety(c: Constants, v: Variables)
   requires Inv(c, v)
@@ -233,6 +234,12 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
   MessageAndApplicationInvImpliesAgreement(c, v');
 }
+
+
+
+/***************************************************************************************
+*                                 InvNext Proofs                                       *
+***************************************************************************************/
 
 lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -390,6 +397,7 @@ lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variab
   }
 }
 
+// Helper lemma for InvNextProposeBackedByPromiseQuorum
 lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables, v': Variables, p: Message) 
   requires Inv(c, v)
   requires Next(c, v, v')
@@ -407,6 +415,62 @@ lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables
   assert PromiseQuorumSupportsVal(c, v', quorum, p.bal, p.val);  // trigger
 }
 
+// This is the core Paxos lemma
+lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires AcceptMessageImpliesProposed(c, v')
+  requires AcceptMessagesValid(c, v')
+  requires ProposeBackedByPromiseQuorum(c, v')
+  requires OneValuePerProposeBallot(c, v')
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+  requires PromiseVbImpliesAccepted(c, v')
+  requires PromiseBalLargerThanAccepted(c, v')
+  ensures ChosenValImpliesProposeOnlyVal(c, v')
+{
+  InvImpliesChosenValImpliesPromiseQuorumSeesBal(c, v);
+  var dsStep :| NextStep(c, v, v', dsStep);
+  var actor, msgOps := dsStep.actor, dsStep.msgOps;
+  if dsStep.LeaderStep? {
+    /* This case is trivial. This is because if something has already been chosen, then
+    * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
+    * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
+    forall vb, propose | 
+      && Chosen(c, v', vb)
+      && IsProposeMessage(v', propose)
+      && propose.bal > vb.b
+    ensures
+      propose.val == vb.v
+    {
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+      assert Chosen(c, v, vb);
+      var l := v.leaders[actor];
+      if |l.receivedPromises| >= c.f+1 && propose !in v.network.sentMsgs {
+        var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
+        assert IsPromiseQuorum(c, v, pquorum, actor);  // trigger 
+        // remaining proof is true by ChosenValImpliesPromiseQuorumSeesBal
+      }
+    }
+  } else if dsStep.AcceptorStep? {
+    var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
+    var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+    if step.ReceiveStep? && msgOps.recv.value.Propose? {
+      InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(c, v, v', dsStep, step);
+    } else {
+      forall vb | Chosen(c, v', vb)
+      ensures Chosen(c, v, vb)
+      {
+        var quorum :| IsAcceptQuorum(c, v', quorum, vb);  // witness
+        assert IsAcceptQuorum(c, v, quorum, vb);  // trigger
+      }
+    }
+  } else {
+    // Nothing new chosen
+    NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+  } 
+}
+
+// Helper lemma for InvNextChosenValImpliesProposeOnlyVal
 lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
   c: Constants, v: Variables, v': Variables, dsStep: Step, step: AcceptorHost.Step)
   requires Inv(c, v)
@@ -469,7 +533,7 @@ lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
   }
 }
 
-// Here lies most of the heavy-lifting Paxos logic
+// InvNextChosenValImpliesProposeOnlyVal. Here lies most of the heavy-lifting Paxos logic
 lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosenVb: ValBal, p: Message) 
   requires MessageInv(c, v)
   requires OneValuePerProposeBallot(c, v)
@@ -520,59 +584,9 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
 }
 
 
-lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires AcceptMessageImpliesProposed(c, v')
-  requires AcceptMessagesValid(c, v')
-  requires ProposeBackedByPromiseQuorum(c, v')
-  requires OneValuePerProposeBallot(c, v')
-  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
-  requires PromiseVbImpliesAccepted(c, v')
-  requires PromiseBalLargerThanAccepted(c, v')
-  ensures ChosenValImpliesProposeOnlyVal(c, v')
-{
-  InvImpliesChosenValImpliesPromiseQuorumSeesBal(c, v);
-  var dsStep :| NextStep(c, v, v', dsStep);
-  var actor, msgOps := dsStep.actor, dsStep.msgOps;
-  if dsStep.LeaderStep? {
-    /* This case is trivial. This is because if something has already been chosen, then
-    * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
-    * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
-    forall vb, propose | 
-      && Chosen(c, v', vb)
-      && IsProposeMessage(v', propose)
-      && propose.bal > vb.b
-    ensures
-      propose.val == vb.v
-    {
-      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-      assert Chosen(c, v, vb);
-      var l := v.leaders[actor];
-      if |l.receivedPromises| >= c.f+1 && propose !in v.network.sentMsgs {
-        var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
-        assert IsPromiseQuorum(c, v, pquorum, actor);  // trigger 
-        // remaining proof is true by ChosenValImpliesPromiseQuorumSeesBal
-      }
-    }
-  } else if dsStep.AcceptorStep? {
-    var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
-    var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-    if step.ReceiveStep? && msgOps.recv.value.Propose? {
-      InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(c, v, v', dsStep, step);
-    } else {
-      forall vb | Chosen(c, v', vb)
-      ensures Chosen(c, v, vb)
-      {
-        var quorum :| IsAcceptQuorum(c, v', quorum, vb);  // witness
-        assert IsAcceptQuorum(c, v, quorum, vb);  // trigger
-      }
-    }
-  } else {
-    // Nothing new chosen
-    NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-  } 
-}
+/***************************************************************************************
+*                            Helper Definitions and Lemmas                             *
+***************************************************************************************/
 
 
 // Lemma: For any Learn message, that learned value must have been chosen
@@ -628,9 +642,6 @@ lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables)
   }
 }
 
-/***************************************************************************************
-*                                        Utils                                         *
-***************************************************************************************/
 
 // This is a consequence of OneValuePerProposeBallot, and AcceptMessageImpliesProposed
 predicate OneValuePerAcceptBallot(c: Constants, v: Variables)
@@ -665,7 +676,6 @@ predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables)
 // lemma: Inv implies that ChosenValImpliesPromiseQuorumSeesBal
 lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
   requires Inv(c, v)
-  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
   ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
 {
   forall chosenVb, prQuorum, pbal | 
@@ -682,19 +692,6 @@ lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables)
   }
 }
 
-// Lemma: Given b1 < b2, there is a finite, strictly ordered sequence 
-// [b1, b_a, b_b, ... , b_2] such that for all ballots b where b1 < b < b2, b in seq
-lemma FiniteBallots(b1: LeaderId, b2: LeaderId) returns (res: seq<LeaderId>)
-  requires b1 < b2
-  ensures SeqIsComplete(res, b1, b2)
-{
-  if b1 == b2 - 1 {
-    return [b1, b2];
-  } else {
-    var sub := FiniteBallots(b1, b2-1);
-    return sub + [b2];
-  }
-}
 
 lemma QuorumFromReceivedAccepts(s: set<AcceptorId>, vb: ValBal) returns (q: set<Message>)
   decreases s
