@@ -77,7 +77,7 @@ module DistributedSystem {
     predicate WF(c: Constants) {
       && c.WF()
       && LeaderHost.GroupWF(c.leaderConstants, leaders, c.f)
-      && AcceptorHost.GroupWF(c.acceptorConstants, acceptors)
+      && AcceptorHost.GroupWF(c.acceptorConstants, acceptors, c.f)
       && LearnerHost.GroupWF(c.learnerConstants, learners, c.f)
     }
   }
@@ -86,7 +86,7 @@ module DistributedSystem {
   {
     && v.WF(c)
     && LeaderHost.GroupInit(c.leaderConstants, v.leaders, c.f)
-    && AcceptorHost.GroupInit(c.acceptorConstants, v.acceptors)
+    && AcceptorHost.GroupInit(c.acceptorConstants, v.acceptors, c.f)
     && LearnerHost.GroupInit(c.learnerConstants, v.learners, c.f)
 
     && Network.Init(v.network)

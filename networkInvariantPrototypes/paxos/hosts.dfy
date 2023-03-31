@@ -141,13 +141,13 @@ module AcceptorHost {
         :: ConstantsValidForAcceptor(grp_c[idx], idx))
   }
 
-  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>) {
+  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWFConstants(grp_c)
-    && |grp_v| == |grp_c|
+    && |grp_v| == |grp_c| == 2*f+1
   }
 
-  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>) {
-    && GroupWF(grp_c, grp_v)
+  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && GroupWF(grp_c, grp_v, f)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
   }
 
