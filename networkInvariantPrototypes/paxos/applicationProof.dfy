@@ -184,18 +184,6 @@ predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) {
     propose.val == vb.v
 }
 
-// Inv: If vb is chosen, then all Promise quorums > vb.b must observe a ballot >= vb.b
-predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall vb, quorum, pbal | 
-    && Chosen(c, v, vb)
-    && IsPromiseQuorum(c, v, quorum, pbal)
-    && vb.b < pbal
-  ::
-    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
-}
-
 // Application bundle
 predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
@@ -214,7 +202,6 @@ predicate ApplicationInv(c: Constants, v: Variables)
 
   // TODO: Can all the ChosenImplies- below be proven as lemmas rather than stated as invariants?
   // It seems that they can all be proven from ChosenValImpliesProposeOnlyVal
-  && ChosenValImpliesPromiseQuorumSeesBal(c, v)
   && ChosenValImpliesLeaderOnlyHearsVal(c, v)
   && AtMostOneChosenVal(c, v)
 }
@@ -268,7 +255,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextPromiseBalLargerThanAccepted(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
-  InvNextChosenValImpliesPromiseQuorumSeesBal(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextAtMostOneChosenVal(c, v, v');
   AtMostOneChosenImpliesAgreement(c, v');
@@ -572,6 +558,7 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   requires PromiseBalLargerThanAccepted(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
+  InvImpliesChosenValImpliesPromiseQuorumSeesBal(c, v);
   var dsStep :| NextStep(c, v, v', dsStep);
   var actor, msgOps := dsStep.actor, dsStep.msgOps;
   if dsStep.LeaderStep? {
@@ -612,33 +599,6 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
   } 
 }
-
-lemma InvNextChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
-  ensures ChosenValImpliesPromiseQuorumSeesBal(c, v')
-{
-  forall chosenVb, prQuorum, pbal | 
-    && Chosen(c, v', chosenVb)
-    && IsPromiseQuorum(c, v', prQuorum, pbal)
-    && chosenVb.b < pbal
-  ensures
-    exists m: Message :: m in prQuorum && m.vbOpt.Some? && chosenVb.b <= m.vbOpt.value.b
-  {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    if dsStep.LeaderStep? || dsStep.LearnerStep? {
-      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-      assert IsPromiseQuorum(c, v, prQuorum, pbal);  // trigger
-    } else {
-      var acQuorum :| IsAcceptQuorum(c, v', acQuorum, chosenVb);
-      var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v', prQuorum, pbal, acQuorum, chosenVb);
-      var m: Message :| m in prQuorum && m.acc == accId;  // witness
-      // m satisfies postcondition via AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
-    }
-  }
-}
-
 
 lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
@@ -766,6 +726,39 @@ lemma OneValuePerAcceptBallotLemma(c: Constants, v: Variables)
   requires AcceptMessageImpliesProposed(c, v)
   ensures OneValuePerAcceptBallot(c, v)
 {}
+
+
+// Implied by Inv: If vb is chosen, then all Promise quorums > vb.b must observe a ballot >= vb.b
+predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, quorum, pbal | 
+    && Chosen(c, v, vb)
+    && IsPromiseQuorum(c, v, quorum, pbal)
+    && vb.b < pbal
+  ::
+    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
+}
+
+// lemma: Inv implies that ChosenValImpliesPromiseQuorumSeesBal
+lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+  requires Inv(c, v)
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
+  ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
+{
+  forall chosenVb, prQuorum, pbal | 
+    && Chosen(c, v, chosenVb)
+    && IsPromiseQuorum(c, v, prQuorum, pbal)
+    && chosenVb.b < pbal
+  ensures
+    exists m: Message :: m in prQuorum && m.vbOpt.Some? && chosenVb.b <= m.vbOpt.value.b
+  {
+    var acQuorum :| IsAcceptQuorum(c, v, acQuorum, chosenVb);
+    var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, pbal, acQuorum, chosenVb);
+    var m: Message :| m in prQuorum && m.acc == accId;  // witness
+    // m satisfies postcondition via AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+  }
+}
 
 // Lemma: Given b1 < b2, there is a finite, strictly ordered sequence 
 // [b1, b_a, b_b, ... , b_2] such that for all ballots b where b1 < b < b2, b in seq
