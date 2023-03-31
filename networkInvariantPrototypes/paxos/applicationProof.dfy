@@ -390,11 +390,14 @@ lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables
 lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  // requires OneValuePerProposeBallot(c, v)
   ensures PromiseVbImpliesAccepted(c, v')
 {
-  // assume OneValuePerProposeBallot(c, v);
-  assume false;  // need OneValuePerProposeBallot(c, v) ?
+  forall prom | 
+    && IsPromiseMessage(v', prom)
+    && prom.vbOpt.Some?
+  ensures
+    Accept(prom.vbOpt.value, prom.acc) in v'.network.sentMsgs
+  {}  // trigger
 }
 
 lemma InvNextPromiseVbImpliesProposed(c: Constants, v: Variables, v': Variables)
