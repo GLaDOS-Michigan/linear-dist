@@ -20,11 +20,6 @@ predicate Chosen(c: Constants, v: Variables, vb: ValBal) {
   exists quorum: set<Message> :: IsAcceptQuorum(c, v, quorum, vb)
 }
 
-predicate AtMostOneChosenVal(c: Constants, v: Variables) {
-  forall vb1, vb2 | Chosen(c, v, vb1) && Chosen(c, v, vb2) 
-  :: vb1.v == vb2.v
-}
-
 predicate OneValuePerProposeBallot(c: Constants, v: Variables)
 {
   forall p1, p2 | 
@@ -185,10 +180,6 @@ predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorPromisedLargerThanAccepted(c, v)
   && PromiseBalLargerThanAccepted(c, v)
   && ChosenValImpliesProposeOnlyVal(c, v)
-
-  // TODO: Can all the ChosenImplies- below be proven as lemmas rather than stated as invariants?
-  // It seems that they can all be proven from ChosenValImpliesProposeOnlyVal
-  && AtMostOneChosenVal(c, v)
 }
 
 predicate Inv(c: Constants, v: Variables)
@@ -240,8 +231,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextPromiseBalLargerThanAccepted(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
-  InvNextAtMostOneChosenVal(c, v, v');
-  AtMostOneChosenImpliesAgreement(c, v');
+  MessageAndApplicationInvImpliesAgreement(c, v');
 }
 
 lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
@@ -584,16 +574,6 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   } 
 }
 
-lemma InvNextAtMostOneChosenVal(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires OneValuePerProposeBallot(c, v')
-  requires AcceptMessageImpliesProposed(c, v')
-  requires ChosenValImpliesProposeOnlyVal(c, v')
-  ensures AtMostOneChosenVal(c, v')
-{}
-
-
 
 // Lemma: For any Learn message, that learned value must have been chosen
 lemma LearnedImpliesChosen(c: Constants, v: Variables, learnMsg: Message)
@@ -627,18 +607,16 @@ lemma NoNewChosenInLeaderOrLearnerSteps(c: Constants, v: Variables, v': Variable
   }
 }
 
-
-
-// Lemma: If at most one value can be chosen, then the Agreement property is true
-lemma AtMostOneChosenImpliesAgreement(c: Constants, v: Variables) 
-  requires v.WF(c)
+// Lemma: If MessageInv and ApplicationInv, then the Agreement property is true
+lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables) 
   requires MessageInv(c, v)
-  requires AtMostOneChosenVal(c, v)
+  requires ApplicationInv(c, v)
   ensures Agreement(c, v)
 {
   /* Proof by contradiction. Suppose that v violates agreement, such that there are two
     Learn messages with differnt values. Then by LearnedImpliesChosen, two different 
-    values are chosen, thus violating AtMostOneChosenVal */
+    values are chosen, thus violating fact that at most one value is chosen 
+    (at most one chosen value is implied by application invs) */
   if !Agreement(c, v) {
     var m1, m2 :| 
       && IsLearnMessage(v, m1)
