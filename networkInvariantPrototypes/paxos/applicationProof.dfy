@@ -35,6 +35,18 @@ predicate OneValuePerProposeBallot(c: Constants, v: Variables)
     p1.val == p2.val
 }
 
+// This invariant implies that l.receivedPromises is monotonic increasing, and l.value 
+// does not equivocate. This is for proving InvNextOneValuePerProposeBallot
+// Tony: Monotonic transformations apply here.
+predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+{
+  forall p | IsProposeMessage(v, p) 
+  ::  && |v.leaders[p.bal].receivedPromises| >= c.f+1
+      && v.leaders[p.bal].value == p.val
+}
+
 predicate PromiseVbImpliesAccepted(c: Constants, v: Variables) {
   forall prom | 
     && IsPromiseMessage(v, prom)
@@ -281,7 +293,8 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
-  && OneValuePerProposeBallot(c, v)
+  && ProposeImpliesLeaderState(c, v)
+  // && OneValuePerProposeBallot(c, v)  // not sure if needed 
   && PromiseVbImpliesAccepted(c, v)
   && PromiseVbImpliesProposed(c, v)
   && AcceptMessageImpliesProposed(c, v)
@@ -343,8 +356,9 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
+  InvNextProposeImpliesLeaderState(c, v, v');
+  // InvNextOneValuePerProposeBallot(c, v, v');
 
-  assume OneValuePerProposeBallot(c, v');
   InvNextPromiseVbImpliesAccepted(c, v, v');
   InvNextPromiseVbImpliesProposed(c, v, v');
   InvNextAcceptMessageImpliesProposed(c, v, v');
@@ -365,11 +379,23 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   AtMostOneChosenImpliesAgreement(c, v');
 }
 
+lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ProposeImpliesLeaderState(c, v')
+  ensures OneValuePerProposeBallot(c, v)  // Implied by ProposeImpliesLeaderState
+  ensures OneValuePerProposeBallot(c, v')  // Implied by ProposeImpliesLeaderState
+{}
+
 lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
+  // requires OneValuePerProposeBallot(c, v)
   ensures PromiseVbImpliesAccepted(c, v')
-{}
+{
+  // assume OneValuePerProposeBallot(c, v);
+  assume false;  // need OneValuePerProposeBallot(c, v) ?
+}
 
 lemma InvNextPromiseVbImpliesProposed(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
