@@ -56,7 +56,7 @@ predicate AcceptorValidPromised(c: Constants, v: Variables)
 {
   forall idx, b | c.ValidAcceptorIdx(idx) && v.acceptors[idx].promised == Some(b)
   :: (exists m: Message ::
-        && (IsPromiseMessage(v, m) || IsProposeMessage(v, m))
+        && (IsPrepareMessage(v, m) || IsProposeMessage(v, m))
         && m.bal == b
     )
 }
