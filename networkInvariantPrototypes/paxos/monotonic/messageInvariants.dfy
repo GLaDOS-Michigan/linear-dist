@@ -27,14 +27,15 @@ predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && ValidMessageSrc(c, v)
-  // Leader stuff
+  // From Leader transitions
   && LeaderValidHighestHeard(c, v)
   && LeaderValidReceivedPromises(c, v)
-  // Acceptor stuff
+  // From Acceptor transitions
   && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB(c, v)
   && ValidPromiseMessage(c, v)
-  // Learner stuff
+  && ValidAcceptMessage(c, v)
+  // From Learner transitions
   && LearnerValidReceivedAccepts(c, v)
 }
 
@@ -51,6 +52,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 {
   InvNextAcceptorValidPromised(c, v, v');
   InvNextValidPromiseMessage(c, v, v');
+  InvNextValidAcceptMessage(c, v, v');
 }
 
 /***************************************************************************************
@@ -116,6 +118,7 @@ predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
     && Accept(vb, c.acceptorConstants[idx].id) in v.network.sentMsgs
 }
 
+// certified self-inductive
 // Every Promise message ballot reflects acceptor's local promised history, and 
 // it's vbOpt represents a prior accepted value
 predicate ValidPromiseMessage(c: Constants, v: Variables) 
@@ -127,8 +130,19 @@ predicate ValidPromiseMessage(c: Constants, v: Variables)
   (exists i :: PromiseMessageMatchesHistory(c, v, prom, i))
 }
 
+// certified self-inductive
 // Every Accept message reflects acceptor state history
-// predicate ValidAcceptMessage(c: Constants, v: Variables)
+predicate ValidAcceptMessage(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+{
+  forall accept | IsAcceptMessage(v, accept)
+  ::
+  (exists i :: 
+    && 0 <= i < |v.acceptors[accept.acc].acceptedVB|
+    && v.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb)
+  )
+}
 
 
 /***************************************************************************************
@@ -157,7 +171,7 @@ predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
 ***************************************************************************************/
 
 // Tony: This message invariant requires proof. What do I make of this?
-// Also the copy-pasta for the unchanged cases are is gross
+// Because dafny can't handle alternating quantifiers
 lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires v'.WF(c)
@@ -200,6 +214,7 @@ lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
   }
 }  
 
+// Because dafny can't handle alternating quantifiers
 lemma InvNextValidPromiseMessage(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -229,6 +244,44 @@ lemma InvNextValidPromiseMessage(c: Constants, v: Variables, v': Variables)
       assert IsPromiseMessage(v, prom);  // trigger
       var i :| PromiseMessageMatchesHistory(c, v, prom, i);  // witness
       assert PromiseMessageMatchesHistory(c, v', prom, i);   // trigger
+    }
+  }
+}
+
+// Because dafny can't handle alternating quantifiers
+lemma InvNextValidAcceptMessage(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires ValidAcceptMessage(c, v)
+  requires Next(c, v, v')
+  ensures ValidAcceptMessage(c, v')
+{
+  forall accept | IsAcceptMessage(v', accept)
+  ensures exists i :: 
+    && 0 <= i < |v'.acceptors[accept.acc].acceptedVB|
+    && v'.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb)
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    var actor, msgOps := dsStep.actor, dsStep.msgOps;
+    if && dsStep.AcceptorStep? 
+       && accept.acc == actor 
+       && msgOps.send == Some(accept)
+    {
+      var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
+      var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+      if step.ReceiveStep? && msgOps.recv.value.Propose? {
+        var doAccept := a.PromisedNone() || a.GetPromised() <= msgOps.recv.value.bal;
+        if doAccept {
+          var i := |a'.acceptedVB|-1;
+          assert v'.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb); // trigger
+        }
+      }
+    } else {
+      assert IsAcceptMessage(v, accept);  // trigger
+      var i :|  && 0 <= i < |v.acceptors[accept.acc].acceptedVB|   // witness
+                && v.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb);
+      assert  && 0 <= i < |v'.acceptors[accept.acc].acceptedVB|   // witness
+              && v'.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb);   // trigger
     }
   }
 }
