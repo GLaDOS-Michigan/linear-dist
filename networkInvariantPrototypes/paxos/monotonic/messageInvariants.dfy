@@ -27,10 +27,14 @@ predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && ValidMessageSrc(c, v)
+  // Leader stuff
   && LeaderValidHighestHeard(c, v)
   && LeaderValidReceivedPromises(c, v)
+  // Acceptor stuff
   && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB(c, v)
+  && ValidPromiseMessage(c, v)
+  // Learner stuff
   && LearnerValidReceivedAccepts(c, v)
 }
 
@@ -46,6 +50,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   ensures MessageInv(c, v')
 {
   InvNextAcceptorValidPromised(c, v, v');
+  InvNextValidPromiseMessage(c, v, v');
 }
 
 /***************************************************************************************
@@ -104,11 +109,26 @@ predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
   forall idx, i | 
     && c.ValidAcceptorIdx(idx) 
     && 0 <= i < |v.acceptors[idx].acceptedVB|
+    && v.acceptors[idx].acceptedVB[i].Some?
   :: 
-    && var vb := v.acceptors[idx].acceptedVB[i];
+    && var vb := v.acceptors[idx].acceptedVB[i].value;
     && Propose(vb.b, vb.v) in v.network.sentMsgs
     && Accept(vb, c.acceptorConstants[idx].id) in v.network.sentMsgs
 }
+
+// Every Promise message ballot reflects acceptor's local promised history, and 
+// it's vbOpt represents a prior accepted value
+predicate ValidPromiseMessage(c: Constants, v: Variables) 
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+{
+  forall prom | IsPromiseMessage(v, prom)
+  ::
+  (exists i :: PromiseMessageMatchesHistory(c, v, prom, i))
+}
+
+// Every Accept message reflects acceptor state history
+// predicate ValidAcceptMessage(c: Constants, v: Variables)
 
 
 /***************************************************************************************
@@ -180,6 +200,39 @@ lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
   }
 }  
 
+lemma InvNextValidPromiseMessage(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires ValidPromiseMessage(c, v)
+  requires Next(c, v, v')
+  ensures ValidPromiseMessage(c, v')
+{
+  forall prom | IsPromiseMessage(v', prom)
+  ensures
+    exists i :: PromiseMessageMatchesHistory(c, v', prom, i)
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    var actor, msgOps := dsStep.actor, dsStep.msgOps;
+    if && dsStep.AcceptorStep? 
+       && prom.acc == actor 
+       && msgOps.send == Some(prom)
+    {
+      var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
+      var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+      if step.ReceiveStep? && msgOps.recv.value.Prepare? {
+        var doPromise := a.PromisedNone() || a.GetPromised() < msgOps.recv.value.bal;
+        if doPromise {
+          assert PromiseMessageMatchesHistory(c, v', prom, |a'.promised|-1);  // trigger
+        }
+      }
+    } else {
+      assert IsPromiseMessage(v, prom);  // trigger
+      var i :| PromiseMessageMatchesHistory(c, v, prom, i);  // witness
+      assert PromiseMessageMatchesHistory(c, v', prom, i);   // trigger
+    }
+  }
+}
+
 /***************************************************************************************
 *                                        Utils                                         *
 ***************************************************************************************/
@@ -223,6 +276,17 @@ predicate ExistsIsPrepareOrPropose(c: Constants, v: Variables, idx: nat, i: int)
   requires 0 <= i < |v.acceptors[idx].promised|
 {
   exists m :: IsPrepareOrPropose(v, m, v.acceptors[idx].promised[i])
+}
+
+predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires IsPromiseMessage(v, prom)
+{
+  && 0 <= i < |v.acceptors[prom.acc].promised|
+  && 0 <= i < |v.acceptors[prom.acc].acceptedVB|
+  && prom.bal == v.acceptors[prom.acc].promised[i]
+  && prom.vbOpt == v.acceptors[prom.acc].acceptedVB[i]
 }
 
 }  // end module PaxosProof

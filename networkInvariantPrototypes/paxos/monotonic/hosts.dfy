@@ -131,9 +131,16 @@ module AcceptorHost {
   }
 
   datatype Variables = Variables(
-    promised: seq<LeaderId>,  // monotonic seq
-    acceptedVB: seq<ValBal>   // monotonic seq
+    promised: seq<LeaderId>,          // monotonic seq
+    acceptedVB: seq<Option<ValBal>>   // monotonic seq
   ) {
+
+    // Tony: This is a minor application property that is swept under WF(). However,
+    // the same can be achieved if we bundle promised-accepted pairs into the same seq,
+    // which removes the need for this WF
+    predicate WF() {
+      |promised| == |acceptedVB|
+    }
     
     predicate PromisedNone() {
       promised == []
@@ -152,9 +159,8 @@ module AcceptorHost {
     function GetAccepted() : Option<ValBal> 
     {
       if AcceptedNone() then None
-      else Some(Last(acceptedVB))
+      else Last(acceptedVB)
     }
-    
   }
 
   predicate GroupWFConstants(grp_c: seq<Constants>) {
@@ -166,6 +172,7 @@ module AcceptorHost {
   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWFConstants(grp_c)
     && |grp_v| == |grp_c| == 2*f+1
+    && (forall i | 0 <= i < |grp_c| :: grp_v[i].WF())
   }
 
   predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
@@ -194,7 +201,10 @@ module AcceptorHost {
         case Prepare(bal) => (
           var doPromise := v.PromisedNone() || v.GetPromised() < bal;
           if doPromise then
-            && v' == v.(promised := v.promised + [bal])
+            && v' == v.(
+              promised := v.promised + [bal],
+              acceptedVB := v.acceptedVB + [v.GetAccepted()]
+            )
             && msgOps.send == Some(Promise(bal, c.id, v.GetAccepted()))
           else
             NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
@@ -204,9 +214,7 @@ module AcceptorHost {
           if doAccept then
             && v' == v.(
                   promised := v.promised + [bal], 
-                  acceptedVB := v.acceptedVB + [VB(val, bal)])
-            // Tony: This is a target for monotonic transformation -- it would allow me to say that
-            // Accept messages are from some acceptedVB once held by the acceptor
+                  acceptedVB := v.acceptedVB + [Some(VB(val, bal))])
             && msgOps.send == Some(Accept(VB(val, bal), c.id))
           else
             NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
