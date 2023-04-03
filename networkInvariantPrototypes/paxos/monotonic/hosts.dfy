@@ -131,9 +131,31 @@ module AcceptorHost {
   }
 
   datatype Variables = Variables(
-    promised: Option<LeaderId>,
-    acceptedVB: Option<ValBal>
-  )
+    promised: seq<LeaderId>,  // monotonic seq
+    acceptedVB: seq<ValBal>   // monotonic seq
+  ) {
+    
+    predicate PromisedNone() {
+      promised == []
+    }
+
+    function GetPromised() : LeaderId 
+      requires !PromisedNone()
+    {
+      Last(promised)
+    }
+    
+    predicate AcceptedNone() {
+      acceptedVB == []
+    }
+
+    function GetAccepted() : Option<ValBal> 
+    {
+      if AcceptedNone() then None
+      else Some(Last(acceptedVB))
+    }
+    
+  }
 
   predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|
@@ -152,8 +174,8 @@ module AcceptorHost {
   }
 
   predicate Init(c: Constants, v: Variables) {
-    && v.promised == None
-    && v.acceptedVB == None
+    && v.promised == []
+    && v.acceptedVB == []
   }
 
   datatype Step =
@@ -170,19 +192,19 @@ module AcceptorHost {
     && msgOps.recv.Some?
     && match msgOps.recv.value
         case Prepare(bal) => (
-          var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+          var doPromise := v.PromisedNone() || v.GetPromised() < bal;
           if doPromise then
-            && v' == v.(promised := Some(bal))
-            && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
+            && v' == v.(promised := v.promised + [bal])
+            && msgOps.send == Some(Promise(bal, c.id, v.GetAccepted()))
           else
             NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
         )
         case Propose(bal, val) => (
-          var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
+          var doAccept := v.PromisedNone() || v.GetPromised() <= bal;
           if doAccept then
             && v' == v.(
-                  promised := Some(bal), 
-                  acceptedVB := Some(VB(val, bal)))
+                  promised := v.promised + [bal], 
+                  acceptedVB := v.acceptedVB + [VB(val, bal)])
             // Tony: This is a target for monotonic transformation -- it would allow me to say that
             // Accept messages are from some acceptedVB once held by the acceptor
             && msgOps.send == Some(Accept(VB(val, bal), c.id))
