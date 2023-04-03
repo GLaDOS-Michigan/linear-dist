@@ -253,7 +253,7 @@ module LearnerHost {
 
   datatype Variables = Variables(
     // maps ValBal to acceptors that accepted such pair
-    receivedAccepts: map<ValBal, set<AcceptorId>>
+    receivedAccepts: map<ValBal, seq<set<AcceptorId>>>  // each vb maps to monotonic seq
   )
 
   predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
@@ -288,18 +288,13 @@ module LearnerHost {
       case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
-  function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
-    vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>)
-    // TODO: These two ensures are required for the LearnMsgsValid message invariant. 
-    // Is this cheating?
-    ensures vb in receivedAccepts ==> vb in out
-    ensures vb in receivedAccepts ==> |receivedAccepts[vb]| <= |out[vb]|
+  function UpdateReceivedAccepts(receivedAccepts: map<ValBal, seq<set<AcceptorId>>>, 
+    vb: ValBal, acc: AcceptorId) : (out: map<ValBal, seq<set<AcceptorId>>>)
   {
-    if vb in receivedAccepts then 
-      UnionIncreasesCardinality(receivedAccepts[vb], {acc});
-      receivedAccepts[vb := receivedAccepts[vb] + {acc}]
+    if vb in receivedAccepts && 0 < |receivedAccepts[vb]| then 
+      receivedAccepts[vb := receivedAccepts[vb] + [Last(receivedAccepts[vb]) + {acc}]]
     else 
-      receivedAccepts[vb := {acc}]
+      receivedAccepts[vb := [{acc}]]
   }
 
   predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -315,7 +310,8 @@ module LearnerHost {
   predicate NextLearnStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, vb: ValBal) {
     && msgOps.recv.None?
     && vb in v.receivedAccepts  // enabling
-    && |v.receivedAccepts[vb]| >= c.f + 1  // enabling
+    && 0 < |v.receivedAccepts[vb]|
+    && |Last(v.receivedAccepts[vb])| >= c.f + 1  // enabling
     && msgOps.send == Some(Learn(c.id, vb.b, vb.v))
     && v' == v  // local state unchanged
   }

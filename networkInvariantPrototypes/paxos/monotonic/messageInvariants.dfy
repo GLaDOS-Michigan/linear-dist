@@ -149,18 +149,17 @@ predicate ValidAcceptMessage(c: Constants, v: Variables)
 *                                     Learner Host                                     *
 ***************************************************************************************/
 
-
-
 // certified self-inductive
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
 // accepted ValBal pair
 predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall idx, vb, acc | 
+  forall idx, vb, acc, i | 
     && c.ValidLearnerIdx(idx)
     && vb in v.learners[idx].receivedAccepts
-    && acc in v.learners[idx].receivedAccepts[vb]
+    && 0 <= i < |v.learners[idx].receivedAccepts[vb]|
+    && acc in v.learners[idx].receivedAccepts[vb][i]
   ::
     Accept(vb, acc) in v.network.sentMsgs
 }
