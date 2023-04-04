@@ -30,6 +30,7 @@ predicate MessageInv(c: Constants, v: Variables)
   // From Leader transitions
   && LeaderValidHighestHeard(c, v)
   && LeaderValidReceivedPromises(c, v)
+  && ValidProposeMesssage(c, v)
   // From Acceptor transitions
   && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB(c, v)
@@ -88,7 +89,18 @@ predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
         && IsPromiseMessage(v, prom)
         && prom.bal == idx
     )
-} 
+}
+
+// certified self-inductive
+predicate ValidProposeMesssage(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+{
+  forall prop | IsProposeMessage(v, prop)
+  ::
+    && prop.val in v.leaders[prop.bal].proposed
+    && (prop.val in v.leaders[prop.bal].value || prop.val == c.leaderConstants[prop.bal].preferredValue)
+}
 
 /***************************************************************************************
 *                                     Acceptor Host                                    *
@@ -169,6 +181,7 @@ predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
     Accept(vb, acc) in v.network.sentMsgs
 }
 
+// certified self-inductive
 predicate ValidLearnMessage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
