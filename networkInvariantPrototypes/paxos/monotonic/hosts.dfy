@@ -188,6 +188,10 @@ module AcceptorHost {
       if AcceptedNone() then None
       else Last(acceptedVB)
     }
+
+    predicate HasAccepted(vb: ValBal) {
+      Some(vb) in acceptedVB
+    }
   }
 
   predicate GroupWFConstants(grp_c: seq<Constants>) {
@@ -280,7 +284,8 @@ module LearnerHost {
 
   datatype Variables = Variables(
     // maps ValBal to acceptors that accepted such pair
-    receivedAccepts: map<ValBal, seq<set<AcceptorId>>>  // each vb maps to monotonic seq
+    receivedAccepts: map<ValBal, seq<set<AcceptorId>>>,  // each vb maps to monotonic seq
+    learned: seq<ValBal>                                  // monotonic seq
   )
 
   predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
@@ -301,7 +306,8 @@ module LearnerHost {
   }
 
   predicate Init(c: Constants, v: Variables) {
-    v.receivedAccepts == map[]
+    && v.receivedAccepts == map[]
+    && v.learned == []
   }
 
   datatype Step =
@@ -329,18 +335,21 @@ module LearnerHost {
     && msgOps.send.None?
     && match msgOps.recv.value
       case Accept(vb, acc) => 
-        v' == Variables(UpdateReceivedAccepts(v.receivedAccepts, vb, acc))
+        v' == Variables(UpdateReceivedAccepts(v.receivedAccepts, vb, acc), v.learned)
       case _ =>
         NextStutterStep(c, v, v', msgOps)
   }
 
   predicate NextLearnStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, vb: ValBal) {
     && msgOps.recv.None?
+    && v.learned == []
     && vb in v.receivedAccepts  // enabling
     && 0 < |v.receivedAccepts[vb]|
     && |Last(v.receivedAccepts[vb])| >= c.f + 1  // enabling
     && msgOps.send == Some(Learn(c.id, vb.b, vb.v))
-    && v' == v  // local state unchanged
+    && v' == v.(
+      learned := v.learned + [vb]
+    )
   }
 
   predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {

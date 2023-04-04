@@ -56,7 +56,6 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   InvNextAcceptorValidPromised(c, v, v');
   InvNextValidPromiseMessage(c, v, v');
   InvNextValidAcceptMessage(c, v, v');
-  InvNextValidLearnMessage(c, v, v');
 }
 
 /***************************************************************************************
@@ -188,7 +187,7 @@ predicate ValidLearnMessage(c: Constants, v: Variables)
 {
   forall learn | IsLearnMessage(v, learn)
   :: 
-  (exists i :: LearnMessageMatchesHistory(c, v, learn, i))
+  VB(learn.val, learn.bal) in v.learners[learn.lnr].learned
 }
 
 
@@ -349,37 +348,6 @@ lemma InvNextValidAcceptMessage(c: Constants, v: Variables, v': Variables)
   }
 }
 
-// Because dafny can't handle alternating quantifiers
-lemma InvNextValidLearnMessage(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
-  requires ValidLearnMessage(c, v)
-  requires Next(c, v, v')
-  ensures ValidLearnMessage(c, v')
-{
-  forall learn | IsLearnMessage(v', learn)
-  ensures exists i :: LearnMessageMatchesHistory(c, v', learn, i)
-  {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    var actor, msgOps := dsStep.actor, dsStep.msgOps;
-    if && dsStep.LearnerStep? 
-       && learn.lnr == actor 
-       && msgOps.send == Some(learn)
-    {
-      var lc, l, l' := c.learnerConstants[actor], v.learners[actor], v'.learners[actor];
-      var step :| LearnerHost.NextStep(lc, l, l', step, msgOps);
-      if step.LearnStep? {
-        var vb := VB(learn.val, learn.bal);
-        var i := |l'.receivedAccepts[vb]|-1;
-        assert LearnMessageMatchesHistory(c, v', learn, i);   // trigger
-      }
-    } else {
-      assert IsLearnMessage(v, learn);                        // trigger
-      var i :| LearnMessageMatchesHistory(c, v, learn, i);    // witness
-      assert LearnMessageMatchesHistory(c, v', learn, i);     // trigger
-    }
-  }
-}
 
 /***************************************************************************************
 *                                        Utils                                         *
@@ -445,17 +413,6 @@ predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message
   && 0 <= i < |v.acceptors[prom.acc].acceptedVB|
   && prom.bal == v.acceptors[prom.acc].promised[i]
   && prom.vbOpt == v.acceptors[prom.acc].acceptedVB[i]
-}
-
-predicate LearnMessageMatchesHistory(c: Constants, v: Variables, learn: Message, i: nat)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
-  requires IsLearnMessage(v, learn)
-{
-  && var vb := VB(learn.val, learn.bal);
-  && vb in v.learners[learn.lnr].receivedAccepts
-  && 0 <= i < |v.learners[learn.lnr].receivedAccepts[vb]|
-  && |v.learners[learn.lnr].receivedAccepts[vb][i]| >= c.f+1
 }
 
 }  // end module PaxosProof
