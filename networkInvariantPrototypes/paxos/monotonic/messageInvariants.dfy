@@ -67,11 +67,11 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 predicate LeaderValidHighestHeard(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall idx, b| c.ValidLeaderIdx(idx) && v.leaders[idx].highestHeardBallot == Some(b)
+  forall idx | c.ValidLeaderIdx(idx) && !v.leaders[idx].HighestHeardNone()
   :: (exists prom: Message ::
         && IsPromiseMessage(v, prom)
         && prom.bal == idx
-        && prom.vbOpt == Some(VB(v.leaders[idx].value, b))
+        && prom.vbOpt == Some(VB(v.leaders[idx].GetValue(), v.leaders[idx].GetHighestHeard()))
     )
 }
 
@@ -80,7 +80,10 @@ predicate LeaderValidHighestHeard(c: Constants, v: Variables)
 predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall idx, src | c.ValidLeaderIdx(idx) && src in v.leaders[idx].receivedPromises
+  forall idx, src, i | 
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v.leaders[idx].receivedPromises|
+    && src in v.leaders[idx].receivedPromises[i]
   :: (exists prom: Message ::
         && IsPromiseMessage(v, prom)
         && prom.bal == idx

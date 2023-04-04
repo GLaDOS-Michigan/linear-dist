@@ -17,10 +17,32 @@ module LeaderHost {
   }
 
   datatype Variables = Variables(
-    receivedPromises: set<LeaderId>, 
-    value: Value, 
-    highestHeardBallot: Option<LeaderId>
-  )
+    receivedPromises: seq<set<LeaderId>>, 
+    value: seq<Value>,
+    proposed: seq<Value>,
+    highestHeardBallot: seq<LeaderId>
+  ) {
+    predicate WF() {
+      && 0 < |receivedPromises|
+      && 0 < |value|
+    }
+
+    predicate HighestHeardNone() {
+      highestHeardBallot == []
+    }
+
+    function GetHighestHeard() : LeaderId 
+      requires !HighestHeardNone()
+    {
+      Last(highestHeardBallot)
+    }
+
+    function GetValue() : Value 
+      requires 0 < |value|
+    {
+      Last(value)
+    }
+  }
 
   predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
     && 0 < |grp_c|
@@ -32,6 +54,7 @@ module LeaderHost {
     && 0 < f
     && GroupWFConstants(grp_c, f)
     && |grp_v| == |grp_c|
+    && (forall i | 0 <= i < |grp_c| :: grp_v[i].WF())
   }
 
   predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
@@ -40,9 +63,10 @@ module LeaderHost {
   }
 
   predicate Init(c: Constants, v: Variables) {
-    && v.receivedPromises == {}
-    && v.value == c.preferredValue
-    && v.highestHeardBallot == None
+    && v.receivedPromises == [{}]
+    && v.value == [c.preferredValue]
+    && v.proposed == []
+    && v.highestHeardBallot == []
   }
 
   datatype Step =
@@ -50,11 +74,12 @@ module LeaderHost {
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
-    match step
-      case PrepareStep => NextPrepareStep(c, v, v', msgOps)
-      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
-      case ProposeStep => NextProposeStep(c, v, v', msgOps)
-      case StutterStep => NextStutterStep(c, v, v', msgOps)
+    && v.WF()
+    && match step
+        case PrepareStep => NextPrepareStep(c, v, v', msgOps)
+        case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+        case ProposeStep => NextProposeStep(c, v, v', msgOps)
+        case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
   predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -63,7 +88,9 @@ module LeaderHost {
     && v' == v
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
+    requires v.WF()
+  {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && match msgOps.recv.value
@@ -71,17 +98,16 @@ module LeaderHost {
         // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
         // probably simplify proof, preventing the leader from potentially equivocating
         // on its proposed value after receiving extraneous straggling promises.
-        && |v.receivedPromises| <= c.f
-        && acc !in v.receivedPromises
+        && |Last(v.receivedPromises)| <= c.f
+        && acc !in Last(v.receivedPromises)
         && if bal == c.id then
-            var doUpdate := 
-              && vbOpt.Some? 
-              && (|| v.highestHeardBallot.None?
-                  || (v.highestHeardBallot.Some? && vbOpt.value.b > v.highestHeardBallot.value));
+            var doUpdate := && vbOpt.Some? 
+                            && (v.HighestHeardNone() || vbOpt.value.b > v.GetHighestHeard());
             v' == v.(
-              receivedPromises := v.receivedPromises + {acc},
-              value :=  if doUpdate then vbOpt.value.v else v.value,
-              highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
+              receivedPromises := v.receivedPromises + [Last(v.receivedPromises) + {acc}],
+              value := if doUpdate then v.value + [vbOpt.value.v] else v.value,
+              highestHeardBallot := 
+                if doUpdate then v.highestHeardBallot + [vbOpt.value.b] else v.highestHeardBallot
             )
           else 
             // this promise is not for me
@@ -90,18 +116,19 @@ module LeaderHost {
         NextStutterStep(c, v, v', msgOps)
   }
 
-  predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
+    requires v.WF()
+  {
     && msgOps.recv.None?
-    && |v.receivedPromises| >= c.f+1  // enabling condition
+    && |Last(v.receivedPromises)| >= c.f+1  // enabling condition
     // Enabling condition that my hightest heard 
     // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
     // It is equivalent to being preempted
-    && (v.highestHeardBallot.None? || v.highestHeardBallot.value <= c.id)
-    
-    // Tony: This is a target for monotonic transformation -- it would allow me to say that
-    // Propose messages are from some value once held by the leader
-    && msgOps.send == Some(Propose(c.id, v.value))
-    && v' == v
+    && (v.HighestHeardNone() || v.GetHighestHeard() <= c.id)
+    && msgOps.send == Some(Propose(c.id, v.GetValue()))
+    && v' == v.(
+      proposed := v.proposed + [v.GetValue()]
+    )
   }
 
   predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -137,7 +164,9 @@ module AcceptorHost {
 
     // Tony: This is a minor application property that is swept under WF(). However,
     // the same can be achieved if we bundle promised-accepted pairs into the same seq,
-    // which removes the need for this WF
+    // which removes the need for this WF.
+    // On second thought, this is not really an application property. It is something we 
+    // enforce during monotonic transformation, which we should have the freedom to do.
     predicate WF() {
       |promised| == |acceptedVB|
     }
