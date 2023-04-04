@@ -51,6 +51,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
 {
+  InvNextLeaderValidHighestHeard(c, v, v');
   InvNextAcceptorValidPromised(c, v, v');
   InvNextValidPromiseMessage(c, v, v');
   InvNextValidAcceptMessage(c, v, v');
@@ -67,11 +68,10 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 predicate LeaderValidHighestHeard(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall idx | c.ValidLeaderIdx(idx) && !v.leaders[idx].HighestHeardNone()
-  :: (exists prom: Message ::
-        && IsPromiseMessage(v, prom)
-        && prom.bal == idx
-        && prom.vbOpt == Some(VB(v.leaders[idx].GetValue(), v.leaders[idx].GetHighestHeard()))
+  forall idx, i |
+    && c.ValidLeaderIdx(idx) 
+    && 0 <= i < |v.leaders[idx].highestHeardBallot|
+  :: (exists prom :: IsValidPromise(c, v, prom, idx, i)
     )
 }
 
@@ -185,9 +185,46 @@ predicate ValidLearnMessage(c: Constants, v: Variables)
 
 // Tony: This message invariant requires proof. What do I make of this?
 // Because dafny can't handle alternating quantifiers
+lemma InvNextLeaderValidHighestHeard(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LeaderValidHighestHeard(c, v)
+  requires Next(c, v, v')
+  ensures LeaderValidHighestHeard(c, v')
+{
+  forall idx, i | 
+    && c.ValidLeaderIdx(idx) 
+    && 0 <= i < |v'.leaders[idx].highestHeardBallot|
+  ensures exists prom :: IsValidPromise(c, v', prom, idx, i)
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    var actor, msgOps := dsStep.actor, dsStep.msgOps;
+    if dsStep.LeaderStep? && idx == actor {
+      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      if  && step.ReceiveStep?
+          && msgOps.recv.value.Promise? 
+          && msgOps.recv.value.bal == lc.id
+          && msgOps.recv.value.vbOpt.Some? 
+          && (l.HighestHeardNone() || msgOps.recv.value.vbOpt.value.b > l.GetHighestHeard())
+          && i == |l'.value|-1
+      { 
+        assert IsValidPromise(c, v', msgOps.recv.value, idx, |l'.value|-1);  // trigger
+      } else {
+        assert 0 <= i < |v.leaders[idx].highestHeardBallot|;  // trigger
+        var m :| IsValidPromise(c, v, m, idx, i);             // witness
+        assert IsValidPromise(c, v', m, idx, i);              // trigger
+      }
+    } else {
+      var m :| IsValidPromise(c, v, m, idx, i);               // witness
+      assert IsValidPromise(c, v', m, idx, i);                // trigger
+    }
+  }
+}
+
+// Tony: This message invariant requires proof. What do I make of this?
+// Because dafny can't handle alternating quantifiers
 lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
-  requires v'.WF(c)
   requires AcceptorValidPromised(c, v)
   requires Next(c, v, v')
   ensures AcceptorValidPromised(c, v')
@@ -374,6 +411,16 @@ predicate ExistsIsPrepareOrPropose(c: Constants, v: Variables, idx: nat, i: int)
   requires 0 <= i < |v.acceptors[idx].promised|
 {
   exists m :: IsPrepareOrPropose(v, m, v.acceptors[idx].promised[i])
+}
+
+predicate IsValidPromise(c: Constants, v: Variables, m: Message, idx: LeaderId, i: nat )
+  requires v.WF(c)
+  requires c.ValidLeaderIdx(idx)
+  requires 0 <= i < |v.leaders[idx].highestHeardBallot|
+{
+  && IsPromiseMessage(v, m)
+  && m.bal == idx
+  && m.vbOpt == Some(VB(v.leaders[idx].value[i], v.leaders[idx].highestHeardBallot[i]))
 }
 
 predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)

@@ -24,7 +24,7 @@ module LeaderHost {
   ) {
     predicate WF() {
       && 0 < |receivedPromises|
-      && 0 < |value|
+      && |value| == |highestHeardBallot|
     }
 
     predicate HighestHeardNone() {
@@ -37,10 +37,8 @@ module LeaderHost {
       Last(highestHeardBallot)
     }
 
-    function GetValue() : Value 
-      requires 0 < |value|
-    {
-      Last(value)
+    function GetValue(c: Constants) : Value {
+      if value == [] then c.preferredValue else Last(value)
     }
   }
 
@@ -64,7 +62,7 @@ module LeaderHost {
 
   predicate Init(c: Constants, v: Variables) {
     && v.receivedPromises == [{}]
-    && v.value == [c.preferredValue]
+    && v.value == []
     && v.proposed == []
     && v.highestHeardBallot == []
   }
@@ -125,9 +123,9 @@ module LeaderHost {
     // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
     // It is equivalent to being preempted
     && (v.HighestHeardNone() || v.GetHighestHeard() <= c.id)
-    && msgOps.send == Some(Propose(c.id, v.GetValue()))
+    && msgOps.send == Some(Propose(c.id, v.GetValue(c)))
     && v' == v.(
-      proposed := v.proposed + [v.GetValue()]
+      proposed := v.proposed + [v.GetValue(c)]
     )
   }
 
