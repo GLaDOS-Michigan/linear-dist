@@ -19,6 +19,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
+  && AcceptorPromisedMonotonic(c, v)
   && LearnedValuesValid(c, v)
 }
 
@@ -30,7 +31,15 @@ predicate Inv(c: Constants, v: Variables)
 }
 
 
-// Analogous to LearnMsgsValid in non-monotonic land
+// Corresponds to AcceptorPromisedMonotonic
+predicate AcceptorPromisedMonotonic(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall idx | c.ValidAcceptorIdx(idx) 
+  :: BallotSeqMonotoneIncreasing(v.acceptors[idx].promised)
+}
+
+// Corresponds to LearnMsgsValid in non-monotonic land
 predicate LearnedValuesValid(c: Constants, v: Variables) 
   requires v.WF(c)
 {
@@ -149,6 +158,12 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, idx: LearnerId, vb: ValBa
   var i :| 0 <= i < |l.receivedAccepts[vb]| && |l.receivedAccepts[vb][i]| >= c.f+1;
   var acceptorIds := l.receivedAccepts[vb][i];
   assert IsAcceptorQuorum(c, v, acceptorIds, vb);  // trigger
+}
+
+
+predicate BallotSeqMonotoneIncreasing(s: seq<LeaderId>) {
+  forall i, j | 0 <= i < |s| && 0 <= j < |s| && i <= j
+  :: s[i] <= s[j]
 }
 
 
