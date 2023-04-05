@@ -286,7 +286,12 @@ module LearnerHost {
     // maps ValBal to acceptors that accepted such pair
     receivedAccepts: map<ValBal, seq<set<AcceptorId>>>,  // each vb maps to monotonic seq
     learned: seq<ValBal>                                  // monotonic seq
-  )
+  ) {
+    
+    predicate Learned(vb: ValBal) {
+      vb in learned
+    }
+  }
 
   predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
     && 0 < |grp_c|
