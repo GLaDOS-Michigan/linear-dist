@@ -678,24 +678,6 @@ lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables)
 }
 
 
-// This is a consequence of OneValuePerProposeBallot, and AcceptMessageImpliesProposed
-predicate OneValuePerAcceptBallot(c: Constants, v: Variables)
-{
-  forall a1, a2 | 
-    && IsAcceptMessage(v, a1)
-    && IsAcceptMessage(v, a2)
-    && a1.vb.b == a2.vb.b
-  ::
-    a1.vb.v == a2.vb.v
-}
-
-lemma OneValuePerAcceptBallotLemma(c: Constants, v: Variables)
-  requires OneValuePerProposeBallot(c, v)
-  requires AcceptMessageImpliesProposed(c, v)
-  ensures OneValuePerAcceptBallot(c, v)
-{}
-
-
 // Implied by Inv: If vb is chosen, then all Promise quorums > vb.b must observe a ballot >= vb.b
 predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
   requires v.WF(c)
