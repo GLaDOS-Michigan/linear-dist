@@ -21,6 +21,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
 {
   && AcceptorPromisedMonotonic(c, v)
   && LearnedValuesValid(c, v)
+  && ChosenValImpliesProposeOnlyVal(c, v)
 }
 
 predicate Inv(c: Constants, v: Variables)
@@ -53,6 +54,23 @@ predicate LearnedValuesValid(c: Constants, v: Variables)
         && |v.learners[idx].receivedAccepts[vb][i]| >= c.f+1)
 }
 
+// TODO: Another invariant is probably that each leader's proposed seq is size at most 1.
+// This then would imply OneValuePerProposeBallot! Cool! 
+
+// The heavy-hitter inv: If vb is chosen, then for all Leader hosts l such that l's ballot > vb.b, all 
+// values in l.proposed messages equals vb.v
+predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, idx, i | 
+    && Chosen(c, v, vb)
+    && c.ValidLeaderIdx(idx)
+    && vb.b < c.leaderConstants[idx].id
+    && 0 <= i < |v.leaders[idx].proposed|
+  ::
+    v.leaders[idx].proposed[i] == vb.v
+}
+
 /***************************************************************************************
 *                                Top-level Obligations                                 *
 ***************************************************************************************/
@@ -75,7 +93,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 {
   MessageInvInductive(c, v, v');
   InvNextLearnedValuesValid(c, v, v');
-  assume Agreement(c, v');
+  InvNextChosenValImpliesProposeOnlyVal(c, v, v');
+  MessageAndApplicationInvImpliesAgreement(c, v');
 }
 
 
@@ -117,6 +136,15 @@ lemma InvNextLearnedValuesValid(c: Constants, v: Variables, v': Variables)
       }
     }
   }
+}
+
+// This is the core Paxos lemma
+lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ChosenValImpliesProposeOnlyVal(c, v')
+{
+  assume false;
 }
 
 /***************************************************************************************
@@ -181,6 +209,19 @@ returns (out: set<Message>)
     var sub := AcceptMessagesFromAcceptorIds(ids - {id}, vb);
     out := sub + {Accept(vb, id)};
   }
+}
+
+// Lemma: If MessageInv and ApplicationInv, then the Agreement property is true
+lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables) 
+  requires MessageInv(c, v)
+  requires ApplicationInv(c, v)
+  ensures Agreement(c, v)
+{
+  /* Proof by contradiction. Suppose that v violates agreement, such that there are two
+    Learn messages with differnt values. Then by LearnedImpliesChosen, two different 
+    values are chosen, thus violating fact that at most one value is chosen 
+    (at most one chosen value is implied by application invs) */
+  assume false; // TODO
 }
 
 }  // end module PaxosProof
