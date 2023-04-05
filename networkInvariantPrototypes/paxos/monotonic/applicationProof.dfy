@@ -114,26 +114,6 @@ lemma InvNextLearnedValuesValid(c: Constants, v: Variables, v': Variables)
 *                            Helper Definitions and Lemmas                             *
 ***************************************************************************************/
 
-// Lemma: For any Learner that learned a Value, that learned value must have been chosen
-lemma LearnedImpliesChosen(c: Constants, v: Variables, idx: LearnerId, vb: ValBal)
-  requires v.WF(c)
-  requires MessageInv(c, v)
-  requires LearnedValuesValid(c, v)
-  requires c.ValidLearnerIdx(idx)
-  requires v.learners[idx].Learned(vb)
-  ensures Chosen(c, v, vb)
-{
-  /* Suppose Learner l learned vb. Then it has a quorum of supporting acceptors for vb in 
-  * l.receivedAccepts, by LearnedValuesValid. By LearnerValidReceivedAccepts, there is a quorum of accept messages
-  * in the network supporting vb. By ValidAcceptMessage, this means there is a quorum of 
-  * acceptors that accepted vb */
-  var l := v.learners[idx];
-
-  // assert vb in l.receivedAccepts;
-
-  assume false;
-  assert Chosen(c, v, vb);
-}
 
 // A quorum of Acceptors accepted the same vb
 predicate Chosen(c: Constants, v: Variables, vb: ValBal) 
@@ -150,6 +130,42 @@ predicate IsAcceptorQuorum(c: Constants, v: Variables, aset: set<AcceptorId>, vb
       && c.ValidAcceptorIdx(id)
       && v.acceptors[id].HasAccepted(vb)
   )
+}
+
+// Lemma: For any Learner that learned a Value, that learned value must have been chosen
+lemma LearnedImpliesChosen(c: Constants, v: Variables, idx: LearnerId, vb: ValBal)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires LearnedValuesValid(c, v)
+  requires c.ValidLearnerIdx(idx)
+  requires v.learners[idx].Learned(vb)
+  ensures Chosen(c, v, vb)
+{
+  /* Suppose Learner l learned vb. Then it has a quorum of supporting acceptors for vb in 
+  * l.receivedAccepts, by LearnedValuesValid. By LearnerValidReceivedAccepts, there is a 
+  * quorum of accept messages in the network supporting vb. By ValidAcceptMessage, this 
+  * means there is a quorum of acceptors that accepted vb */
+  var l := v.learners[idx];
+  var i :| 0 <= i < |l.receivedAccepts[vb]| && |l.receivedAccepts[vb][i]| >= c.f+1;
+  var acceptorIds := l.receivedAccepts[vb][i];
+  assert IsAcceptorQuorum(c, v, acceptorIds, vb);  // trigger
+}
+
+
+
+// Lemma: Get a quorum of Accept messages from a set of AcceptorIds
+lemma AcceptMessagesFromAcceptorIds(ids: set<AcceptorId>, vb: ValBal) 
+returns (out: set<Message>)
+  ensures |out| == |ids|
+  ensures forall m | m in out :: m.Accept? && m.vb == vb && m.acc in ids
+{
+  if |ids| == 0 {
+    out := {};
+  } else {
+    var id :| id in ids;
+    var sub := AcceptMessagesFromAcceptorIds(ids - {id}, vb);
+    out := sub + {Accept(vb, id)};
+  }
 }
 
 }  // end module PaxosProof
