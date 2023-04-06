@@ -30,6 +30,7 @@ predicate MessageInv(c: Constants, v: Variables)
   // From Leader transitions
   && LeaderValidHighestHeard(c, v)
   && LeaderValidReceivedPromises(c, v)
+  && LeaderValidProposedSeq(c, v)
   && ValidProposeMesssage(c, v)
   // From Acceptor transitions
   && AcceptorValidPromised(c, v)
@@ -53,6 +54,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   ensures MessageInv(c, v')
 {
   InvNextLeaderValidHighestHeard(c, v, v');
+  InvNextValidProposeMesssage(c, v, v');
   InvNextAcceptorValidPromised(c, v, v');
   InvNextValidPromiseMessage(c, v, v');
   InvNextValidAcceptMessage(c, v, v');
@@ -90,6 +92,16 @@ predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
     )
 }
 
+predicate LeaderValidProposedSeq(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall idx, i | 
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v.leaders[idx].proposed|
+  ::
+    Propose(c.leaderConstants[idx].id, v.leaders[idx].proposed[i]) in v.network.sentMsgs
+}
+
 // certified self-inductive
 predicate ValidProposeMesssage(c: Constants, v: Variables)
   requires v.WF(c)
@@ -98,7 +110,11 @@ predicate ValidProposeMesssage(c: Constants, v: Variables)
   forall prop | IsProposeMessage(v, prop)
   ::
     && prop.val in v.leaders[prop.bal].proposed
-    && prop.val in v.leaders[prop.bal].value
+    && (exists i ::
+      && 0 <= i < |v.leaders[prop.bal].value|
+      && v.leaders[prop.bal].value[i] == prop.val
+      && |v.leaders[prop.bal].receivedPromises[i]| >= c.f+1
+    )
 }
 
 /***************************************************************************************
@@ -230,6 +246,38 @@ lemma InvNextLeaderValidHighestHeard(c: Constants, v: Variables, v': Variables)
     } else {
       var m :| IsValidPromise(c, v, m, idx, i);               // witness
       assert IsValidPromise(c, v', m, idx, i);                // trigger
+    }
+  }
+}
+
+lemma InvNextValidProposeMesssage(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires ValidProposeMesssage(c, v)
+  requires Next(c, v, v')
+  ensures ValidProposeMesssage(c, v')
+{
+  forall prop | IsProposeMessage(v', prop)
+  ensures
+    && prop.val in v'.leaders[prop.bal].proposed
+    && (exists i ::
+      && 0 <= i < |v'.leaders[prop.bal].value|
+      && v'.leaders[prop.bal].value[i] == prop.val
+      && |v'.leaders[prop.bal].receivedPromises[i]| >= c.f+1
+    )
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    var actor, msgOps := dsStep.actor, dsStep.msgOps;
+    if dsStep.LeaderStep? && prop.bal == actor {
+      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      if step.ProposeStep? && prop == msgOps.send.value {
+        var i := |l'.value| - 1;
+      } else {
+        // witness and trigger
+        var i :| 0 <= i < |l.value| && l.value[i] == prop.val && |l.receivedPromises[i]| >= c.f+1;
+        assert 0 <= i < |l'.value| && l'.value[i] == prop.val && |l'.receivedPromises[i]| >= c.f+1;
+      }
     }
   }
 }

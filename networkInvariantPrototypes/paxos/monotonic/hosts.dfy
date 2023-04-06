@@ -40,7 +40,7 @@ module LeaderHost {
       Last(highestHeardBal).value
     }
 
-    function GetValue(c: Constants) : Value 
+    function GetValue() : Value 
       requires WF()
     {
       Last(value)
@@ -128,9 +128,9 @@ module LeaderHost {
     // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
     // It is equivalent to being preempted
     && (v.HighestHeardNone() || v.GetHighestHeard() <= c.id)
-    && msgOps.send == Some(Propose(c.id, v.GetValue(c)))
+    && msgOps.send == Some(Propose(c.id, v.GetValue()))
     && v' == v.(
-      proposed := v.proposed + [v.GetValue(c)]
+      proposed := v.proposed + [v.GetValue()]
     )
   }
 
