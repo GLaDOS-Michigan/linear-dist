@@ -18,27 +18,32 @@ module LeaderHost {
 
   datatype Variables = Variables(
     receivedPromises: seq<set<LeaderId>>, 
+    highestHeardBal: seq<Option<LeaderId>>,
     value: seq<Value>,
-    proposed: seq<Value>,
-    highestHeardBallot: seq<LeaderId>
+    proposed: seq<Value>
   ) {
     predicate WF() {
       && 0 < |receivedPromises|
-      && |value| == |highestHeardBallot|
+      && |value| == |highestHeardBal| == |receivedPromises|
     }
 
-    predicate HighestHeardNone() {
-      highestHeardBallot == []
+    predicate HighestHeardNone() 
+      requires WF()
+    {
+      Last(highestHeardBal) == None
     }
 
     function GetHighestHeard() : LeaderId 
+      requires WF()
       requires !HighestHeardNone()
     {
-      Last(highestHeardBallot)
+      Last(highestHeardBal).value
     }
 
-    function GetValue(c: Constants) : Value {
-      if value == [] then c.preferredValue else Last(value)
+    function GetValue(c: Constants) : Value 
+      requires WF()
+    {
+      Last(value)
     }
   }
 
@@ -62,9 +67,9 @@ module LeaderHost {
 
   predicate Init(c: Constants, v: Variables) {
     && v.receivedPromises == [{}]
-    && v.value == []
+    && v.value == [c.preferredValue]
+    && v.highestHeardBal == [None]
     && v.proposed == []
-    && v.highestHeardBallot == []
   }
 
   datatype Step =
@@ -103,9 +108,9 @@ module LeaderHost {
                             && (v.HighestHeardNone() || vbOpt.value.b > v.GetHighestHeard());
             v' == v.(
               receivedPromises := v.receivedPromises + [Last(v.receivedPromises) + {acc}],
-              value := if doUpdate then v.value + [vbOpt.value.v] else v.value,
-              highestHeardBallot := 
-                if doUpdate then v.highestHeardBallot + [vbOpt.value.b] else v.highestHeardBallot
+              value := if doUpdate then v.value + [vbOpt.value.v] else StutterSeq(v.value),
+              highestHeardBal := 
+                if doUpdate then v.highestHeardBal + [Some(vbOpt.value.b)] else StutterSeq(v.highestHeardBal)
             )
           else 
             // this promise is not for me

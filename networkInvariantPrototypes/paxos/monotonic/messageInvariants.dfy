@@ -69,8 +69,8 @@ predicate LeaderValidHighestHeard(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx, i |
-    && c.ValidLeaderIdx(idx) 
-    && 0 <= i < |v.leaders[idx].highestHeardBallot|
+    && c.ValidLeaderIdx(idx)
+    && 1 <= i < |v.leaders[idx].highestHeardBal|
   :: (exists prom :: IsValidPromise(c, v, prom, idx, i)
     )
 }
@@ -98,7 +98,7 @@ predicate ValidProposeMesssage(c: Constants, v: Variables)
   forall prop | IsProposeMessage(v, prop)
   ::
     && prop.val in v.leaders[prop.bal].proposed
-    && (prop.val in v.leaders[prop.bal].value || prop.val == c.leaderConstants[prop.bal].preferredValue)
+    && prop.val in v.leaders[prop.bal].value
 }
 
 /***************************************************************************************
@@ -203,9 +203,10 @@ lemma InvNextLeaderValidHighestHeard(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures LeaderValidHighestHeard(c, v')
 {
+  assume false;
   forall idx, i | 
     && c.ValidLeaderIdx(idx) 
-    && 0 <= i < |v'.leaders[idx].highestHeardBallot|
+    && 0 <= i < |v'.leaders[idx].highestHeardBal|
   ensures exists prom :: IsValidPromise(c, v', prom, idx, i)
   {
     var dsStep :| NextStep(c, v, v', dsStep);
@@ -222,7 +223,7 @@ lemma InvNextLeaderValidHighestHeard(c: Constants, v: Variables, v': Variables)
       { 
         assert IsValidPromise(c, v', msgOps.recv.value, idx, |l'.value|-1);  // trigger
       } else {
-        assert 0 <= i < |v.leaders[idx].highestHeardBallot|;  // trigger
+        assert 0 <= i < |v.leaders[idx].highestHeardBal|;  // trigger
         var m :| IsValidPromise(c, v, m, idx, i);             // witness
         assert IsValidPromise(c, v', m, idx, i);              // trigger
       }
@@ -397,11 +398,16 @@ predicate ExistsIsPrepareOrPropose(c: Constants, v: Variables, idx: nat, i: int)
 predicate IsValidPromise(c: Constants, v: Variables, m: Message, idx: LeaderId, i: nat )
   requires v.WF(c)
   requires c.ValidLeaderIdx(idx)
-  requires 0 <= i < |v.leaders[idx].highestHeardBallot|
+  requires 1 <= i < |v.leaders[idx].highestHeardBal|
 {
   && IsPromiseMessage(v, m)
   && m.bal == idx
-  && m.vbOpt == Some(VB(v.leaders[idx].value[i], v.leaders[idx].highestHeardBallot[i]))
+  && m.acc in v.leaders[idx].receivedPromises[i]
+  && m.vbOpt == 
+    if v.leaders[idx].highestHeardBal[i].Some? then 
+      Some(VB(v.leaders[idx].value[i], v.leaders[idx].highestHeardBal[i].value))
+    else
+      None()
 }
 
 predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)

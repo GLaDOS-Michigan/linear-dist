@@ -133,4 +133,11 @@ module UtilitiesLibrary {
     assert m'.Keys == m.Keys - {key};
     m'
   }
+
+  function StutterSeq<T>(s: seq<T>) : (s': seq<T>)
+    requires 0 < |s|
+    ensures |s'| == |s|+1
+  {
+    s + [Last(s)]
+  }
 }
