@@ -20,6 +20,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires MessageInv(c, v)
 {
   && LeaderStateMonotonic(c, v)
+  && ProposeImpliesLeaderState(c, v)
   && AcceptorPromisedMonotonic(c, v)
   && LearnedValuesValid(c, v)
   && ChosenValImpliesProposeOnlyVal(c, v)
@@ -41,6 +42,25 @@ predicate LeaderStateMonotonic(c: Constants, v: Variables)
       && SeqOptionMonotoneIncreasing(v.leaders[idx].highestHeardBal)
 }
 
+// Corresponds to ProposeImpliesLeaderState. This implies OneValuePerProposeBallot
+predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, i | 
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v.leaders[idx].proposed|
+  ::
+    LeaderStateValid(c, v, idx, i)
+}
+
+predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
+  requires v.WF(c)
+  requires c.ValidLeaderIdx(idx)
+  requires 0 <= i < |v.leaders[idx].proposed|
+{
+  && |Last(v.leaders[idx].receivedPromises)| >= c.f+1
+  && Last(v.leaders[idx].value) == v.leaders[idx].proposed[i]
+}
 
 // Corresponds to AcceptorPromisedMonotonic
 predicate AcceptorPromisedMonotonic(c: Constants, v: Variables) 
@@ -64,8 +84,6 @@ predicate LearnedValuesValid(c: Constants, v: Variables)
         && |v.learners[idx].receivedAccepts[vb][i]| >= c.f+1)
 }
 
-// TODO: Another invariant is probably that each leader's proposed seq is size at most 1.
-// This then would imply OneValuePerProposeBallot! Cool! 
 
 // The heavy-hitter inv: If vb is chosen, then for all Leader hosts l such that l's ballot > vb.b, all 
 // values in l.proposed messages equals vb.v
@@ -102,6 +120,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
+  InvNextProposeImpliesLeaderState(c, v, v');
   InvNextLearnedValuesValid(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
   assume AtMostOneChosenVal(c, v');  // TODO: Application Inv should imply this
@@ -114,6 +133,35 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
+
+
+lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ProposeImpliesLeaderState(c, v')
+{
+  forall idx, i | 
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v'.leaders[idx].proposed|
+  ensures
+    LeaderStateValid(c, v', idx, i)
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    var actor, msgOps := dsStep.actor, dsStep.msgOps;
+    if dsStep.LeaderStep? && idx == actor
+    {
+      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      if step.ProposeStep? && i == |l'.proposed| - 1 {
+        assert LeaderStateValid(c, v', idx, i);
+      } else {
+        assert LeaderStateValid(c, v, idx, i);  // trigger
+      }
+    } else {
+      assert LeaderStateValid(c, v, idx, i);    // trigger
+    }
+  }
+}
 
 
 lemma InvNextLearnedValuesValid(c: Constants, v: Variables, v': Variables) 
