@@ -140,4 +140,23 @@ module UtilitiesLibrary {
   {
     s + [Last(s)]
   }
+
+  predicate SeqMonotoneIncreasing(s: seq<nat>) {
+    forall i, j | 0 <= i < |s| && 0 <= j < |s| && i <= j
+    :: s[i] <= s[j]
+  }
+
+  predicate SeqOptionMonotoneIncreasing(s: seq<Option<nat>>) {
+    forall i, j | 
+      && 0 <= i < |s| 
+      && 0 <= j < |s| 
+      && i <= j
+      && s[i].Some?
+    :: s[j].Some? && s[i].value <= s[j].value
+  }
+
+  predicate SetMonotoneIncreasing<T>(s: seq<set<T>>) {
+    forall i, j | 0 <= i < |s| && 0 <= j < |s| && i <= j
+    :: s[i] <= s[j]
+  }
 }

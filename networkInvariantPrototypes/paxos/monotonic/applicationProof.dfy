@@ -19,6 +19,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
+  && LeaderStateMonotonic(c, v)
   && AcceptorPromisedMonotonic(c, v)
   && LearnedValuesValid(c, v)
   && ChosenValImpliesProposeOnlyVal(c, v)
@@ -31,13 +32,22 @@ predicate Inv(c: Constants, v: Variables)
   && Agreement(c, v)
 }
 
+// Inv: Leader local state's monotonic properties
+predicate LeaderStateMonotonic(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall idx | c.ValidLeaderIdx(idx)
+  ::  && SetMonotoneIncreasing(v.leaders[idx].receivedPromises)
+      && SeqOptionMonotoneIncreasing(v.leaders[idx].highestHeardBal)
+}
+
 
 // Corresponds to AcceptorPromisedMonotonic
 predicate AcceptorPromisedMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx | c.ValidAcceptorIdx(idx) 
-  :: BallotSeqMonotoneIncreasing(v.acceptors[idx].promised)
+  :: SeqMonotoneIncreasing(v.acceptors[idx].promised)
 }
 
 // Corresponds to LearnMsgsValid in non-monotonic land
@@ -234,13 +244,6 @@ lemma NoNewChosenInLeaderOrLearnerSteps(c: Constants, v: Variables, v': Variable
     assert IsAcceptorQuorum(c, v, quorum, vb);  // trigger
   }
 }
-
-
-predicate BallotSeqMonotoneIncreasing(s: seq<LeaderId>) {
-  forall i, j | 0 <= i < |s| && 0 <= j < |s| && i <= j
-  :: s[i] <= s[j]
-}
-
 
 
 // Lemma: Get a quorum of Accept messages from a set of AcceptorIds
