@@ -94,6 +94,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   MessageInvInductive(c, v, v');
   InvNextLearnedValuesValid(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
+  assume AtMostOneChosenVal(c, v');  // TODO: Application Inv should imply this
   MessageAndApplicationInvImpliesAgreement(c, v');
 }
 
@@ -159,6 +160,14 @@ predicate Chosen(c: Constants, v: Variables, vb: ValBal)
   exists quorum :: IsAcceptorQuorum(c, v, quorum, vb)
 }
 
+
+predicate AtMostOneChosenVal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb1, vb2 | Chosen(c, v, vb1) && Chosen(c, v, vb2) 
+  :: vb1.v == vb2.v
+}
+
 predicate IsAcceptorQuorum(c: Constants, v: Variables, aset: set<AcceptorId>, vb: ValBal) 
   requires v.WF(c)
 {
@@ -215,13 +224,22 @@ returns (out: set<Message>)
 lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables) 
   requires MessageInv(c, v)
   requires ApplicationInv(c, v)
+  requires AtMostOneChosenVal(c, v);  // TODO: Application inv should imply this
   ensures Agreement(c, v)
 {
   /* Proof by contradiction. Suppose that v violates agreement, such that there are two
     Learn messages with differnt values. Then by LearnedImpliesChosen, two different 
     values are chosen, thus violating fact that at most one value is chosen 
     (at most one chosen value is implied by application invs) */
-  assume false; // TODO
+  if !Agreement(c, v) {
+    var m1, m2 :| 
+      && IsLearnMessage(v, m1)
+      && IsLearnMessage(v, m2)
+      && m1.val != m2.val;
+    LearnedImpliesChosen(c, v, m1.lnr, VB(m1.val, m1.bal));
+    LearnedImpliesChosen(c, v, m2.lnr, VB(m2.val, m2.bal));
+    assert false;
+  }
 }
 
 }  // end module PaxosProof
