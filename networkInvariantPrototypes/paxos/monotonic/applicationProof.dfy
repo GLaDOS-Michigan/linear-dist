@@ -151,7 +151,16 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     /* This case is trivial. This is because if something has already been chosen, then
     * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
     * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
-    assume false;
+    forall vb, idx, i | 
+      && Chosen(c, v', vb)
+      && c.ValidLeaderIdx(idx)
+      && vb.b < c.leaderConstants[idx].id
+      && 0 <= i < |v'.leaders[idx].proposed|
+    ensures
+      v'.leaders[idx].proposed[i] == vb.v
+    {
+      assume false;
+    }
   } else if dsStep.AcceptorStep? {
     var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
     var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
@@ -270,6 +279,38 @@ lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables)
     assert false;
   }
 }
+
+// Implied by Inv: If vb is Chosen, then all leaders with ballot > vb.b that has amassed 
+// a Promise quorum, must have highestHeard => vb.b
+// predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+//   requires v.WF(c)
+// {
+//   forall vb, idx | 
+//     && Chosen(c, v, vb)
+//     && c.ValidLeaderIdx(idx)
+//     && vb.b < pbal
+//   ::
+//     exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
+// }
+
+// // lemma: Inv implies that ChosenValImpliesPromiseQuorumSeesBal
+// lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+//   requires Inv(c, v)
+//   ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
+// {
+//   forall chosenVb, prQuorum, pbal | 
+//     && Chosen(c, v, chosenVb)
+//     && IsPromiseQuorum(c, v, prQuorum, pbal)
+//     && chosenVb.b < pbal
+//   ensures
+//     exists m: Message :: m in prQuorum && m.vbOpt.Some? && chosenVb.b <= m.vbOpt.value.b
+//   {
+//     var acQuorum :| IsAcceptQuorum(c, v, acQuorum, chosenVb);
+//     var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, pbal, acQuorum, chosenVb);
+//     var m: Message :| m in prQuorum && m.acc == accId;  // witness
+//     // m satisfies postcondition via AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
+//   }
+// }
 
 }  // end module PaxosProof
 
