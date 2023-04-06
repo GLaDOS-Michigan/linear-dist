@@ -145,7 +145,20 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   requires Next(c, v, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
-  assume false;
+  var dsStep :| NextStep(c, v, v', dsStep);
+  var actor, msgOps := dsStep.actor, dsStep.msgOps;
+  if dsStep.LeaderStep? {
+    /* This case is trivial. This is because if something has already been chosen, then
+    * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
+    * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
+    assume false;
+  } else if dsStep.AcceptorStep? {
+    var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
+    var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+    assume false;
+  } else {
+    NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+  } 
 }
 
 /***************************************************************************************
@@ -195,6 +208,22 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, idx: LearnerId, vb: ValBa
   var i :| 0 <= i < |l.receivedAccepts[vb]| && |l.receivedAccepts[vb][i]| >= c.f+1;
   var acceptorIds := l.receivedAccepts[vb][i];
   assert IsAcceptorQuorum(c, v, acceptorIds, vb);  // trigger
+}
+
+// Lemma: No new values can be chosen during Leader and Learner steps
+lemma NoNewChosenInLeaderOrLearnerSteps(c: Constants, v: Variables, v': Variables, dsStep: Step) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires NextStep(c, v, v', dsStep)
+  requires dsStep.LeaderStep? || dsStep.LearnerStep?
+  ensures forall vb | Chosen(c, v', vb) :: Chosen(c, v, vb)
+{
+  forall vb | Chosen(c, v', vb)
+  ensures Chosen(c, v, vb)
+  {
+    var quorum :| IsAcceptorQuorum(c, v, quorum, vb);  // witness
+    assert IsAcceptorQuorum(c, v, quorum, vb);  // trigger
+  }
 }
 
 
