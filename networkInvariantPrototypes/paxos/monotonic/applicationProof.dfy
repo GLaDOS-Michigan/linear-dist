@@ -21,7 +21,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
 {
   && LeaderStateMonotonic(c, v)
   && ProposeImpliesLeaderState(c, v)
-  && AcceptorPromisedMonotonic(c, v)
+  && AcceptorStateMonotonic(c, v)
   && LearnedValuesValid(c, v)
   && ChosenValImpliesProposeOnlyVal(c, v)
 }
@@ -62,12 +62,19 @@ predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
   && Last(v.leaders[idx].value) == v.leaders[idx].proposed[i]
 }
 
-// Corresponds to AcceptorPromisedMonotonic
-predicate AcceptorPromisedMonotonic(c: Constants, v: Variables) 
+predicate AcceptorStateMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx | c.ValidAcceptorIdx(idx) 
-  :: SeqMonotoneIncreasing(v.acceptors[idx].promised)
+  :: 
+    && SeqMonotoneIncreasing(v.acceptors[idx].promised)
+    && SeqOptionVBMonotoneIncreasing(v.acceptors[idx].acceptedVB)
+    && (forall i | 
+          && 0 <= i < |v.acceptors[idx].promised| 
+          && v.acceptors[idx].acceptedVB[i].Some?
+        ::
+          v.acceptors[idx].acceptedVB[i].value.b <= v.acceptors[idx].promised[i]
+    )
 }
 
 // Corresponds to LearnMsgsValid in non-monotonic land
@@ -121,6 +128,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 {
   MessageInvInductive(c, v, v');
   InvNextProposeImpliesLeaderState(c, v, v');
+  InvNextAcceptorStateMonotonic(c, v, v');
   InvNextLearnedValuesValid(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
   assume AtMostOneChosenVal(c, v');  // TODO: Application Inv should imply this
@@ -162,6 +170,13 @@ lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables
     }
   }
 }
+
+lemma InvNextAcceptorStateMonotonic(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures AcceptorStateMonotonic(c, v')
+{}
+
 
 
 lemma InvNextLearnedValuesValid(c: Constants, v: Variables, v': Variables) 
@@ -330,6 +345,15 @@ lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables)
     assert false;
   }
 }
+
+predicate SeqOptionVBMonotoneIncreasing(s: seq<Option<ValBal>>) {
+    forall i, j | 
+      && 0 <= i < |s| 
+      && 0 <= j < |s| 
+      && i <= j
+      && s[i].Some?
+    :: s[j].Some? && s[i].value.b <= s[j].value.b
+  }
 
 // Implied by Inv: If vb is Chosen, then all leaders with ballot > vb.b that has amassed 
 // a Promise quorum, must have highestHeard => vb.b
