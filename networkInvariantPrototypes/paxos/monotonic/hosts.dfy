@@ -17,7 +17,7 @@ module LeaderHost {
   }
 
   datatype Variables = Variables(
-    receivedPromises: seq<set<LeaderId>>, 
+    receivedPromises: seq<set<Message>>, 
     highestHeardBal: seq<Option<LeaderId>>,
     value: seq<Value>,
     proposed: seq<Value>
@@ -25,6 +25,7 @@ module LeaderHost {
     predicate WF() {
       && 0 < |receivedPromises|
       && |value| == |highestHeardBal| == |receivedPromises|
+      && (forall i, p | 0 <= i < |receivedPromises| && p in receivedPromises[i] :: p.Promise?)
     }
 
     predicate HighestHeardNone() 
@@ -44,6 +45,13 @@ module LeaderHost {
       requires WF()
     {
       Last(value)
+    }
+
+    predicate NewAcceptorPromise(c: Constants, bal: LeaderId, acc: AcceptorId) 
+      requires WF()
+    {
+      && bal == c.id
+      && (forall p | p in Last(receivedPromises) :: p.acc != acc)
     }
   }
 
@@ -102,12 +110,11 @@ module LeaderHost {
         // probably simplify proof, preventing the leader from potentially equivocating
         // on its proposed value after receiving extraneous straggling promises.
         && |Last(v.receivedPromises)| <= c.f
-        && acc !in Last(v.receivedPromises)
-        && if bal == c.id then
+        && if v.NewAcceptorPromise(c, bal, acc) then
             var doUpdate := && vbOpt.Some? 
                             && (v.HighestHeardNone() || vbOpt.value.b > v.GetHighestHeard());
             v' == v.(
-              receivedPromises := v.receivedPromises + [Last(v.receivedPromises) + {acc}],
+              receivedPromises := v.receivedPromises + [Last(v.receivedPromises) + {msgOps.recv.value}],
               value := if doUpdate then v.value + [vbOpt.value.v] else StutterSeq(v.value),
               highestHeardBal := 
                 if doUpdate then v.highestHeardBal + [Some(vbOpt.value.b)] else StutterSeq(v.highestHeardBal)
