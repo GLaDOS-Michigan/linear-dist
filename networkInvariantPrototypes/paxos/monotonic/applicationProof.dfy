@@ -92,7 +92,7 @@ predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
 
 // Acceptor local state's monotonic properties
 // This covers AcceptorPromisedMonotonic and AcceptorPromisedLargerThanAccepted and
-// AcceptMsgImpliesLargerPromiseCarriesVb
+// PromiseBalLargerThanAccepted and AcceptMsgImpliesLargerPromiseCarriesVb
 predicate AcceptorStateMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
