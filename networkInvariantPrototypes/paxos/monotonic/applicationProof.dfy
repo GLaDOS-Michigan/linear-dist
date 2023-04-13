@@ -33,7 +33,7 @@ predicate Inv(c: Constants, v: Variables)
   && Agreement(c, v)
 }
 
-// Inv: Leader local state's monotonic properties
+// Leader local state's monotonic properties
 predicate LeaderStateMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
@@ -62,6 +62,8 @@ predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
   && Last(v.leaders[idx].value) == v.leaders[idx].proposed[i]
 }
 
+// Acceptor local state's monotonic properties
+// This covers AcceptorPromisedMonotonic and AcceptorPromisedLargerThanAccepted
 predicate AcceptorStateMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
