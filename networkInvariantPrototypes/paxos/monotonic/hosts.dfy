@@ -202,7 +202,7 @@ module AcceptorHost {
     }
 
     predicate HasAccepted(vb: ValBal) {
-      Some(vb) in acceptedVB
+      exists i :: 0 <= i < |acceptedVB| && Some(vb) == acceptedVB[i]
     }
   }
 
