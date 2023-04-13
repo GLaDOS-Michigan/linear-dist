@@ -331,8 +331,8 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   var dsStep :| NextStep(c, v, v', dsStep);
   var actor, msgOps := dsStep.actor, dsStep.msgOps;
   if dsStep.LeaderStep? {
-    /* This case is trivial. This is because if something has already been chosen, then
-    * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
+    /* If something has already been chosen, then
+    * the leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
     * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
     forall vb, idx, i | 
       && Chosen(c, v', vb)
@@ -342,6 +342,12 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     ensures
       v'.leaders[idx].proposed[i] == vb.v
     {
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+      assert Chosen(c, v, vb);
+
+      // use ChosenValImpliesAcceptorQuorumSeesBal, and then I think this would imply that
+      // leader promise quorum must also see it?
+
       assume false;
     }
   } else if dsStep.AcceptorStep? {
@@ -373,14 +379,16 @@ predicate AtMostOneChosenVal(c: Constants, v: Variables)
   :: vb1.v == vb2.v
 }
 
+predicate IsAcceptorSet(c: Constants, aset: set<AcceptorId>) {
+  forall id | id in aset :: c.ValidAcceptorIdx(id)
+}
+
 predicate IsAcceptorQuorum(c: Constants, v: Variables, aset: set<AcceptorId>, vb: ValBal) 
   requires v.WF(c)
 {
   && |aset| >= c.f+1
-  && (forall id | id in aset :: 
-      && c.ValidAcceptorIdx(id)
-      && v.acceptors[id].HasAccepted(vb)
-  )
+  && IsAcceptorSet(c, aset)
+  && (forall id | id in aset :: v.acceptors[id].HasAccepted(vb))
 }
 
 // Lemma: For any Learner that learned a Value, that learned value must have been chosen
@@ -504,37 +512,55 @@ predicate WinningPromiseMessageInQuorum(pset: set<Message>, qbal: LeaderId, vb: 
       )
 }
 
-// Implied by Inv: If vb is Chosen, then all leaders with ballot > vb.b that has amassed 
-// a Promise quorum, must have highestHeard => vb.b
-// predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
-//   requires v.WF(c)
-// {
-//   forall vb, idx | 
-//     && Chosen(c, v, vb)
-//     && c.ValidLeaderIdx(idx)
-//     && vb.b < pbal
-//   ::
-//     exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
-// }
+// Corollary of Inv: If vb is Chosen, then given any quorum of acceptors, at least one of them
+// must have accepted that vb
+// Corresponds to ChosenValImpliesPromiseQuorumSeesBal
+predicate ChosenValImpliesAcceptorQuorumSeesBal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, quorum | 
+    && Chosen(c, v, vb)
+    && IsAcceptorSet(c, quorum)
+    && |quorum| >= c.f+1
+  ::
+    exists idx :: 
+      && idx in quorum
+      && v.acceptors[idx].HasAccepted(vb)
+}
 
-// // lemma: Inv implies that ChosenValImpliesPromiseQuorumSeesBal
-// lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
-//   requires Inv(c, v)
-//   ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
-// {
-//   forall chosenVb, prQuorum, pbal | 
-//     && Chosen(c, v, chosenVb)
-//     && IsPromiseQuorum(c, v, prQuorum, pbal)
-//     && chosenVb.b < pbal
-//   ensures
-//     exists m: Message :: m in prQuorum && m.vbOpt.Some? && chosenVb.b <= m.vbOpt.value.b
-//   {
-//     var acQuorum :| IsAcceptQuorum(c, v, acQuorum, chosenVb);
-//     var accId := IntersectingAcceptorInPromiseAndAcceptQuorum(c, v, prQuorum, pbal, acQuorum, chosenVb);
-//     var m: Message :| m in prQuorum && m.acc == accId;  // witness
-//     // m satisfies postcondition via AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
-//   }
-// }
+// lemma: Inv implies that ChosenValImpliesAcceptorQuorumSeesBal
+lemma InvImpliesChosenValImpliesAcceptorQuorumSeesBal(c: Constants, v: Variables) 
+  requires Inv(c, v)
+  ensures ChosenValImpliesAcceptorQuorumSeesBal(c, v)
+{
+  forall vb, anyQuorum | 
+    && Chosen(c, v, vb)
+    && IsAcceptorSet(c, anyQuorum)
+    && |anyQuorum| >= c.f+1
+  ensures
+    exists idx :: 
+      && idx in anyQuorum
+      && v.acceptors[idx].HasAccepted(vb)
+  {
+    var chosenQuorum :| IsAcceptorQuorum(c, v, chosenQuorum, vb);
+    var allAccs := set id: AcceptorId | 0 <= id < 2*c.f+1;
+    AcceptorSetComprehensionSize(2*c.f+1);
+    var commonAcc := QuorumIntersection(allAccs, anyQuorum, chosenQuorum);  // witness
+  }
+}
+
+lemma AcceptorSetComprehensionSize(n: nat) 
+  ensures |(set x: AcceptorId | 0 <= x < n)| == n
+  decreases n
+{
+  var s := (set x: AcceptorId | 0 <= x < n);
+  if n == 0 {
+    assert |s| == 0;
+  } else {
+    AcceptorSetComprehensionSize(n-1);
+    assert s == (set x: AcceptorId | 0 <= x < n-1) + {n-1};  // trigger
+  }
+}
 
 }  // end module PaxosProof
 
