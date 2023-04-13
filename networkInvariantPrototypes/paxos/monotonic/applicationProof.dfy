@@ -70,7 +70,8 @@ predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int, i: in
   && (hbal.None? ==> PromiseSetEmptyVB(pset, cldr.id))
 }
 
-// Corresponds to ProposeImpliesLeaderState. This implies OneValuePerProposeBallot
+// Corresponds to ProposeImpliesLeaderState. This implies LeaderProposesOneValue, 
+// which in turn implies at most one value is chosen
 predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
   requires v.WF(c)
 {
@@ -88,6 +89,18 @@ predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
 {
   && |Last(v.leaders[idx].receivedPromises)| >= c.f+1
   && Last(v.leaders[idx].value) == v.leaders[idx].proposed[i]
+}
+
+// This is a corollary of ProposeImpliesLeaderState, and implies at most one value is chosen
+predicate LeaderProposesOneValue(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, i, j | 
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v.leaders[idx].proposed|
+    && 0 <= j < |v.leaders[idx].proposed|
+  ::
+    v.leaders[idx].proposed[i] == v.leaders[idx].proposed[j]
 }
 
 // Acceptor local state's monotonic properties
@@ -163,7 +176,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextAcceptorStateMonotonic(c, v, v');
   InvNextLearnedValuesValid(c, v, v');
   InvNextChosenValImpliesProposeOnlyVal(c, v, v');
-  assume AtMostOneChosenVal(c, v');  // TODO: Application Inv should imply this
   MessageAndApplicationInvImpliesAgreement(c, v');
 }
 
@@ -230,6 +242,7 @@ lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures ProposeImpliesLeaderState(c, v')
+  ensures LeaderProposesOneValue(c, v')
 {
   forall idx, i | 
     && c.ValidLeaderIdx(idx)
@@ -251,6 +264,19 @@ lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables
     } else {
       assert LeaderStateValid(c, v, idx, i);    // trigger
     }
+  }
+  
+  // Prove corollary LeaderProposesOneValue
+  forall idx, i, j | 
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v'.leaders[idx].proposed|
+    && 0 <= j < |v'.leaders[idx].proposed|
+  ensures
+    v'.leaders[idx].proposed[i] == v'.leaders[idx].proposed[j]
+  {
+    // triggers
+    assert LeaderStateValid(c, v', idx, i);
+    assert LeaderStateValid(c, v', idx, j);
   }
 }
 
@@ -299,6 +325,7 @@ lemma InvNextLearnedValuesValid(c: Constants, v: Variables, v': Variables)
 lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
+  requires LeaderProposesOneValue(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
   var dsStep :| NextStep(c, v, v', dsStep);
