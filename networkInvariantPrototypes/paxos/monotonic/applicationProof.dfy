@@ -20,6 +20,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires MessageInv(c, v)
 {
   && LeaderStateMonotonic(c, v)
+  && LeaderHighestHeardBackedByReceivedPromises(c, v)
   && ProposeImpliesLeaderState(c, v)
   && AcceptorStateMonotonic(c, v)
   && LearnedValuesValid(c, v)
@@ -40,6 +41,33 @@ predicate LeaderStateMonotonic(c: Constants, v: Variables)
   forall idx | c.ValidLeaderIdx(idx)
   ::  && SetMonotoneIncreasing(v.leaders[idx].receivedPromises)
       && SeqOptionMonotoneIncreasing(v.leaders[idx].highestHeardBal)
+}
+
+
+// Highest heard ballot and value backed by received promises, corresponds to HighestHeardBackedByReceivedPromises
+predicate LeaderHighestHeardBackedByReceivedPromises(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall idx, i |
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v.leaders[idx].highestHeardBal|
+  ::
+    LeaderPromiseSetProperties(c, v, idx, i)
+}
+
+predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int, i: int) 
+  requires v.WF(c)
+  requires c.ValidLeaderIdx(idx)
+  requires 0 <= i < |v.leaders[idx].highestHeardBal|
+{
+  var ldr := v.leaders[idx];
+  var cldr := c.leaderConstants[idx];
+  var pset := ldr.receivedPromises[i];
+  var hbal := ldr.highestHeardBal[i];
+  var val := ldr.value[i];
+  && IsPromiseSet(pset, cldr.id)
+  && (hbal.Some? ==> PromiseSetHighestVB(pset, cldr.id, VB(val, hbal.value)))
+  && (hbal.None? ==> PromiseSetEmptyVB(pset, cldr.id))
 }
 
 // Corresponds to ProposeImpliesLeaderState. This implies OneValuePerProposeBallot
@@ -63,7 +91,8 @@ predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
 }
 
 // Acceptor local state's monotonic properties
-// This covers AcceptorPromisedMonotonic and AcceptorPromisedLargerThanAccepted
+// This covers AcceptorPromisedMonotonic and AcceptorPromisedLargerThanAccepted and
+// AcceptMsgImpliesLargerPromiseCarriesVb
 predicate AcceptorStateMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
@@ -129,6 +158,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
+  InvNextLeaderHighestHeardBackedByReceivedPromises(c, v, v');
   InvNextProposeImpliesLeaderState(c, v, v');
   InvNextAcceptorStateMonotonic(c, v, v');
   InvNextLearnedValuesValid(c, v, v');
@@ -143,7 +173,58 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
-
+lemma InvNextLeaderHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LeaderHighestHeardBackedByReceivedPromises(c, v')
+{
+  forall idx, i |
+    && c.ValidLeaderIdx(idx)
+    && 0 <= i < |v'.leaders[idx].highestHeardBal|
+  ensures
+    LeaderPromiseSetProperties(c, v', idx, i)
+  {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.LeaderStep? {
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      if  && actor == idx  
+          && step.ReceiveStep?
+          && msgOps.recv.value.Promise? 
+          && |Last(l.receivedPromises)| <= c.f
+          && l.NewAcceptorPromise(lc, msgOps.recv.value.bal, msgOps.recv.value.acc)
+          && i == |l'.receivedPromises|-1
+      {
+        assert LeaderPromiseSetProperties(c, v, idx, i-1);  // trigger
+        var prom := msgOps.recv.value;
+        var pset := Last(l'.receivedPromises);
+        var hbal := l'.highestHeardBal[i];
+        if hbal.Some? {
+          var vb' := VB(l'.value[i], hbal.value);
+          if l.highestHeardBal[i-1].Some? {
+            var doUpdate := && prom.vbOpt.Some? 
+                            && (l.HighestHeardNone() || prom.vbOpt.value.b > l.GetHighestHeard());
+            if doUpdate {
+              assert WinningPromiseMessageInQuorum(pset, lc.id, vb', prom);  // trigger
+            } else {
+              // witness and trigger
+              var vb := VB(l.value[i-1], l.highestHeardBal[i-1].value);
+              var m :| WinningPromiseMessageInQuorum(l.receivedPromises[i-1], lc.id, vb, m);
+              assert WinningPromiseMessageInQuorum(pset, lc.id, vb, m);
+            }
+          } else {
+            assert WinningPromiseMessageInQuorum(pset, lc.id, vb', prom);  // trigger
+          }
+        }
+      } else {
+        assert LeaderPromiseSetProperties(c, v, idx, i);  // trigger
+      }
+    } else {
+      assert LeaderPromiseSetProperties(c, v, idx, i);  // trigger
+    }
+  }
+}
 
 lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -349,13 +430,52 @@ lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables)
 }
 
 predicate SeqOptionVBMonotoneIncreasing(s: seq<Option<ValBal>>) {
-    forall i, j | 
-      && 0 <= i < |s| 
-      && 0 <= j < |s| 
-      && i <= j
-      && s[i].Some?
-    :: s[j].Some? && s[i].value.b <= s[j].value.b
-  }
+  forall i, j | 
+    && 0 <= i < |s| 
+    && 0 <= j < |s| 
+    && i <= j
+    && s[i].Some?
+  :: s[j].Some? && s[i].value.b <= s[j].value.b
+}
+
+predicate IsPromiseSet(pset: set<Message>, bal: LeaderId) {
+  && (forall m | m in pset ::
+    && m.Promise?     // changed from IsPromiseMsg(v, m), to avoid application definitions mentioning network
+    && m.bal == bal)
+  && PromiseSetDistinctAccs(pset)
+}
+
+predicate PromiseSetDistinctAccs(pset: set<Message>) 
+  requires forall m | m in pset :: m.Promise?
+{
+  forall m1, m2 | m1 in pset && m2 in pset && m1.acc == m2.acc
+      :: m1 == m2
+}
+
+predicate PromiseSetEmptyVB(pset: set<Message>, qbal: LeaderId)
+  requires IsPromiseSet(pset, qbal)
+{
+  forall m | m in pset :: m.vbOpt == None
+}
+
+predicate PromiseSetHighestVB(pset: set<Message>, qbal: LeaderId, vb: ValBal)
+  requires IsPromiseSet(pset, qbal)
+{
+  exists m :: WinningPromiseMessageInQuorum(pset, qbal, vb, m)
+}
+
+predicate WinningPromiseMessageInQuorum(pset: set<Message>, qbal: LeaderId, vb: ValBal, m: Message)
+  requires IsPromiseSet(pset, qbal)
+{
+    && m in pset 
+    && m.vbOpt == Some(vb)
+    && (forall other | 
+          && other in pset 
+          && other.vbOpt.Some?
+        ::
+          other.vbOpt.value.b <= vb.b
+      )
+}
 
 // Implied by Inv: If vb is Chosen, then all leaders with ballot > vb.b that has amassed 
 // a Promise quorum, must have highestHeard => vb.b
