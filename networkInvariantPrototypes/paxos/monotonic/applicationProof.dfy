@@ -345,7 +345,7 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
       NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
       assert Chosen(c, v, vb);
 
-      // use ChosenValImpliesAcceptorQuorumSeesBal, and then I think this would imply that
+      // TODO: use ChosenValImpliesAcceptorQuorumSeesIt, and then I think this would imply that
       // leader promise quorum must also see it?
 
       assume false;
@@ -446,7 +446,7 @@ returns (out: set<Message>)
 lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables) 
   requires MessageInv(c, v)
   requires ApplicationInv(c, v)
-  requires AtMostOneChosenVal(c, v);  // TODO: Application inv should imply this
+  requires AtMostOneChosenVal(c, v)
   ensures Agreement(c, v)
 {
   /* Proof by contradiction. Suppose that v violates agreement, such that there are two
@@ -512,10 +512,19 @@ predicate WinningPromiseMessageInQuorum(pset: set<Message>, qbal: LeaderId, vb: 
       )
 }
 
+predicate AcceptorQuorumSeesVb(c: Constants, v: Variables, quorum: set<AcceptorId>, vb: ValBal) 
+  requires v.WF(c)
+  requires IsAcceptorSet(c, quorum)
+{
+  exists idx :: 
+    && idx in quorum
+    && v.acceptors[idx].HasAccepted(vb)
+}
+
 // Corollary of Inv: If vb is Chosen, then given any quorum of acceptors, at least one of them
 // must have accepted that vb
 // Corresponds to ChosenValImpliesPromiseQuorumSeesBal
-predicate ChosenValImpliesAcceptorQuorumSeesBal(c: Constants, v: Variables) 
+predicate ChosenValImpliesAcceptorQuorumSeesIt(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall vb, quorum | 
@@ -523,24 +532,19 @@ predicate ChosenValImpliesAcceptorQuorumSeesBal(c: Constants, v: Variables)
     && IsAcceptorSet(c, quorum)
     && |quorum| >= c.f+1
   ::
-    exists idx :: 
-      && idx in quorum
-      && v.acceptors[idx].HasAccepted(vb)
+    AcceptorQuorumSeesVb(c, v, quorum, vb)
 }
 
-// lemma: Inv implies that ChosenValImpliesAcceptorQuorumSeesBal
-lemma InvImpliesChosenValImpliesAcceptorQuorumSeesBal(c: Constants, v: Variables) 
+// lemma: Inv implies that ChosenValImpliesAcceptorQuorumSeesIt
+lemma InvImpliesChosenValImpliesAcceptorQuorumSeesIt(c: Constants, v: Variables) 
   requires Inv(c, v)
-  ensures ChosenValImpliesAcceptorQuorumSeesBal(c, v)
+  ensures ChosenValImpliesAcceptorQuorumSeesIt(c, v)
 {
   forall vb, anyQuorum | 
     && Chosen(c, v, vb)
     && IsAcceptorSet(c, anyQuorum)
     && |anyQuorum| >= c.f+1
-  ensures
-    exists idx :: 
-      && idx in anyQuorum
-      && v.acceptors[idx].HasAccepted(vb)
+  ensures AcceptorQuorumSeesVb(c, v, anyQuorum, vb)
   {
     var chosenQuorum :| IsAcceptorQuorum(c, v, chosenQuorum, vb);
     var allAccs := set id: AcceptorId | 0 <= id < 2*c.f+1;
