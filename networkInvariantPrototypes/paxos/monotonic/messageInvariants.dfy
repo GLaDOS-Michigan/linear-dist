@@ -157,6 +157,7 @@ predicate ValidAcceptMessage(c: Constants, v: Variables)
   (exists i :: 
     && 0 <= i < |v.acceptors[accept.acc].acceptedVB|
     && v.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb)
+    && v.acceptors[accept.acc].promised[i] == accept.vb.b
   )
 }
 
@@ -337,6 +338,7 @@ lemma InvNextValidAcceptMessage(c: Constants, v: Variables, v': Variables)
   ensures exists i :: 
     && 0 <= i < |v'.acceptors[accept.acc].acceptedVB|
     && v'.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb)
+    && v'.acceptors[accept.acc].promised[i] == accept.vb.b
   {
     var dsStep :| NextStep(c, v, v', dsStep);
     var actor, msgOps := dsStep.actor, dsStep.msgOps;
@@ -351,14 +353,17 @@ lemma InvNextValidAcceptMessage(c: Constants, v: Variables, v': Variables)
         if doAccept {
           var i := |a'.acceptedVB|-1;
           assert v'.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb); // trigger
+          assert v'.acceptors[accept.acc].promised[i] == accept.vb.b;       // trigger
         }
       }
     } else {
       assert IsAcceptMessage(v, accept);  // trigger
       var i :|  && 0 <= i < |v.acceptors[accept.acc].acceptedVB|   // witness
-                && v.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb);
-      assert  && 0 <= i < |v'.acceptors[accept.acc].acceptedVB|   // witness
-              && v'.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb);   // trigger
+                && v.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb)
+                && v.acceptors[accept.acc].promised[i] == accept.vb.b;
+      assert  && 0 <= i < |v'.acceptors[accept.acc].acceptedVB|    // trigger
+              && v'.acceptors[accept.acc].acceptedVB[i] == Some(accept.vb)
+              && v'.acceptors[accept.acc].promised[i] == accept.vb.b;
     }
   }
 }
