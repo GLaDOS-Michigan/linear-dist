@@ -201,8 +201,15 @@ module AcceptorHost {
       else Last(acceptedVB)
     }
 
-    predicate HasAccepted(vb: ValBal) {
-      exists i :: 0 <= i < |acceptedVB| && Some(vb) == acceptedVB[i]
+    // This is defined as such because at the moment an acceptor accepts a value, its
+    // promised ballot is the same as the accepted valbal
+    predicate HasAccepted(vb: ValBal) 
+      requires WF()
+    {
+      exists i :: 
+        && 0 <= i < |acceptedVB| 
+        && Some(vb) == acceptedVB[i]
+        && promised[i] == vb.b
     }
   }
 
