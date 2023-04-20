@@ -466,9 +466,6 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   var dsStep :| NextStep(c, v, v', dsStep);
   var actor, msgOps := dsStep.actor, dsStep.msgOps;
   if dsStep.LeaderStep? {
-    /* This case is trivial. This is because if something has already been chosen, then
-    * then leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
-    * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
     forall vb, propose | 
       && Chosen(c, v', vb)
       && IsProposeMessage(v', propose)
@@ -480,9 +477,14 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
       assert Chosen(c, v, vb);
       var l := v.leaders[actor];
       if |l.receivedPromises| >= c.f+1 && propose !in v.network.sentMsgs {
+        /* Suppose vb has been chosen, and leader highest heard is vb'. By 
+        * HighestHeardBackedByReceivedPromises, this vb' was carried by a Promise message. 
+        * By ChosenValImpliesPromiseQuorumSeesBal, highest heard vb' has vb'.b >= vb.b. 
+        * By PromiseVbImpliesAccepted, there is an Accept(vb'). By AcceptMessageImpliesProposed,
+        * there is a Propose(vb') in the pre state v. By ChosenValImpliesProposeOnlyVal,
+        * vb'.v == vb.v */
         var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
         assert IsPromiseQuorum(c, v, pquorum, actor);  // trigger 
-        // remaining proof is true by ChosenValImpliesPromiseQuorumSeesBal
       }
     }
   } else if dsStep.AcceptorStep? {
