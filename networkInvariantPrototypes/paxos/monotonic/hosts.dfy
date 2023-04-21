@@ -209,7 +209,6 @@ module AcceptorHost {
       exists i :: 
         && 0 <= i < |acceptedVB| 
         && Some(vb) == acceptedVB[i]
-        && promised[i] == vb.b
     }
   }
 
