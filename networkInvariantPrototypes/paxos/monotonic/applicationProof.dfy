@@ -328,12 +328,10 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   requires LeaderProposesOneValue(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
+  InvImpliesChosenValImpliesPromiseQuorumSeesBal(c, v);
   var dsStep :| NextStep(c, v, v', dsStep);
   var actor, msgOps := dsStep.actor, dsStep.msgOps;
   if dsStep.LeaderStep? {
-    /* If something has already been chosen, then
-    * the leader can only propose same val by ChosenValImpliesPromiseQuorumSeesBal.
-    * Otherwise, the post-condition is vacuously true, as nothing new can be chosen */
     forall vb, idx, i | 
       && Chosen(c, v', vb)
       && c.ValidLeaderIdx(idx)
@@ -344,11 +342,28 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     {
       NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
       assert Chosen(c, v, vb);
-
-      // TODO: use ChosenValImpliesAcceptorQuorumSeesIt, and then I think this would imply that
-      // leader promise quorum must also see it?
-
-      assume false;
+      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+      if actor == idx && step.ProposeStep? && i == |l'.proposed|-1 {
+        /* Suppose vb has been chosen in state v, and the new proposal is value v' != vb.v. 
+        * By LeaderHighestHeardBackedByReceivedPromises, there is a promise message m in 
+        * l.receivedPromises[i] that accepted v' at some b' <= vb.b. 
+        * By ChosenValImpliesPromiseQuorumSeesBal, b' >= vb.b. 
+        * By ValidPromiseMessage, there is an acceptor that accepted (v', b').
+        * By AcceptorValidAcceptedVB, there is a Propose(b', v') in the network of state v.
+        * This then contradicts ChosenValImpliesProposeOnlyVal. */
+        var pv' := Last(l'.proposed);
+        if pv' != vb.v {
+          var j := |l.receivedPromises|-1;
+          var pquorum := l.receivedPromises[j];
+          assert LeaderPromiseSetProperties(c, v, actor, j);    // trigger
+          assert IsPromiseQuorum(c, pquorum, lc.id);            // trigger
+          var b' := l.highestHeardBal[j].value;
+          var m :| WinningPromiseMessageInQuorum(pquorum, lc.id, VB(pv', b'), m);  // witness
+          assert IsPromiseMessage(v, m);                        // trigger
+          assert false;
+        }
+      }
     }
   } else if dsStep.AcceptorStep? {
     var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
@@ -480,6 +495,11 @@ predicate IsPromiseSet(pset: set<Message>, bal: LeaderId) {
   && PromiseSetDistinctAccs(pset)
 }
 
+predicate IsPromiseQuorum(c: Constants, quorum: set<Message>, bal: LeaderId) {
+  && |quorum| >= c.f+1
+  && IsPromiseSet(quorum, bal)
+}
+
 predicate PromiseSetDistinctAccs(pset: set<Message>) 
   requires forall m | m in pset :: m.Promise?
 {
@@ -550,6 +570,34 @@ lemma InvImpliesChosenValImpliesAcceptorQuorumSeesIt(c: Constants, v: Variables)
     var allAccs := set id: AcceptorId | 0 <= id < 2*c.f+1;
     AcceptorSetComprehensionSize(2*c.f+1);
     var commonAcc := QuorumIntersection(allAccs, anyQuorum, chosenQuorum);  // witness
+  }
+}
+
+// Collorary of ChosenValImpliesAcceptorQuorumSeesIt
+predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, quorum, pbal | 
+    && Chosen(c, v, vb)
+    && IsPromiseQuorum(c, quorum, pbal)
+    && vb.b < pbal
+  ::
+    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
+}
+
+// lemma: Inv implies that ChosenValImpliesPromiseQuorumSeesBal
+lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+  requires Inv(c, v)
+  ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
+{
+  forall vb, quorum, pbal | 
+    && Chosen(c, v, vb)
+    && IsPromiseQuorum(c, quorum, pbal)
+    && vb.b < pbal
+  ensures
+    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
+  {
+    assume false;
   }
 }
 
