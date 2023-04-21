@@ -94,10 +94,12 @@ predicate ValidProposeMesssage(c: Constants, v: Variables)
   forall prop | IsProposeMessage(v, prop)
   ::
     && prop.val in v.leaders[prop.bal].proposed
-    && (exists i ::
+    && (exists i, j ::
       && 0 <= i < |v.leaders[prop.bal].value|
+      && 0 <= j < |v.leaders[prop.bal].proposed|
       && v.leaders[prop.bal].value[i] == prop.val
       && |v.leaders[prop.bal].receivedPromises[i]| >= c.f+1
+      && prop.val == v.leaders[prop.bal].proposed[j]
     )
 }
 
@@ -227,10 +229,12 @@ lemma InvNextValidProposeMesssage(c: Constants, v: Variables, v': Variables)
   forall prop | IsProposeMessage(v', prop)
   ensures
     && prop.val in v'.leaders[prop.bal].proposed
-    && (exists i ::
+    && (exists i, j ::
       && 0 <= i < |v'.leaders[prop.bal].value|
+      && 0 <= j < |v'.leaders[prop.bal].proposed|
       && v'.leaders[prop.bal].value[i] == prop.val
       && |v'.leaders[prop.bal].receivedPromises[i]| >= c.f+1
+      && prop.val == v'.leaders[prop.bal].proposed[j]
     )
   {
     var dsStep :| NextStep(c, v, v', dsStep);

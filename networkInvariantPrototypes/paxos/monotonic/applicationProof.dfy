@@ -325,54 +325,129 @@ lemma InvNextLearnedValuesValid(c: Constants, v: Variables, v': Variables)
 lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
+  requires LeaderStateMonotonic(c, v')
+  requires LeaderHighestHeardBackedByReceivedPromises(c, v')
+  requires ProposeImpliesLeaderState(c, v')
+  requires AcceptorStateMonotonic(c, v')
+  requires LearnedValuesValid(c, v')
+  requires LeaderProposesOneValue(c, v')
   requires LeaderProposesOneValue(c, v')
   ensures ChosenValImpliesProposeOnlyVal(c, v')
 {
   InvImpliesChosenValImpliesPromiseQuorumSeesBal(c, v);
   var dsStep :| NextStep(c, v, v', dsStep);
   var actor, msgOps := dsStep.actor, dsStep.msgOps;
-  if dsStep.LeaderStep? {
-    forall vb, idx, i | 
-      && Chosen(c, v', vb)
-      && c.ValidLeaderIdx(idx)
-      && vb.b < c.leaderConstants[idx].id
-      && 0 <= i < |v'.leaders[idx].proposed|
-    ensures
-      v'.leaders[idx].proposed[i] == vb.v
-    {
-      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-      assert Chosen(c, v, vb);
-      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
-      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-      if actor == idx && step.ProposeStep? && i == |l'.proposed|-1 {
-        /* Suppose vb has been chosen in state v, and the new proposal is value v' != vb.v. 
-        * By LeaderHighestHeardBackedByReceivedPromises, there is a promise message m in 
-        * l.receivedPromises[i] that accepted v' at some b' <= vb.b. 
-        * By ChosenValImpliesPromiseQuorumSeesBal, b' >= vb.b. 
-        * By ValidPromiseMessage, there is an acceptor that accepted (v', b').
-        * By AcceptorValidAcceptedVB, there is a Propose(b', v') in the network of state v.
-        * This then contradicts ChosenValImpliesProposeOnlyVal. */
-        var pv' := Last(l'.proposed);
-        if pv' != vb.v {
-          var j := |l.receivedPromises|-1;
-          var pquorum := l.receivedPromises[j];
-          assert LeaderPromiseSetProperties(c, v, actor, j);    // trigger
-          assert IsPromiseQuorum(c, pquorum, lc.id);            // trigger
-          var b' := l.highestHeardBal[j].value;
-          var m :| WinningPromiseMessageInQuorum(pquorum, lc.id, VB(pv', b'), m);  // witness
-          assert IsPromiseMessage(v, m);                        // trigger
-          assert false;
+  forall vb, idx, i | 
+    && Chosen(c, v', vb)
+    && c.ValidLeaderIdx(idx)
+    && vb.b < c.leaderConstants[idx].id
+    && 0 <= i < |v'.leaders[idx].proposed|
+  ensures
+    v'.leaders[idx].proposed[i] == vb.v
+  {
+    if dsStep.LeaderStep? {
+        NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+        assert Chosen(c, v, vb);
+        var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+        if actor == idx && step.ProposeStep? && i == |l'.proposed|-1 {
+          /* Suppose vb has been chosen in state v, and the new proposal is value v' != vb.v. 
+          * By LeaderHighestHeardBackedByReceivedPromises, there is a promise message m in 
+          * l.receivedPromises[i] that accepted v' at some b' <= vb.b. 
+          * By ChosenValImpliesPromiseQuorumSeesBal, b' >= vb.b. 
+          * By ValidPromiseMessage, there is an acceptor that accepted (v', b').
+          * By AcceptorValidAcceptedVB, there is a Propose(b', v') in the network of state v.
+          * This then contradicts ChosenValImpliesProposeOnlyVal. */
+          var pv' := Last(l'.proposed);
+          if pv' != vb.v {
+            var j := |l.receivedPromises|-1;
+            var pquorum := l.receivedPromises[j];
+            assert LeaderPromiseSetProperties(c, v, actor, j);    // trigger
+            assert IsPromiseQuorum(c, pquorum, lc.id);            // trigger
+            var b' := l.highestHeardBal[j].value;
+            var m :| WinningPromiseMessageInQuorum(pquorum, lc.id, VB(pv', b'), m);  // witness
+            assert IsPromiseMessage(v, m);                        // trigger
+            assert false;
+          }
         }
+    } else if dsStep.AcceptorStep? {
+      var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
+      var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+      if step.ReceiveStep? && msgOps.recv.value.Propose? {
+        if !Chosen(c, v, vb) && v'.leaders[idx].proposed[i] != vb.v {
+          /* This is a point where something can suddenly be chosen.*/
+          MessageInvInductive(c, v, v');
+          ChosenAndConflictingProposeImpliesFalse(c, v', vb, idx, i);
+        }
+      } else {
+        var quorum :| IsAcceptorQuorum(c, v', quorum, vb);  // witness
+        assert IsAcceptorQuorum(c, v, quorum, vb);          // trigger
       }
-    }
-  } else if dsStep.AcceptorStep? {
-    var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
-    var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-    assume false;
-  } else {
-    NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-  } 
+    } else {
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+    } 
+  }
 }
+
+
+// Helper lemma for InvNextChosenValImpliesProposeOnlyVal. Here lies most of the heavy-lifting Paxos logic
+lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosenVb: ValBal, proposedBal: LeaderId, i: nat) 
+  requires MessageInv(c, v)
+  requires LeaderStateMonotonic(c, v)
+  requires LeaderHighestHeardBackedByReceivedPromises(c, v)
+  requires ProposeImpliesLeaderState(c, v)
+  requires AcceptorStateMonotonic(c, v)
+  requires LearnedValuesValid(c, v)
+  requires LeaderProposesOneValue(c, v)
+  requires Chosen(c, v, chosenVb)
+  requires c.ValidLeaderIdx(proposedBal)
+  requires 0 <= i < |v.leaders[proposedBal].proposed|
+  requires v.leaders[proposedBal].proposed[i] != chosenVb.v
+  requires chosenVb.b < proposedBal
+  decreases proposedBal
+  ensures false
+{
+  /* Proof by contradiction. 
+  * Suppose a leader l of ballot b' > vb.b proposed value v' != chosenVb.val. Then l's
+  * supporting promise quorum prQuorum has a winning promise message that reflects some
+  * accepted b'' where vb.b <= b'' < proposedBal. 
+  * Then there is an acceptor that accepted (pv', b''), by ValidPromiseMessage.
+  * Then there is a leader that proposed (pv', b''), by AcceptorValidAcceptedVB and ValidProposeMesssage.
+  */
+  var l := v.leaders[proposedBal];
+  var j := |l.receivedPromises|-1;
+  var pv' := v.leaders[proposedBal].proposed[i];
+  var prQuorum := l.receivedPromises[j];
+  assert LeaderPromiseSetProperties(c, v, proposedBal, j);    // trigger
+  assert LeaderStateValid(c, v, proposedBal, i);              // trigger
+  assert IsPromiseQuorum(c, prQuorum, proposedBal);           // trigger
+  var choosingAccs :| IsAcceptorQuorum(c, v, choosingAccs, chosenVb);
+  var promisingAccs := AcceptorsFromPromiseSet(prQuorum, proposedBal);
+  var allAccs := set id: AcceptorId | 0 <= id < 2*c.f+1;
+  AcceptorSetComprehensionSize(2*c.f+1);
+  assert (forall pr | pr in prQuorum :: IsPromiseMessage(v, pr));  // trigger
+  var commonAcc := QuorumIntersection(allAccs, choosingAccs, promisingAccs);  // witness
+  var b'' := l.highestHeardBal[j].value;
+  var m :| WinningPromiseMessageInQuorum(prQuorum, proposedBal, VB(pv', b''), m);
+
+
+  assert chosenVb.b <= b'';
+  var k :| PromiseMessageMatchesHistory(c, v, m, k);
+  assume b'' < proposedBal;   // by AcceptorStateMonotonic
+
+
+  assert Propose(b'', pv') in v.network.sentMsgs;
+  var x, y :| 
+      && 0 <= x < |v.leaders[b''].value|
+      && 0 <= y < |v.leaders[b''].proposed|
+      && v.leaders[b''].value[x] == pv'
+      && |v.leaders[b''].receivedPromises[x]| >= c.f+1
+      && pv' == v.leaders[b''].proposed[y];
+  ChosenAndConflictingProposeImpliesFalse(c, v, chosenVb, b'', y);
+  assert false;
+}
+
+
 
 /***************************************************************************************
 *                            Helper Definitions and Lemmas                             *
