@@ -478,11 +478,12 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
       var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
       var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
       if step.ProposeStep? && propose !in v.network.sentMsgs {
-        /* Suppose vb has been chosen in state v, and propose is of some vb' with vb.v != vb'.v. 
-        * By HighestHeardBackedByReceivedPromises, this vb' was carried by a Promise message. 
-        * By ChosenValImpliesPromiseQuorumSeesBal, highest heard vb' has vb'.b >= vb.b. 
-        * By PromiseVbImpliesAccepted, there is an Accept(vb'). By AcceptMessageImpliesProposed,
-        * there is a Propose(vb') in the state v. This contradicts ChosenValImpliesProposeOnlyVal. */
+        /* Suppose vb has been chosen in state v, and propose is of some v' with vb.v != v'. 
+        * By HighestHeardBackedByReceivedPromises, this v' was carried by a Promise message
+        * with winning ballot b' <= vb.b. 
+        * By ChosenValImpliesPromiseQuorumSeesBal, b' >= vb.b. 
+        * By PromiseVbImpliesAccepted, there is an Accept(VB(v', b')). By AcceptMessageImpliesProposed,
+        * there is a Propose(b', v') in the state v. This contradicts ChosenValImpliesProposeOnlyVal. */
         if propose.val != vb.v {
           assert LeaderHost.NextProposeStep(lc, l, l', msgOps);
           var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
