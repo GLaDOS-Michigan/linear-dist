@@ -465,14 +465,14 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
   InvImpliesChosenValImpliesPromiseQuorumSeesBal(c, v);
   var dsStep :| NextStep(c, v, v', dsStep);
   var actor, msgOps := dsStep.actor, dsStep.msgOps;
-  if dsStep.LeaderStep? {
-    forall vb, propose | 
-      && Chosen(c, v', vb)
-      && IsProposeMessage(v', propose)
-      && propose.bal > vb.b
-    ensures
-      propose.val == vb.v
-    {
+  forall vb, propose | 
+    && Chosen(c, v', vb)
+    && IsProposeMessage(v', propose)
+    && propose.bal > vb.b
+  ensures
+    propose.val == vb.v
+  {
+    if dsStep.LeaderStep? {
       NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
       assert Chosen(c, v, vb);
       var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
@@ -492,90 +492,30 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
           assert false;
         }
       }
-    }
-  } else if dsStep.AcceptorStep? {
-    var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
-    var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-    if step.ReceiveStep? && msgOps.recv.value.Propose? {
-      InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(c, v, v', dsStep, step);
-    } else {
-      forall vb | Chosen(c, v', vb)
-      ensures Chosen(c, v, vb)
-      {
-        var quorum :| IsAcceptQuorum(c, v', quorum, vb);  // witness
-        assert IsAcceptQuorum(c, v, quorum, vb);  // trigger
-      }
-    }
-  } else {
-    // Nothing new chosen
-    NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-  } 
-}
-
-// Helper lemma for InvNextChosenValImpliesProposeOnlyVal
-lemma InvNextChosenValImpliesProposeOnlyValAcceptorRecvStep(
-  c: Constants, v: Variables, v': Variables, dsStep: Step, step: AcceptorHost.Step)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires NextStep(c, v, v', dsStep)
-  requires dsStep.AcceptorStep?
-  requires AcceptorHost.NextStep(
-            c.acceptorConstants[dsStep.actor], 
-            v.acceptors[dsStep.actor], v'.acceptors[dsStep.actor],
-            step, dsStep.msgOps)
-  requires step.ReceiveStep?
-  requires dsStep.msgOps.recv.value.Propose?
-  requires AcceptMessageImpliesProposed(c, v')
-  requires AcceptMessagesValid(c, v')
-  requires ProposeBackedByPromiseQuorum(c, v')
-  requires OneValuePerProposeBallot(c, v')
-  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
-  requires PromiseVbImpliesAccepted(c, v')
-  requires PromiseBalLargerThanAccepted(c, v')
-  ensures ChosenValImpliesProposeOnlyVal(c, v')
-{
-  forall vb, propose | 
-    && Chosen(c, v', vb)
-    && propose in v'.network.sentMsgs
-    && propose.Propose?
-    && propose.bal >= vb.b
-  ensures propose.val == vb.v
-  {
-    if !Chosen(c, v, vb) {
-      /* This is a point where something can suddenly be chosen.*/
-      var ac, a, a' := c.acceptorConstants[dsStep.actor], v.acceptors[dsStep.actor], v'.acceptors[dsStep.actor];
-      var propVal, propBal := dsStep.msgOps.recv.value.val, dsStep.msgOps.recv.value.bal;
-      var doAccept := a.promised.None? || (a.promised.Some? && a.promised.value <= propBal);
-      if doAccept && vb == VB(propVal, propBal) {
-        if exists p :: 
-          && p in v'.network.sentMsgs
-          && p.Propose?
-          && p.bal >= vb.b
-          && p.val != vb.v 
-        {
-          var p :|
-            && p in v'.network.sentMsgs
-            && p.Propose?
-            && p.bal >= vb.b
-            && p.val != vb.v;
-          assert p.bal > vb.b;
+    } else if dsStep.AcceptorStep? {
+      var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
+      var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+      if step.ReceiveStep? && msgOps.recv.value.Propose? {
+        if !Chosen(c, v, vb) && propose.val != vb.v {
+          /* This is a point where something can suddenly be chosen.*/
+          assert propose.bal > vb.b;
           MessageInvInductive(c, v, v');
-          ChosenAndConflictingProposeImpliesFalse(c, v', vb, p);
+          ChosenAndConflictingProposeImpliesFalse(c, v', vb, propose);
           assert false;
         }
       } else {
-        if exists quorum: set<Message> :: IsAcceptQuorum(c, v', quorum, vb) {
-          var q :| IsAcceptQuorum(c, v', q, vb);
-          assert IsAcceptQuorum(c, v, q, vb);  // trigger
-          assert false;
-        }
-        assert !Chosen(c, v', vb);
+        // vb already chosen in state v
+        var quorum :| IsAcceptQuorum(c, v', quorum, vb);  // witness
+        assert IsAcceptQuorum(c, v, quorum, vb);          // trigger
       }
-    }
+    } else {
+      // Nothing new chosen
+      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+    } 
   }
 }
 
-// InvNextChosenValImpliesProposeOnlyVal. Here lies most of the heavy-lifting Paxos logic
+// Helper lemma for InvNextChosenValImpliesProposeOnlyVal. Here lies most of the heavy-lifting Paxos logic
 lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosenVb: ValBal, p: Message) 
   requires MessageInv(c, v)
   requires OneValuePerProposeBallot(c, v)
