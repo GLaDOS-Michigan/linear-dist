@@ -71,7 +71,7 @@ predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int, i: in
 }
 
 // Corresponds to ProposeImpliesLeaderState. This implies LeaderProposesOneValue, 
-// which in turn implies at most one value is chosen
+// which in turn helps imply at most one value is chosen
 predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
   requires v.WF(c)
 {
@@ -541,66 +541,6 @@ predicate AcceptorQuorumSeesVb(c: Constants, v: Variables, quorum: set<AcceptorI
     && v.acceptors[idx].HasAccepted(vb)
 }
 
-// Corollary of Inv: If vb is Chosen, then given any quorum of acceptors, at least one of them
-// must have accepted that vb
-// Corresponds to ChosenValImpliesPromiseQuorumSeesBal
-predicate ChosenValImpliesAcceptorQuorumSeesIt(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall vb, quorum | 
-    && Chosen(c, v, vb)
-    && IsAcceptorSet(c, quorum)
-    && |quorum| >= c.f+1
-  ::
-    AcceptorQuorumSeesVb(c, v, quorum, vb)
-}
-
-// lemma: Inv implies that ChosenValImpliesAcceptorQuorumSeesIt
-lemma InvImpliesChosenValImpliesAcceptorQuorumSeesIt(c: Constants, v: Variables) 
-  requires Inv(c, v)
-  ensures ChosenValImpliesAcceptorQuorumSeesIt(c, v)
-{
-  forall vb, anyQuorum | 
-    && Chosen(c, v, vb)
-    && IsAcceptorSet(c, anyQuorum)
-    && |anyQuorum| >= c.f+1
-  ensures AcceptorQuorumSeesVb(c, v, anyQuorum, vb)
-  {
-    var chosenQuorum :| IsAcceptorQuorum(c, v, chosenQuorum, vb);
-    var allAccs := set id: AcceptorId | 0 <= id < 2*c.f+1;
-    AcceptorSetComprehensionSize(2*c.f+1);
-    var commonAcc := QuorumIntersection(allAccs, anyQuorum, chosenQuorum);  // witness
-  }
-}
-
-// Collorary of ChosenValImpliesAcceptorQuorumSeesIt
-predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall vb, quorum, pbal | 
-    && Chosen(c, v, vb)
-    && IsPromiseQuorum(c, quorum, pbal)
-    && vb.b < pbal
-  ::
-    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
-}
-
-// lemma: Inv implies that ChosenValImpliesPromiseQuorumSeesBal
-lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
-  requires Inv(c, v)
-  ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
-{
-  forall vb, quorum, pbal | 
-    && Chosen(c, v, vb)
-    && IsPromiseQuorum(c, quorum, pbal)
-    && vb.b < pbal
-  ensures
-    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
-  {
-    assume false;
-  }
-}
-
 lemma AcceptorSetComprehensionSize(n: nat) 
   ensures |(set x: AcceptorId | 0 <= x < n)| == n
   decreases n
@@ -611,6 +551,58 @@ lemma AcceptorSetComprehensionSize(n: nat)
   } else {
     AcceptorSetComprehensionSize(n-1);
     assert s == (set x: AcceptorId | 0 <= x < n-1) + {n-1};  // trigger
+  }
+}
+
+// Collorary of Inv
+// Tony: IsPromiseMessage refers to network, but this is ok as this is not an application
+// invariant. This is simply needed to get promisingAccs <= allAccs;
+predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, quorum, pbal | 
+    && Chosen(c, v, vb)
+    && IsPromiseQuorum(c, quorum, pbal)
+    && vb.b < pbal
+    && (forall pr | pr in quorum :: IsPromiseMessage(v, pr))
+  ::
+    exists m: Message :: m in quorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
+}
+
+// lemma: Inv implies that ChosenValImpliesPromiseQuorumSeesBal
+lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+  requires Inv(c, v)
+  ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
+{
+  forall vb, prQuorum, pbal | 
+    && Chosen(c, v, vb)
+    && IsPromiseQuorum(c, prQuorum, pbal)
+    && vb.b < pbal
+    && (forall pr | pr in prQuorum :: IsPromiseMessage(v, pr))
+  ensures
+    exists m: Message :: m in prQuorum && m.vbOpt.Some? && vb.b <= m.vbOpt.value.b
+  {
+    var choosingAccs :| IsAcceptorQuorum(c, v, choosingAccs, vb);
+    var promisingAccs := AcceptorsFromPromiseSet(prQuorum, pbal);
+    var allAccs := set id: AcceptorId | 0 <= id < 2*c.f+1;
+    AcceptorSetComprehensionSize(2*c.f+1);
+    var commonAcc := QuorumIntersection(allAccs, choosingAccs, promisingAccs);  // witness
+  }
+}
+
+lemma AcceptorsFromPromiseSet(prSet: set<Message>, prBal: LeaderId) 
+returns (accs: set<AcceptorId>)  
+  requires IsPromiseSet(prSet, prBal)
+  ensures forall a | a in accs 
+    :: (exists pr :: pr in prSet && pr.acc == a)
+  ensures |accs| == |prSet|
+{
+  if |prSet| == 0 {
+    accs := {};
+  } else {
+    var p :| p in prSet;
+    var accs' := AcceptorsFromPromiseSet(prSet-{p}, prBal);
+    accs := accs' + {p.acc};
   }
 }
 
