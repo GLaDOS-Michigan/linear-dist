@@ -113,7 +113,8 @@ predicate AcceptorStateMonotonic(c: Constants, v: Variables)
   :: 
     && SeqMonotoneIncreasing(v.acceptors[idx].promised)
     && SeqOptionVBMonotoneIncreasing(v.acceptors[idx].acceptedVB)
-    && (forall i | 
+    && (forall p | p in v.acceptors[idx].sentPromises && p.Promise? && p.vbOpt.Some? :: p.vbOpt.value.b < p.bal)
+    && (forall i |
           && 0 <= i < |v.acceptors[idx].promised| 
           && v.acceptors[idx].acceptedVB[i].Some?
         ::
@@ -412,8 +413,7 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   * supporting promise quorum prQuorum has a winning promise message that reflects some
   * accepted b'' where vb.b <= b'' < proposedBal. 
   * Then there is an acceptor that accepted (pv', b''), by ValidPromiseMessage.
-  * Then there is a leader that proposed (pv', b''), by AcceptorValidAcceptedVB and ValidProposeMesssage.
-  */
+  * Then there is a leader that proposed (pv', b''), by AcceptorValidAcceptedVB and ValidProposeMesssage. */
   var l := v.leaders[proposedBal];
   var j := |l.receivedPromises|-1;
   var pv' := v.leaders[proposedBal].proposed[i];
@@ -425,18 +425,9 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
   var promisingAccs := AcceptorsFromPromiseSet(prQuorum, proposedBal);
   var allAccs := set id: AcceptorId | 0 <= id < 2*c.f+1;
   AcceptorSetComprehensionSize(2*c.f+1);
-  assert (forall pr | pr in prQuorum :: IsPromiseMessage(v, pr));  // trigger
+  assert (forall pr | pr in prQuorum :: IsPromiseMessage(v, pr));             // trigger
   var commonAcc := QuorumIntersection(allAccs, choosingAccs, promisingAccs);  // witness
   var b'' := l.highestHeardBal[j].value;
-  var m :| WinningPromiseMessageInQuorum(prQuorum, proposedBal, VB(pv', b''), m);
-
-
-  assert chosenVb.b <= b'';
-  var k :| PromiseMessageMatchesHistory(c, v, m, k);
-  assume b'' < proposedBal;   // by AcceptorStateMonotonic
-
-
-  assert Propose(b'', pv') in v.network.sentMsgs;
   var x, y :| 
       && 0 <= x < |v.leaders[b''].value|
       && 0 <= y < |v.leaders[b''].proposed|

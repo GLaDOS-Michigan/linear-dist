@@ -9,7 +9,7 @@ else
     exit 1
 fi
 
-files="../../lib/UtilitiesLibrary.dfy types.dfy hosts.dfy distributedSystem.dfy spec.dfy messageInvariants.dfy"
+files="../../lib/UtilitiesLibrary.dfy types.dfy hosts.dfy distributedSystem.dfy spec.dfy messageInvariants.dfy applicationProof.dfy"
 
 echo "Verifying $files"
 
