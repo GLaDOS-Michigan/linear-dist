@@ -62,6 +62,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 
 // certified self-inductive
 // Leader updates receivedPromises based on Promise messages
+// Property of Receive
 predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
   requires v.WF(c)
 {
@@ -74,6 +75,7 @@ predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
 }
 
 // certified self-inductive
+// Property of Send
 predicate ValidProposeMesssage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -117,6 +119,7 @@ predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
 // certified self-inductive
 // Every Promise message ballot reflects acceptor's local promised history, and 
 // it's vbOpt represents a prior accepted value
+// Property of Send
 predicate ValidPromiseMessage(c: Constants, v: Variables) 
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -140,6 +143,7 @@ predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message
 
 // certified self-inductive
 // Every Accept message reflects acceptor state history
+// Property of Send
 predicate ValidAcceptMessage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -161,6 +165,7 @@ predicate ValidAcceptMessage(c: Constants, v: Variables)
 // certified self-inductive
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
 // accepted ValBal pair
+// Property of Receive
 predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
   requires v.WF(c)
 {
