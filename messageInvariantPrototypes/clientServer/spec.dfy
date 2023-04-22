@@ -1,4 +1,4 @@
-include "protocol.dfy"
+include "distributedSystem.dfy"
 
 module Obligations {
   import opened Types

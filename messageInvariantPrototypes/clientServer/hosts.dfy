@@ -1,21 +1,13 @@
-include "../lib/UtilitiesLibrary.dfy"
+include "types.dfy"
 
 /* The "client_server_ae protocol sourced from DuoAI (OSDI'22) 
  * Multiple clients can send requests to a server. The server processes each request 
  * and returns a response to the respective client. The server may process the 
  * requests out-of-order.*/
 
-module Types {
-  import opened UtilitiesLibrary
-
-  type ClientId = nat
-  
-  datatype Message =
-    Request(clientId: ClientId, reqId: nat) | Response(clientId: ClientId, reqId: nat)
-
-  datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
-} // end module Types
-
+/***************************************************************************************
+*                                      Server Host                                     *
+***************************************************************************************/
 
 module ServerHost {
   import opened UtilitiesLibrary
@@ -63,6 +55,10 @@ module ServerHost {
   }
 }  // end module ServerHost
 
+
+/***************************************************************************************
+*                                      Client Host                                     *
+***************************************************************************************/
 
 module ClientHost {
   import opened UtilitiesLibrary
@@ -127,6 +123,10 @@ module ClientHost {
 }  // end module ClientHost
 
 
+/***************************************************************************************
+*                                     Generic Host                                     *
+***************************************************************************************/
+
 module Host {
   import opened UtilitiesLibrary
   import opened Types
@@ -189,85 +189,3 @@ module Host {
       )
   }
 }  // end module Host
-
-
-module Network {
-  import opened Types
-
-  datatype Variables = Variables(sentMsgs:set<Message>)
-
-  predicate Init(v: Variables) {
-    && v.sentMsgs == {}
-  }
-
-  predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
-  {
-    && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
-    && v'.sentMsgs ==
-      v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }
-  }
-}
-
-
-module DistributedSystem {
-  import opened UtilitiesLibrary
-  import opened Types
-  import Network
-  import Host
-  import ServerHost
-  import ClientHost
-
-  datatype Constants = Constants(hosts: seq<Host.Constants>)
-  {
-    predicate WF() {
-      Host.GroupWFConstants(hosts)
-    }
-    predicate ValidActorIdx(idx: nat) {
-      idx < |hosts|
-    }
-    predicate ValidClientIdx(idx: nat) {
-      idx < |hosts|-1
-    }
-  }
-
-  datatype Variables = Variables(
-    hosts: seq<Host.Variables>,
-    network: Network.Variables)
-  {
-    predicate WF(c: Constants) {
-      && c.WF()
-      && Host.GroupWF(c.hosts, hosts)
-    }
-  }
-
-  predicate Init(c: Constants, v: Variables)
-  {
-    && v.WF(c)
-    && Host.GroupInit(c.hosts, v.hosts)
-    && Network.Init(v.network)
-  }
-
-  predicate HostAction(c: Constants, v: Variables, v': Variables, actorIdx: nat, msgOps: MessageOps)
-  {
-    && v.WF(c)
-    && v'.WF(c)
-    && c.ValidActorIdx(actorIdx)
-    && Host.Next(c.hosts[actorIdx], v.hosts[actorIdx], v'.hosts[actorIdx], msgOps)
-    // all other hosts UNCHANGED
-    && (forall otherIdx:nat | c.ValidActorIdx(otherIdx) && otherIdx != actorIdx :: v'.hosts[otherIdx] == v.hosts[otherIdx])
-  }
-
-  datatype Step =
-    | HostActionStep(actorIdx: nat, msgOps: MessageOps)
-
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
-  {
-    && HostAction(c, v, v', step.actorIdx, step.msgOps)
-    && Network.Next(v.network, v'.network, step.msgOps)
-  }
-
-  predicate Next(c: Constants, v: Variables, v': Variables)
-  {
-    exists step :: NextStep(c, v, v', step)
-  }
-}  // end module Distributed System
