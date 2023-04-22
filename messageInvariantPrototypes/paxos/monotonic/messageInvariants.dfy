@@ -29,10 +29,8 @@ predicate MessageInv(c: Constants, v: Variables)
   && ValidMessageSrc(c, v)
   // From Leader transitions
   && LeaderValidReceivedPromises(c, v)
-  && LeaderValidProposedSeq(c, v)
   && ValidProposeMesssage(c, v)
   // From Acceptor transitions
-  && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB(c, v)
   && ValidPromiseMessage(c, v)
   && ValidAcceptMessage(c, v)
@@ -54,7 +52,6 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 {
   InvNextLeaderValidReceivedPromises(c, v, v');
   InvNextValidProposeMesssage(c, v, v');
-  InvNextAcceptorValidPromised(c, v, v');
   InvNextValidPromiseMessage(c, v, v');
   InvNextValidAcceptMessage(c, v, v');
 }
@@ -74,16 +71,6 @@ predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
     && p in v.leaders[idx].receivedPromises[i]
   :: 
     IsPromiseMessage(v, p)
-}
-
-predicate LeaderValidProposedSeq(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall idx, i | 
-    && c.ValidLeaderIdx(idx)
-    && 0 <= i < |v.leaders[idx].proposed|
-  ::
-    Propose(c.leaderConstants[idx].id, v.leaders[idx].proposed[i]) in v.network.sentMsgs
 }
 
 // certified self-inductive
@@ -107,18 +94,9 @@ predicate ValidProposeMesssage(c: Constants, v: Variables)
 *                                     Acceptor Host                                    *
 ***************************************************************************************/
 
-// certified self-inductive
-// Acceptor updates its promised ballot based on a Prepare/Propose message carrying 
-// that ballot. Derived from only NextReceiveStep
-predicate AcceptorValidPromised(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall idx, i | 
-    && c.ValidAcceptorIdx(idx) 
-    && 0 <= i < |v.acceptors[idx].promised|
-  :: 
-    ExistsIsPrepareOrPropose(c, v, idx, i)
-}
+// TODO(tony): I don't like this AcceptorValidAcceptedVB invariant. It should be broken 
+// up into stuff in acceptedVB comes from Propose message, and an ValidAcceptMessage 
+// component --- accept message comes from an index in acceptedVB
 
 // certified self-inductive
 // Acceptor updates its acceptedVB based on a Propose message carrying that ballot 
@@ -265,49 +243,6 @@ lemma InvNextValidProposeMesssage(c: Constants, v: Variables, v': Variables)
   }
 }
 
-// Tony: This message invariant requires proof. What do I make of this?
-// Because dafny can't handle alternating quantifiers
-lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires AcceptorValidPromised(c, v)
-  requires Next(c, v, v')
-  ensures AcceptorValidPromised(c, v')
-{
-  forall idx, i | 
-    && c.ValidAcceptorIdx(idx) 
-    && 0 <= i < |v'.acceptors[idx].promised|
-  ensures
-    ExistsIsPrepareOrPropose(c, v', idx, i)
-  {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    var actor, msgOps := dsStep.actor, dsStep.msgOps;
-    if dsStep.AcceptorStep? && idx == actor && i == |v'.acceptors[idx].promised| - 1 {
-      var ac, a, a' := c.acceptorConstants[idx], v.acceptors[idx], v'.acceptors[idx];
-      var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-      if step.ReceiveStep? {
-        var m := msgOps.recv.value;
-        if m.Prepare? && (a.PromisedNone() || a.GetPromised() < m.bal) {
-          assert IsPrepareOrPropose(v', m, a'.promised[i]);  // trigger
-        } else if m.Propose? && (a.PromisedNone() || a.GetPromised() <= m.bal) {
-          assert IsPrepareOrPropose(v', m, a'.promised[i]);  // trigger
-        } else {
-          assert ExistsIsPrepareOrPropose(c, v, idx, i);                    // trigger
-          var m :| IsPrepareOrPropose(v, m, v.acceptors[idx].promised[i]);  // witness
-          assert IsPrepareOrPropose(v', m, v'.acceptors[idx].promised[i]);  // trigger
-        }
-      } else {
-        assert ExistsIsPrepareOrPropose(c, v, idx, i);                    // trigger
-        var m :| IsPrepareOrPropose(v, m, v.acceptors[idx].promised[i]);  // witness
-        assert IsPrepareOrPropose(v', m, v'.acceptors[idx].promised[i]);  // trigger
-      }
-    } else {
-      assert ExistsIsPrepareOrPropose(c, v, idx, i);                    // trigger
-      var m :| IsPrepareOrPropose(v, m, v.acceptors[idx].promised[i]);  // witness
-      assert IsPrepareOrPropose(v', m, v'.acceptors[idx].promised[i]);  // trigger
-    }
-  }
-}  
-
 // Because dafny can't handle alternating quantifiers
 lemma InvNextValidPromiseMessage(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
@@ -413,21 +348,5 @@ predicate IsLearnMessage(v: Variables, m: Message) {
   && m.Learn?
   && m in v.network.sentMsgs
 } 
-
-predicate IsPrepareOrPropose(v: Variables, m: Message, bal: LeaderId) {
-  && m in v.network.sentMsgs
-  && (m.Prepare? || m.Propose?)
-  && m.bal == bal
-}
-
-// Tony: Dafny is somehow unable to prove AcceptorValidPromised(c, v') if the exists is
-// not wrapped in such a predicate
-predicate ExistsIsPrepareOrPropose(c: Constants, v: Variables, idx: nat, i: int) 
-  requires v.WF(c)
-  requires c.ValidAcceptorIdx(idx) 
-  requires 0 <= i < |v.acceptors[idx].promised|
-{
-  exists m :: IsPrepareOrPropose(v, m, v.acceptors[idx].promised[i])
-}
 }  // end module PaxosProof
 
