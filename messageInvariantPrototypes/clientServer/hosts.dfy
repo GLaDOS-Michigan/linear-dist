@@ -15,8 +15,9 @@ module ServerHost {
 
   datatype Constants = Constants
 
-  // Server is stateless
-  datatype Variables = Variables
+  datatype Variables = Variables(
+    currentRequest: Option<Request>
+  )
   {
     predicate WF(c: Constants) {
       true
@@ -24,29 +25,36 @@ module ServerHost {
   }
 
   predicate Init(c: Constants, v: Variables) {
-    v.WF(c)
+    v.currentRequest == None
   }
 
   datatype Step =
-    ReceiveStep() | StutterStep()
+    ReceiveStep() | ProcessStep() | StutterStep()
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(v, v', msgOps)
+      case ProcessStep => NextProcessStep(v, v', msgOps)
       case StutterStep => && v == v'
                           && msgOps.send == msgOps.recv == None
   }
 
   predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
+    && msgOps.send == None
     && match msgOps.recv.value
-        case Request(clientId, reqId) =>
-          && v' == v
-          && msgOps.send == Some(Response(clientId, reqId))
-        case _ => 
+        case RequestMsg(r) =>
+          && v' == v.(currentRequest := Some(r))
+        case _ =>
           && v' == v //stutter
-          && msgOps.send == None
+  }
+
+  predicate NextProcessStep(v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && v.currentRequest.Some?
+    && v' == v.(currentRequest := None)
+    && msgOps.send == Some(ResponseMsg(v.currentRequest.value))
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
@@ -83,7 +91,7 @@ module ClientHost {
   }
 
   datatype Step =
-    RequestStep(reqId: nat)  // non-deterministic id for the new request
+      RequestStep(reqId: nat)  // non-deterministic id for the new request
     | ReceiveStep() 
     | StutterStep
 
@@ -99,7 +107,7 @@ module ClientHost {
   predicate NextRequestStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, reqId: nat) {
     && msgOps.recv.None?
     && reqId !in v.requests  // reqId must be fresh
-    && msgOps.send == Some(Request(c.clientId, reqId))
+    && msgOps.send == Some(RequestMsg(Req(c.clientId, reqId)))
     && v' == v.(requests := v.requests + {reqId})
   }
 
@@ -107,9 +115,9 @@ module ClientHost {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && match msgOps.recv.value
-        case Response(clientId, reqId) =>
-          if clientId == c.clientId then 
-            v' == v.(responses := v.responses + {reqId})
+        case ResponseMsg(r) =>
+          if r.clientId == c.clientId then 
+            v' == v.(responses := v.responses + {r.reqId})
           else 
             v' == v 
         case _ => 

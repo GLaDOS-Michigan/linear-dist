@@ -37,6 +37,10 @@ module DistributedSystem {
     predicate ValidClientIdx(idx: nat) {
       idx < |hosts|-1
     }
+
+    predicate ValidServerIdx(idx: nat) {
+      idx == |hosts|-1
+    }
   }
 
   datatype Variables = Variables(

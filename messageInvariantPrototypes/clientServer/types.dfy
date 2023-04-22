@@ -5,8 +5,10 @@ module Types {
 
   type ClientId = nat
   
+  datatype Request = Req(clientId: ClientId, reqId: nat)
+
   datatype Message =
-    Request(clientId: ClientId, reqId: nat) | Response(clientId: ClientId, reqId: nat)
+    RequestMsg(r: Request) | ResponseMsg(r: Request)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 } // end module Types

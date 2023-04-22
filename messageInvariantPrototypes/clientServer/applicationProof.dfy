@@ -13,12 +13,26 @@ import opened MessageInvariants
 *                                Application Invariants                                *
 ***************************************************************************************/
 
-// There are no application invariants :)
+// Application bundle
+predicate ApplicationInv(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+{
+  ResponseCorrespondToRequest(c, v)
+}
 
 predicate Inv(c: Constants, v: Variables)
 {
   && MessageInv(c, v)
+  && ApplicationInv(c, v)
   && Safety(c, v)
+}
+
+predicate ResponseCorrespondToRequest(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall resp | resp in v.network.sentMsgs && resp.ResponseMsg?
+  :: RequestMsg(resp.r) in v.network.sentMsgs
 }
 
 /***************************************************************************************
