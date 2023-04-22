@@ -42,7 +42,8 @@ module ServerHost {
 
   predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
-    && msgOps.send == None
+    && msgOps.send.None?
+    && v.currentRequest.None?
     && match msgOps.recv.value
         case RequestMsg(r) =>
           && v' == v.(currentRequest := Some(r))
