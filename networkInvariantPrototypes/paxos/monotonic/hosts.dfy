@@ -167,9 +167,14 @@ module AcceptorHost {
     && c.id == id
   }
 
+  // The sentPromises set is introduced so that I can maintain an application invariant
+  // that for all Promise messages, the accepted ballot must be strictly less than the 
+  // accepted ballot. It can also be maintained using a boolean seq that marks when a promise
+  // message is sent out. But I am not sure which is "better"
   datatype Variables = Variables(
     promised: seq<LeaderId>,          // monotonic seq
-    acceptedVB: seq<Option<ValBal>>   // monotonic seq
+    acceptedVB: seq<Option<ValBal>>,  // monotonic seq
+    sentPromises: set<Message>        // monotonic set
   ) {
 
     // Tony: This is a minor application property that is swept under WF(). However,
@@ -232,6 +237,7 @@ module AcceptorHost {
   predicate Init(c: Constants, v: Variables) {
     && v.promised == []
     && v.acceptedVB == []
+    && v.sentPromises == {}
   }
 
   datatype Step =
@@ -250,11 +256,13 @@ module AcceptorHost {
         case Prepare(bal) => (
           var doPromise := v.PromisedNone() || v.GetPromised() < bal;
           if doPromise then
+            && var outPromise := Promise(bal, c.id, v.GetAccepted());
             && v' == v.(
               promised := v.promised + [bal],
-              acceptedVB := v.acceptedVB + [v.GetAccepted()]
+              acceptedVB := v.acceptedVB + [v.GetAccepted()],
+              sentPromises := v.sentPromises + {outPromise}
             )
-            && msgOps.send == Some(Promise(bal, c.id, v.GetAccepted()))
+            && msgOps.send == Some(outPromise)
           else
             NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
         )

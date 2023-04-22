@@ -148,6 +148,18 @@ predicate ValidPromiseMessage(c: Constants, v: Variables)
   (exists i :: PromiseMessageMatchesHistory(c, v, prom, i))
 }
 
+predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires IsPromiseMessage(v, prom)
+{
+  && prom in v.acceptors[prom.acc].sentPromises
+  && 0 <= i < |v.acceptors[prom.acc].promised|
+  && 0 <= i < |v.acceptors[prom.acc].acceptedVB|
+  && prom.bal == v.acceptors[prom.acc].promised[i]
+  && prom.vbOpt == v.acceptors[prom.acc].acceptedVB[i]
+}
+
 // certified self-inductive
 // Every Accept message reflects acceptor state history
 predicate ValidAcceptMessage(c: Constants, v: Variables)
@@ -417,17 +429,5 @@ predicate ExistsIsPrepareOrPropose(c: Constants, v: Variables, idx: nat, i: int)
 {
   exists m :: IsPrepareOrPropose(v, m, v.acceptors[idx].promised[i])
 }
-
-predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
-  requires IsPromiseMessage(v, prom)
-{
-  && 0 <= i < |v.acceptors[prom.acc].promised|
-  && 0 <= i < |v.acceptors[prom.acc].acceptedVB|
-  && prom.bal == v.acceptors[prom.acc].promised[i]
-  && prom.vbOpt == v.acceptors[prom.acc].acceptedVB[i]
-}
-
 }  // end module PaxosProof
 
