@@ -28,7 +28,7 @@ predicate RequestMsgsValid(c: Constants, v: Variables)
 }
 
 // certified self inductive, modulo requires
-// Every request message in the network comes from the source's request set
+// The server's current request must have come from the network
 // Property of Receive
 predicate ServerCurrentRequestValid(c: Constants, v: Variables)
   requires v.WF(c)
