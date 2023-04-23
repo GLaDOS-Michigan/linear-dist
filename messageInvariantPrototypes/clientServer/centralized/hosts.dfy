@@ -29,7 +29,7 @@ module ServerHost {
   }
 
   datatype TransitionLabel =
-    ReceiveLbl(r: Request) | ProcessLbl() | InternalLbl()
+    ReceiveLbl(r: Request) | ProcessLbl(r: Request) | InternalLbl()
 
   datatype Step =
     ReceiveStep() | ProcessStep() | StutterStep()
@@ -52,6 +52,7 @@ module ServerHost {
   predicate NextProcessStep(v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.ProcessLbl?
     && v.currentRequest.Some?
+    && lbl.r == v.currentRequest.value
     && v' == v.(currentRequest := None)
   }
 
@@ -152,9 +153,9 @@ module Host {
     }
   }
 
-  datatype TransitionLabel =
-    | ServerLabel(s: ServerHost.TransitionLabel)
-    | ClientLabel(c: ClientHost.TransitionLabel)
+  datatype TransitionLabel = 
+    | SL(s: ServerHost.TransitionLabel)
+    | CL(c: ClientHost.TransitionLabel)
 
   predicate GroupWFConstants(grp_c: seq<Constants>)
   {
@@ -191,11 +192,11 @@ module Host {
     && v'.WF(c)
     && (match c
       case ServerConstants(_) => 
-            && lbl.ServerLabel?
-            && ServerHost.Next(c.server, v.server, v'.server, lbl.s)
+          && lbl.SL?
+          && ServerHost.Next(c.server, v.server, v'.server, lbl.s)
       case ClientConstants(_) => 
-            && lbl.ClientLabel?
-            && ClientHost.Next(c.client, v.client, v'.client, lbl.c)
+          && lbl.CL?
+          && ClientHost.Next(c.client, v.client, v'.client, lbl.c)
       )
   }
 }  // end module Host
