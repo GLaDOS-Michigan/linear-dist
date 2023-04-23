@@ -1,1 +1,0 @@
-Note that without Monotonic Transformation, the Application Invariant relies on network state.
