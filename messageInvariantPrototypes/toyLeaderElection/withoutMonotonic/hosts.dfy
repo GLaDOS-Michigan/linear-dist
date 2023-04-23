@@ -25,7 +25,10 @@ module Host {
     && c.clusterSize == clusterSize
   }
 
-  datatype Variables = Variables(voted: bool, receivedVotes: set<HostId>)
+  datatype Variables = Variables(
+    voted: bool,                // monotonic boolean
+    receivedVotes: set<HostId>  // monotonic set
+  )
 
   predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|

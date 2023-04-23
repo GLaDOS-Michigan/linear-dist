@@ -26,8 +26,8 @@ module Host {
   datatype Variables = Variables(
     // Apply monotonic transformation here. Rather than a single boolean "voted" flag, 
     // keep track of all candidates I voted for. There should be at most one.
-    voted: seq<HostId>,  
-    receivedVotes: set<HostId>
+    voted: seq<HostId>,             // monotonic seq
+    receivedVotes: set<HostId>      // monotonic set
   )
 
   predicate GroupWFConstants(grp_c: seq<Constants>) {

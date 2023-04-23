@@ -15,7 +15,7 @@ predicate ValidMessages(c: Constants, v: Variables)
   forall msg | msg in v.network.sentMsgs 
   :: match msg 
       case VoteReq(candidate) => c.ValidIdx(candidate)
-      case Vote(voter, candidate) => c.ValidIdx(voter) && c.ValidIdx(candidate)
+      case Vote(voter, candidate) => c.ValidIdx(voter)
       case Leader(src) => c.ValidIdx(src)
       case _ => true
 }
