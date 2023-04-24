@@ -5,7 +5,6 @@ include "spec.dfy"
 //#extract exercise02.template solution exercise02.dfy
 
 module TwoPCInvariantProof {
-  import opened CommitTypes
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem

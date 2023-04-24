@@ -17,11 +17,10 @@
 // Note that we include the model of exercise01, so you should write your 
 // spec accordingly. Of course, that also means double-checking that your
 // model performs all actions as described.
-include "protocol.dfy"
+include "distributedSystem.dfy"
 //#extract exercise01.template solution exercise01.dfy
 
 module Obligations {
-  import opened CommitTypes
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem
