@@ -17,14 +17,14 @@ module MessageInvariants {
   }
 
   // Every message's val is at least the senders HostId
-  predicate payloadGeqSenderHostId(c: Constants, v: Variables) {
+  predicate PayloadGeqSenderHostId(c: Constants, v: Variables) {
     forall msg | msg in v.network.sentMsgs && 0 <= msg.src < |c.hostConstants|
     :: msg.val >= c.hostConstants[msg.src].hostId
   }
 
   // For each host, if its highestHeard is >-1, then it must have gotten it from a message
   // from its predecessor
-  predicate receiveValidity(c: Constants, v: Variables) 
+  predicate ReceiveValidity(c: Constants, v: Variables) 
     requires v.WF(c)
     requires VoteMsgValidSrc(c, v)
   {
@@ -38,8 +38,8 @@ module MessageInvariants {
   {
     && v.WF(c)
     && VoteMsgValidSrc(c, v)
-    && payloadGeqSenderHostId(c, v)
-    && receiveValidity(c, v)
+    && PayloadGeqSenderHostId(c, v)
+    && ReceiveValidity(c, v)
   }
 
   lemma InitImpliesMessageInv(c: Constants, v: Variables)

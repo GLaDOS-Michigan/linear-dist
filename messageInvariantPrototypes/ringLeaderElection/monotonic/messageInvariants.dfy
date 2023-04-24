@@ -2,7 +2,7 @@
 
 include "spec.dfy"
 
-module NetworkInvariants {
+module MessageInvariants {
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem
@@ -17,23 +17,13 @@ module NetworkInvariants {
   }
 
   // Every message's val is at least the senders HostId
-  predicate payloadGeqSenderHostId(c: Constants, v: Variables) {
+  predicate PayloadGeqSenderHostId(c: Constants, v: Variables) {
     forall msg | msg in v.network.sentMsgs && 0 <= msg.src < |c.hostConstants|
     :: msg.val >= c.hostConstants[msg.src].hostId
   }
 
-  // Every message's val less than or eq max(highest seen of nodes[msg.src], hostid of nodes[mag.src])
-  // TODO: This is not a network invariant. It relies on the application knowledge that 
-  // the RHS of the inequality is monotonically increasing
-  predicate payloadLeqSenderMax(c: Constants, v: Variables) 
-    requires v.WF(c)
-  {
-    forall msg | msg in v.network.sentMsgs && 0 <= msg.src < |c.hostConstants|
-    :: msg.val <= max(c.hostConstants[msg.src].hostId, v.hosts[msg.src].highestHeard())
-  }
-
   // Every message's val comes from either the HostId or from highestHeardSeq
-  predicate payloadComesFromHighestHeardSeq(c: Constants, v: Variables) 
+  predicate PayloadComesFromHighestHeardSeq(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     forall msg | msg in v.network.sentMsgs && 0 <= msg.src < |c.hostConstants|
@@ -42,32 +32,31 @@ module NetworkInvariants {
 
   // For each host, any values in its highestHeardSeq came from a message
   // from its predecessor
-  predicate receiveValidity(c: Constants, v: Variables) 
+  predicate ReceiveValidity(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     forall idx, val | 0 <= idx < |c.hostConstants| && val in v.hosts[idx].highestHeardSeq
     :: Msg(val, Predecessor(|c.hostConstants|, idx)) in v.network.sentMsgs 
   }
 
-  predicate NetworkInv(c: Constants, v: Variables)
+  predicate MessageInv(c: Constants, v: Variables)
   {
     && v.WF(c)
     && VoteMsgValidSrc(c, v)                  // needed
-    && payloadGeqSenderHostId(c, v)           // needed
-    // && payloadLeqSenderMax(c, v)              // not needed
-    && payloadComesFromHighestHeardSeq(c, v)  // needed
-    && receiveValidity(c, v)                  // needed
+    && PayloadGeqSenderHostId(c, v)           // needed
+    && PayloadComesFromHighestHeardSeq(c, v)  // needed
+    && ReceiveValidity(c, v)                  // needed
   }
 
   lemma InitImpliesNetworkInv(c: Constants, v: Variables)
     requires Init(c, v)
-    ensures NetworkInv(c, v)
+    ensures MessageInv(c, v)
   {}
 
   lemma NetworkInvInductive(c: Constants, v: Variables, v': Variables)
-    requires NetworkInv(c, v)
+    requires MessageInv(c, v)
     requires Next(c, v, v')
-    ensures NetworkInv(c, v')
+    ensures MessageInv(c, v')
   {}
 }
 
