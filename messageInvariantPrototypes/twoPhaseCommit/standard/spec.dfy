@@ -25,18 +25,14 @@ module Obligations {
   import opened UtilitiesLibrary
   import opened DistributedSystem
 
-/*{*/
-/*}*/
   // AC-1: All processes that reach a decision reach the same one.
   predicate SafetyAC1(c: Constants, v: Variables)
     requires v.WF(c)
   {
     // All hosts that reach a decision reach the same one
-/*{*/
     var n := |v.hosts|;
     forall i, j | 0 <= i < n && 0 <= j < n && HostHasDecided(v.hosts[i]) && HostHasDecided(v.hosts[j])
     :: HostsReachSameDecision(v.hosts[i], v.hosts[j])
-/*}*/
   }
 
   // AC2 is sort of a history predicate; we're going to ignore it.
@@ -45,12 +41,10 @@ module Obligations {
   predicate SafetyAC3(c: Constants, v: Variables)
     requires v.WF(c)
   {
-/*{*/
     var n := |v.hosts|;
     (exists i :: 0 <= i < n && HostDecidedCommit(v.hosts[i]))
     ==>
     AllPreferYes(c, v)
-/*}*/
   }
 
   // This one is easier to prove
@@ -67,12 +61,10 @@ module Obligations {
   predicate SafetyAC4(c: Constants, v: Variables)
     requires v.WF(c)
   {
-/*{*/
     var n := |v.hosts|;
     AllPreferYes(c, v)
     ==> 
     forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) :: HostDecidedCommit(v.hosts[i])
-/*}*/
   }
 
   // AC5 is a liveness proprety, we're definitely going to ignore it.
