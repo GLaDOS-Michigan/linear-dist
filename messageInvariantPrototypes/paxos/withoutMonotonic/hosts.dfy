@@ -260,8 +260,8 @@ module LearnerHost {
 
   function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
     vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>)
-    // TODO: These two ensures are required for the LearnMsgsValid message invariant. 
-    // Is this cheating?
+    // Tony: ensures clauses are exactly how I can prove to the user, and tell dafny, that 
+    // data structures annotated as monotonic actually are monotonic --- cool!
     ensures vb in receivedAccepts ==> vb in out
     ensures vb in receivedAccepts ==> |receivedAccepts[vb]| <= |out[vb]|
   {
