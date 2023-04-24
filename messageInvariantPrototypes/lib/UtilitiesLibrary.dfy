@@ -64,9 +64,25 @@ module UtilitiesLibrary {
 
   lemma UnionIncreasesCardinality<T>(s1: set<T>, s2: set<T>) 
     ensures |s1 + s2| >= |s1|
-    ensures |s1 + s2| >= |s2|
+    decreases s2
   {
-    assume false;  // TODO
+    if |s2| == 0 {
+      assert |s1 + s2| == |s1|;
+    } else {
+      var x :| x in s2;
+      var s2' := s2 - {x};
+      UnionIncreasesCardinality(s1, s2');
+      LargerSetIncreasesCardinalityMore(s1, s2', s2);
+      assert |s1 + s2| >= |s1|;
+    }
+  }
+
+  lemma LargerSetIncreasesCardinalityMore<T>(s: set<T>, s1: set<T>, s2: set<T>) 
+    requires s1 <= s2
+    ensures |s+s1| <= |s+s2|
+  {
+
+    assume false;  //TODO
   }
 
   function UnionSeqOfSets<T>(theSets: seq<set<T>>) : set<T>
