@@ -24,6 +24,9 @@ predicate Chosen(c: Constants, v: Variables, vb: ValBal) {
 // application level knowledge that l.receivedAccepts is monotonically increasing.
 // For every Learn(lnr, val) message in the network, the learner must have a quorum of
 // accepts for that val, at some common ballot
+// Tony update a week later: monotonic variables need to be annotated by the user. Hence,
+// if user were to annotate l.receivedAccepts as a monotonic set, then this is a proper 
+// message invariant
 predicate LearnMsgsValid(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
