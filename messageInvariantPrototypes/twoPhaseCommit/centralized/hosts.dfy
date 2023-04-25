@@ -31,66 +31,57 @@ module CoordinatorHost {
   }
 
   datatype TransitionLabel =
-    VoteReqLbl() | ProcessLbl(r: Request) | InternalLbl()
+    VoteReqLbl() | ReceiveVoteLbl(vote: Vote, src: HostId) | DecideLbl(decision: Decision) | InternalLbl()
 
   datatype Step =
-    VoteReqStep() | ReceiveLbl(vote: Vote, src: src) | DecideLbl() | InternalLbl()
+    VoteReqStep() | ReceiveStep() | DecisionStep() | StutterStep()
 
-
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
-      case VoteReqStep => NextVoteReqStep(v, v', msgOps)
-      case ReceiveStep => NextReceiveStep(v, v', msgOps)
-      case DecisionStep => NextDecisionStep(c, v, v', msgOps)
+      case VoteReqStep => NextVoteReqStep(v, v', lbl)
+      case ReceiveStep => NextReceiveStep(v, v', lbl)
+      case DecisionStep => NextDecisionStep(c, v, v', lbl)
       case StutterStep => && v == v'
                           && lbl.InternalLbl?
   }
 
   predicate NextVoteReqStep(v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.ReceiveVoteLbl?
     && v' == v  // coordinator local state unchanged
-    && lbl.VoteReqLbl?
   }
 
-  // TODO: WORK IN PROGRESS
-  // Asynchronous 2PC has receiving and sending on same step, and that needs to be fixed
+  predicate NextReceiveStep(v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.ReceiveVoteLbl?
+    &&  if lbl.vote == Yes then 
+        v' == v.(
+          yesVotes := v.yesVotes + {lbl.src}
+        )
+      else
+        v' == v.(
+          noVotes := v.noVotes + {lbl.src}
+        )
+  }
 
-  predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
-    && msgOps.recv.Some?
-    && msgOps.send.None?
-    && match msgOps.recv.value
-        case VoteMsg(vote, src) =>
-          if vote == Yes then 
-            v' == v.(
-              yesVotes := v.yesVotes + {src}
-            )
-          else
-            v' == v.(
-              noVotes := v.noVotes + {src}
-            )
-        case _ => v' == v //stutter
-  } 
-
-  // This step doubles as a stutter step
-  predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-    && msgOps.recv.None?
+  predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.DecideLbl?
     && v.decision.None?  // enabling condition
+    && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
     && if |v.noVotes| > 0 then
         && v' == v.(decision := Some(Abort))
-        && msgOps.send == Some(DecideMsg(Abort))
+        && lbl.decision == Abort
       else if |v.yesVotes| == c.numParticipants then
         && v' == v.(decision := Some(Commit))
-        && msgOps.send == Some(DecideMsg(Commit))
+        && lbl.decision == Commit
       else
         && v' == v
-        && msgOps.send.None?
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
-    exists step :: NextStep(c, v, v', step, msgOps)
+    exists step :: NextStep(c, v, v', step, lbl)
   }
-}
+} // end module CoordinatorHost
 
 
 module ParticipantHost {
@@ -104,7 +95,12 @@ module ParticipantHost {
     c.hostId == hostId
   }
 
-  datatype Variables = Variables(decision: Option<Decision>)
+  datatype Variables = Variables(
+    // Boolean flag that acts as enabling condition for sending VoteMsg, introduced to make
+    // receiving voteReq and sending vote two distinct steps.
+    sendVote: bool,
+    decision: Option<Decision>
+  )
   {
     predicate WF(c: Constants) {
       true
@@ -113,38 +109,46 @@ module ParticipantHost {
 
   predicate Init(c: Constants, v: Variables)
   {
-    v.decision == None
+    && v.sendVote == false
+    && v.decision == None
   }
+
+  datatype TransitionLabel =
+    VoteReqLbl() | SendVoteLbl(vote: Vote) | DecideLbl(decision: Decision) | InternalLbl()
 
   datatype Step =
-    ReceiveStep() | StutterStep()
+    ReceiveStep() | SendVoteStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
-      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case ReceiveStep => NextReceiveStep(c, v, v', lbl)
+      case SendVoteStep => NextSendVoteStep(c, v, v', lbl)
       case StutterStep => 
           && v == v'
-          && msgOps.send == msgOps.recv == None
+          && lbl.InternalLbl?
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-    && msgOps.recv.Some?
-    && match msgOps.recv.value
-        case VoteReqMsg =>
-          && v == v' 
-          && msgOps.send == Some(VoteMsg(c.preference, c.hostId))
-        case VoteMsg(_, _) => 
-          && v' == v
-          && msgOps.send.None?
-        case DecideMsg(d) =>
+  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && match lbl
+        case VoteReqLbl =>
+          && v == v'.(sendVote := true)
+        case DecideLbl(d) =>
+          && lbl.DecideLbl?
           && v' == v.(decision := Some(d))
-          && msgOps.send.None?
+        case _ => 
+          false
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.SendVoteLbl?
+    && lbl.vote == c.preference
+    && v' == v.(sendVote := false)
+  }
+
+  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
-    exists step :: NextStep(c, v, v', step, msgOps)
+    exists step :: NextStep(c, v, v', step, lbl)
   }
 } // end module ParticipantHost
 
@@ -166,14 +170,12 @@ module Host {
   {
     predicate WF(c: Constants) {
       && (CoordinatorVariables? <==> c.CoordinatorConstants?) // types of c & v agree
-      // subtype WF satisfied
       && (match c
             case CoordinatorConstants(_) => coordinator.WF(c.coordinator)
             case ParticipantConstants(_) => participant.WF(c.participant)
           )
     }
   }
-
 
   predicate GroupWFConstants(grp_c: seq<Constants>)
   {
@@ -213,14 +215,22 @@ module Host {
       )
   }
 
+  datatype TransitionLabel = 
+    | CL(c: CoordinatorHost.TransitionLabel)
+    | PL(p: ParticipantHost.TransitionLabel)
+
   // Dispatch Next to appropriate underlying implementation.
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
     && v.WF(c)
     && v'.WF(c)
     && (match c
-      case CoordinatorConstants(_) => CoordinatorHost.Next(c.coordinator, v.coordinator, v'.coordinator, msgOps)
-      case ParticipantConstants(_) => ParticipantHost.Next(c.participant, v.participant, v'.participant, msgOps)
+      case CoordinatorConstants(_) => 
+          && lbl.CL?
+          && CoordinatorHost.Next(c.coordinator, v.coordinator, v'.coordinator, lbl.c)
+      case ParticipantConstants(_) => 
+          && lbl.PL?
+          && ParticipantHost.Next(c.participant, v.participant, v'.participant, lbl.p)
       )
   }
 } // end module Host
