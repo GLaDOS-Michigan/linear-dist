@@ -47,7 +47,7 @@ module CoordinatorHost {
   }
 
   predicate NextVoteReqStep(v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.ReceiveVoteLbl?
+    && lbl.VoteReqLbl?
     && v' == v  // coordinator local state unchanged
   }
 
