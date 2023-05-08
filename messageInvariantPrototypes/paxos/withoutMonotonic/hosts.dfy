@@ -131,9 +131,14 @@ module AcceptorHost {
   }
 
   datatype Variables = Variables(
+    pendingMsg: Option<Message>,
     promised: Option<LeaderId>,
     acceptedVB: Option<ValBal>
-  )
+  ) {
+    predicate WF() {
+      pendingMsg.Some? ==> (pendingMsg.value.Prepare? || pendingMsg.value.Propose?)
+    }
+  }
 
   predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|
@@ -144,6 +149,7 @@ module AcceptorHost {
   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWFConstants(grp_c)
     && |grp_v| == |grp_c| == 2*f+1
+    && forall i | 0 <= i < |grp_v| :: grp_v[i].WF()
   }
 
   predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
@@ -154,44 +160,66 @@ module AcceptorHost {
   predicate Init(c: Constants, v: Variables) {
     && v.promised == None
     && v.acceptedVB == None
+    && v.pendingMsg == None
   }
 
   datatype Step =
-    ReceiveStep() | StutterStep()
+    ReceiveStep() | MaybePromiseStep() | MaybeProposeStep() | StutterStep()
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case MaybePromiseStep => NextMaybePromiseStep(c, v, v', msgOps)
+      case MaybeProposeStep => NextMaybeProposeStep(c, v, v', msgOps)
       case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
   predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && v.pendingMsg.None?
     && msgOps.recv.Some?
+    && msgOps.send.None?
     && match msgOps.recv.value
-        case Prepare(bal) => (
-          var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
-          if doPromise then
-            && v' == v.(promised := Some(bal))
-            && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
-          else
-            NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
-        )
-        case Propose(bal, val) => (
-          var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
-          if doAccept then
-            && v' == v.(
-                  promised := Some(bal), 
-                  acceptedVB := Some(VB(val, bal)))
-            // Tony: This is a target for monotonic transformation -- it would allow me to say that
-            // Accept messages are from some acceptedVB once held by the acceptor
-            && msgOps.send == Some(Accept(VB(val, bal), c.id))
-          else
-            NextStutterStep(c, v, v', msgOps)  // ignore smaller ballots
-        )
-        case _ => (
+        case Prepare(_) =>
+          v' == v.(pendingMsg := Some(msgOps.recv.value))
+        case Propose(bal, val) =>
+          v' == v.(pendingMsg := Some(msgOps.recv.value))
+        case _ =>
           NextStutterStep(c, v, v', msgOps)
-        )
+  }
+
+  predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && v.pendingMsg.Some?
+    && v.pendingMsg.value.Prepare?
+    && var bal := v.pendingMsg.value.bal;
+    && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+    && if doPromise then
+          && v' == v.(
+            promised := Some(bal),
+            pendingMsg := None)
+          && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
+        else
+          && v' == v.(pendingMsg := None)
+          && msgOps.send == None
+  }
+
+  predicate NextMaybeProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && v.pendingMsg.Some?
+    && v.pendingMsg.value.Propose?
+    && var bal := v.pendingMsg.value.bal;
+    && var val := v.pendingMsg.value.val;
+    && var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
+    &&  if doAccept then
+          && v' == v.(
+                promised := Some(bal), 
+                acceptedVB := Some(VB(val, bal)),
+                pendingMsg := None)
+          && msgOps.send == Some(Accept(VB(val, bal), c.id))
+        else
+          && v' == v.(pendingMsg := None)
+          && msgOps.send == None
   }
 
   predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
