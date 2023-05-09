@@ -164,14 +164,14 @@ module AcceptorHost {
   }
 
   datatype Step =
-    ReceiveStep() | MaybePromiseStep() | MaybeProposeStep() | StutterStep()
+    ReceiveStep() | MaybePromiseStep() | MaybeAcceptStep() | StutterStep()
 
   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
       case MaybePromiseStep => NextMaybePromiseStep(c, v, v', msgOps)
-      case MaybeProposeStep => NextMaybeProposeStep(c, v, v', msgOps)
+      case MaybeAcceptStep => NextMaybeAcceptStep(c, v, v', msgOps)
       case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
@@ -204,7 +204,7 @@ module AcceptorHost {
           && msgOps.send == None
   }
 
-  predicate NextMaybeProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && v.pendingMsg.Some?
     && v.pendingMsg.value.Propose?

@@ -21,7 +21,7 @@ predicate AcceptorValidPromised(c: Constants, v: Variables)
 // Acceptor updates its acceptedVB based on a Propose message carrying that ballot 
 // and value, and there is also a corresponding Accept message
 predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
-  requires v.WF(c)-
+  requires v.WF(c)
 {
   forall idx, val, bal | 
     && c.ValidAcceptorIdx(idx) 
