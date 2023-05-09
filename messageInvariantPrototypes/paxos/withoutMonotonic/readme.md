@@ -1,1 +1,1 @@
-Updating on 7 May 2023 to remove atomic receive-and-send in stame step
+Updating on 7 May 2023 to remove atomic receive-and-send in same step
