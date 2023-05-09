@@ -48,6 +48,13 @@ predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
     )
 } 
 
+// certified self-inductive
+predicate AcceptorValidPendingMsg(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall idx | c.ValidAcceptorIdx(idx) && v.acceptors[idx].pendingMsg.Some?
+  :: v.acceptors[idx].pendingMsg.value in v.network.sentMsgs
+}
 
 // certified self-inductive
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
@@ -68,6 +75,7 @@ predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && ValidMessageSrc(c, v)
+  && AcceptorValidPendingMsg(c, v)
   && LeaderValidHighestHeard(c, v)
   && LeaderValidReceivedPromises(c, v)
   && LearnerValidReceivedAccepts(c, v)
