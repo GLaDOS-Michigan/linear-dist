@@ -313,17 +313,13 @@ lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorValidPromised(c, v')
-{
-  assume false;
-}
+{}
 
 lemma InvNextAcceptorValidAcceptedVB(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorValidAcceptedVB(c, v')
-{
-  assume false;
-}
+{}
 
 lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
