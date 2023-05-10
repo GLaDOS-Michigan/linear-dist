@@ -110,122 +110,127 @@ module LeaderHost {
 }  // end module LeaderHost
 
 
-// /***************************************************************************************
-// *                                     Acceptor Host                                    *
-// ***************************************************************************************/
+/***************************************************************************************
+*                                     Acceptor Host                                    *
+***************************************************************************************/
 
-// module AcceptorHost {
-//   import opened UtilitiesLibrary
-//   import opened Types
+module AcceptorHost {
+  import opened UtilitiesLibrary
+  import opened Types
 
-//   datatype Constants = Constants(id: AcceptorId)
+  datatype Constants = Constants(id: AcceptorId)
 
-//   predicate ConstantsValidForAcceptor(c: Constants, id: AcceptorId) {
-//     && c.id == id
-//   }
+  predicate ConstantsValidForAcceptor(c: Constants, id: AcceptorId) {
+    && c.id == id
+  }
 
-//   datatype Variables = Variables(
-//     pendingMsg: Option<Message>,
-//     promised: Option<LeaderId>,
-//     acceptedVB: Option<ValBal>
-//   ) {
-//     predicate WF() {
-//       pendingMsg.Some? ==> (pendingMsg.value.Prepare? || pendingMsg.value.Propose?)
-//     }
-//   }
+  datatype PendingMsg = Prepare(bal:LeaderId) | Propose(bal:LeaderId, val:Value)
 
-//   predicate GroupWFConstants(grp_c: seq<Constants>) {
-//     && 0 < |grp_c|
-//     && (forall idx: nat | idx < |grp_c|
-//         :: ConstantsValidForAcceptor(grp_c[idx], idx))
-//   }
+  datatype Variables = Variables(
+    pendingMsg: Option<PendingMsg>,
+    promised: Option<LeaderId>,
+    acceptedVB: Option<ValBal>
+  )
 
-//   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-//     && GroupWFConstants(grp_c)
-//     && |grp_v| == |grp_c| == 2*f+1
-//     && forall i | 0 <= i < |grp_v| :: grp_v[i].WF()
-//   }
+  predicate GroupWFConstants(grp_c: seq<Constants>) {
+    && 0 < |grp_c|
+    && (forall idx: nat | idx < |grp_c|
+        :: ConstantsValidForAcceptor(grp_c[idx], idx))
+  }
 
-//   predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-//     && GroupWF(grp_c, grp_v, f)
-//     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
-//   }
+  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && GroupWFConstants(grp_c)
+    && |grp_v| == |grp_c| == 2*f+1
+  }
 
-//   predicate Init(c: Constants, v: Variables) {
-//     && v.promised == None
-//     && v.acceptedVB == None
-//     && v.pendingMsg == None
-//   }
+  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && GroupWF(grp_c, grp_v, f)
+    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  }
 
-//   datatype Step =
-//     ReceiveStep() | MaybePromiseStep() | MaybeAcceptStep() | StutterStep()
+  predicate Init(c: Constants, v: Variables) {
+    && v.promised == None
+    && v.acceptedVB == None
+    && v.pendingMsg == None
+  }
 
-//   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
-//   {
-//     match step
-//       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
-//       case MaybePromiseStep => NextMaybePromiseStep(c, v, v', msgOps)
-//       case MaybeAcceptStep => NextMaybeAcceptStep(c, v, v', msgOps)
-//       case StutterStep => NextStutterStep(c, v, v', msgOps)
-//   }
+  datatype TransitionLabel =
+    | ReceivePrepareLbl(bal:LeaderId)
+    | ReceiveProposeLbl(bal:LeaderId, val:Value)
+    | MaybePromiseLbl(balOpt:Option<LeaderId>, vbOptOpt:Option<Option<ValBal>>)
+    | MaybeAcceptLbl(vb:Option<ValBal>)
+    | InternalLbl()
 
-//   predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-//     && v.pendingMsg.None?
-//     && msgOps.recv.Some?
-//     && msgOps.send.None?
-//     && match msgOps.recv.value
-//         case Prepare(_) =>
-//           v' == v.(pendingMsg := Some(msgOps.recv.value))
-//         case Propose(bal, val) =>
-//           v' == v.(pendingMsg := Some(msgOps.recv.value))
-//         case _ =>
-//           NextStutterStep(c, v, v', msgOps)
-//   }
+  datatype Step =
+    ReceivePrepareStep() | ReceiveProposeStep() | MaybePromiseStep() | MaybeAcceptStep() | StutterStep()
 
-//   predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-//     && msgOps.recv.None?
-//     && v.pendingMsg.Some?
-//     && v.pendingMsg.value.Prepare?
-//     && var bal := v.pendingMsg.value.bal;
-//     && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
-//     && if doPromise then
-//           && v' == v.(
-//             promised := Some(bal),
-//             pendingMsg := None)
-//           && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
-//         else
-//           && v' == v.(pendingMsg := None)
-//           && msgOps.send == None
-//   }
+  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  {
+    match step
+      case ReceivePrepareStep => NextReceivePrepareStep(c, v, v', lbl)
+      case ReceiveProposeStep => NextReceiveProposeStep(c, v, v', lbl)
+      case MaybePromiseStep => NextMaybePromiseStep(c, v, v', lbl)
+      case MaybeAcceptStep => NextMaybeAcceptStep(c, v, v', lbl)
+      case StutterStep => NextStutterStep(c, v, v', lbl)
+  }
 
-//   predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-//     && msgOps.recv.None?
-//     && v.pendingMsg.Some?
-//     && v.pendingMsg.value.Propose?
-//     && var bal := v.pendingMsg.value.bal;
-//     && var val := v.pendingMsg.value.val;
-//     && var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
-//     &&  if doAccept then
-//           && v' == v.(
-//                 promised := Some(bal), 
-//                 acceptedVB := Some(VB(val, bal)),
-//                 pendingMsg := None)
-//           && msgOps.send == Some(Accept(VB(val, bal), c.id))
-//         else
-//           && v' == v.(pendingMsg := None)
-//           && msgOps.send == None
-//   }
+  predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.ReceivePrepareLbl?
+    && v.pendingMsg.None?
+    && v' == v.(pendingMsg := Some(Prepare(lbl.bal)))
+  }
 
-//   predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-//     && v == v'
-//     && msgOps.send == None
-//   }
+  predicate NextReceiveProposeStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.ReceiveProposeLbl?
+    && v.pendingMsg.None?
+    && v' == v.(pendingMsg := Some(Propose(lbl.bal, lbl.val)))
+  }
 
-//   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
-//   {
-//     exists step :: NextStep(c, v, v', step, msgOps)
-//   }
-// }  // end module AcceptorHost
+  predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  {
+    && lbl.MaybePromiseLbl?
+    && v.pendingMsg.Some?
+    && v.pendingMsg.value.Prepare?
+    && var bal := v.pendingMsg.value.bal;
+    && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+    && if doPromise then
+          && v' == v.(
+            promised := Some(bal),
+            pendingMsg := None)
+          && lbl == MaybePromiseLbl(Some(bal), Some(v.acceptedVB))
+        else
+          && v' == v.(pendingMsg := None)
+          && lbl == MaybePromiseLbl(None, None)
+  }
+
+  predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.MaybeAcceptLbl?
+    && v.pendingMsg.Some?
+    && v.pendingMsg.value.Propose?
+    && var bal := v.pendingMsg.value.bal;
+    && var val := v.pendingMsg.value.val;
+    && var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
+    &&  if doAccept then
+          && v' == v.(
+                promised := Some(bal), 
+                acceptedVB := Some(VB(val, bal)),
+                pendingMsg := None)
+          && lbl == MaybeAcceptLbl(Some(VB(val, bal)))
+        else
+          && v' == v.(pendingMsg := None)
+          && lbl == MaybeAcceptLbl(None)
+  }
+
+  predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.InternalLbl?
+    && v' == v
+  }
+
+  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  {
+    exists step :: NextStep(c, v, v', step, lbl)
+  }
+}  // end module AcceptorHost
 
 
 // /***************************************************************************************
