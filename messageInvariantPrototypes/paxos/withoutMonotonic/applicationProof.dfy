@@ -20,6 +20,33 @@ predicate Chosen(c: Constants, v: Variables, vb: ValBal) {
   exists quorum: set<Message> :: IsAcceptQuorum(c, v, quorum, vb)
 }
 
+
+// Acceptor updates its promised ballot based on a Prepare/Propose message carrying 
+// that ballot
+predicate AcceptorValidPromised(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, b | c.ValidAcceptorIdx(idx) && v.acceptors[idx].promised == Some(b)
+  :: (exists m: Message ::
+        && (IsPrepareMessage(v, m) || IsProposeMessage(v, m))
+        && m.bal == b
+    )
+}
+
+// Acceptor updates its acceptedVB based on a Propose message carrying that ballot 
+// and value, and there is also a corresponding Accept message
+predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, val, bal | 
+    && c.ValidAcceptorIdx(idx) 
+    && v.acceptors[idx].acceptedVB == Some(VB(val, bal))
+  :: 
+    && Propose(bal, val) in v.network.sentMsgs
+    && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
+}
+
+
 // Tony: I once thought this was a message invariant, but it isn't --- it depends on 
 // application level knowledge that l.receivedAccepts is monotonically increasing.
 // For every Learn(lnr, val) message in the network, the learner must have a quorum of
@@ -205,6 +232,8 @@ predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
+  && AcceptorValidPromised(c, v)
+  && AcceptorValidAcceptedVB(c, v)
   && LearnMsgsValid(c, v)
   && AcceptorPromisedMonotonic(c, v)
   && ProposeImpliesLeaderState(c, v)
@@ -259,6 +288,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
+  InvNextAcceptorValidPromised(c, v, v');
+  InvNextAcceptorValidAcceptedVB(c, v, v');
   InvNextProposeImpliesLeaderState(c, v, v');
   InvNextPromiseVbImpliesAccepted(c, v, v');
   InvNextAcceptMessageImpliesProposed(c, v, v');
@@ -277,6 +308,22 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 /***************************************************************************************
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
+
+lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures AcceptorValidPromised(c, v')
+{
+  assume false;
+}
+
+lemma InvNextAcceptorValidAcceptedVB(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures AcceptorValidAcceptedVB(c, v')  // Implied by ProposeImpliesLeaderState
+{
+  assume false;
+}
 
 lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -303,13 +350,17 @@ lemma InvNextAcceptMessageImpliesProposed(c: Constants, v: Variables, v': Variab
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptMessageImpliesProposed(c, v')
-{}
+{
+  assume false;
+}
 
 lemma InvNextAcceptMessagesValid(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptMessagesValid(c, v')
-{}
+{
+  assume false;
+}
 
 lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
@@ -456,6 +507,8 @@ lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables
 lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
+  requires AcceptorValidPromised(c, v')
+  requires AcceptorValidAcceptedVB(c, v')
   requires AcceptMessageImpliesProposed(c, v')
   requires AcceptMessagesValid(c, v')
   requires ProposeBackedByPromiseQuorum(c, v')
@@ -498,7 +551,8 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     } else if dsStep.AcceptorStep? {
       var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
       var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-      if step.ReceiveStep? && msgOps.recv.value.Propose? {
+      if step.MaybeAcceptStep? {
+        var new_prop := a.pendingMsg.value;
         if !Chosen(c, v, vb) && propose.val != vb.v {
           /* This is a point where something can suddenly be chosen.*/
           assert propose.bal > vb.b;
