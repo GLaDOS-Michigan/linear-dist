@@ -320,7 +320,7 @@ lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
 lemma InvNextAcceptorValidAcceptedVB(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures AcceptorValidAcceptedVB(c, v')  // Implied by ProposeImpliesLeaderState
+  ensures AcceptorValidAcceptedVB(c, v')
 {
   assume false;
 }
@@ -350,17 +350,13 @@ lemma InvNextAcceptMessageImpliesProposed(c: Constants, v: Variables, v': Variab
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptMessageImpliesProposed(c, v')
-{
-  assume false;
-}
+{}
 
 lemma InvNextAcceptMessagesValid(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptMessagesValid(c, v')
-{
-  assume false;
-}
+{}
 
 lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
