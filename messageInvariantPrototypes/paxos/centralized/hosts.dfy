@@ -233,97 +233,97 @@ module AcceptorHost {
 }  // end module AcceptorHost
 
 
-// /***************************************************************************************
-// *                                     Learner Host                                     *
-// ***************************************************************************************/
+/***************************************************************************************
+*                                     Learner Host                                     *
+***************************************************************************************/
 
-// module LearnerHost {
-//   import opened UtilitiesLibrary
-//   import opened Types
+module LearnerHost {
+  import opened UtilitiesLibrary
+  import opened Types
 
-//   datatype Constants = Constants(id: LearnerId, f: nat)
+  datatype Constants = Constants(id: LearnerId, f: nat)
 
-//   predicate ConstantsValidForLearner(c: Constants, id: LearnerId, f: nat) {
-//     && c.id == id
-//     && c.f == f
-//   }
+  predicate ConstantsValidForLearner(c: Constants, id: LearnerId, f: nat) {
+    && c.id == id
+    && c.f == f
+  }
 
-//   datatype Variables = Variables(
-//     // maps ValBal to acceptors that accepted such pair
-//     receivedAccepts: map<ValBal, set<AcceptorId>>
-//   )
+  datatype Variables = Variables(
+    // maps ValBal to acceptors that accepted such pair
+    receivedAccepts: map<ValBal, set<AcceptorId>>,
+    learned: Option<Value>
+  )
 
-//   predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
-//     && 0 < |grp_c|
-//     && (forall idx: nat | idx < |grp_c|
-//         :: ConstantsValidForLearner(grp_c[idx], idx, f))
-//   }
+  predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
+    && 0 < |grp_c|
+    && (forall idx: nat | idx < |grp_c|
+        :: ConstantsValidForLearner(grp_c[idx], idx, f))
+  }
 
-//   predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-//     && 0 < f
-//     && GroupWFConstants(grp_c, f)
-//     && |grp_v| == |grp_c|
-//   }
+  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && 0 < f
+    && GroupWFConstants(grp_c, f)
+    && |grp_v| == |grp_c|
+  }
 
-//   predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-//     && GroupWF(grp_c, grp_v, f)
-//     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
-//   }
+  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+    && GroupWF(grp_c, grp_v, f)
+    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  }
 
-//   predicate Init(c: Constants, v: Variables) {
-//     v.receivedAccepts == map[]
-//   }
+  predicate Init(c: Constants, v: Variables) {
+    && v.receivedAccepts == map[]
+    && v.learned == None
+  }
 
-//   datatype Step =
-//     ReceiveStep() | LearnStep(vb: ValBal) | StutterStep()
+  datatype TransitionLabel =
+    | ReceiveAcceptLbl(vb:ValBal, acc:AcceptorId)
+    | InternalLbl()
 
-//   predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
-//   {
-//     match step
-//       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
-//       case LearnStep(vb) => NextLearnStep(c, v, v', msgOps, vb)
-//       case StutterStep => NextStutterStep(c, v, v', msgOps)
-//   }
+  datatype Step =
+    ReceiveStep() | LearnStep(vb: ValBal) | StutterStep()
 
-//   function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
-//     vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>)
-//     // Tony: ensures clauses are exactly how I can prove to the user, and tell dafny, that 
-//     // data structures annotated as monotonic actually are monotonic --- cool!
-//     ensures vb in receivedAccepts ==> vb in out
-//     ensures vb in receivedAccepts ==> |receivedAccepts[vb]| <= |out[vb]|
-//   {
-//     if vb in receivedAccepts then 
-//       UnionIncreasesCardinality(receivedAccepts[vb], {acc});
-//       receivedAccepts[vb := receivedAccepts[vb] + {acc}]
-//     else 
-//       receivedAccepts[vb := {acc}]
-//   }
+  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  {
+    match step
+      case ReceiveStep => NextReceiveAcceptStep(c, v, v', lbl)
+      case LearnStep(vb) => NextLearnStep(c, v, v', vb, lbl)
+      case StutterStep => NextStutterStep(c, v, v', lbl)
+  }
 
-//   predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-//     && msgOps.recv.Some?
-//     && msgOps.send.None?
-//     && match msgOps.recv.value
-//       case Accept(vb, acc) => 
-//         v' == Variables(UpdateReceivedAccepts(v.receivedAccepts, vb, acc))
-//       case _ =>
-//         NextStutterStep(c, v, v', msgOps)
-//   }
+  function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
+    vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>)
+    // Tony: ensures clauses are exactly how I can prove to the user, and tell dafny, that 
+    // data structures annotated as monotonic actually are monotonic --- cool!
+    ensures vb in receivedAccepts ==> vb in out
+    ensures vb in receivedAccepts ==> |receivedAccepts[vb]| <= |out[vb]|
+  {
+    if vb in receivedAccepts then 
+      UnionIncreasesCardinality(receivedAccepts[vb], {acc});
+      receivedAccepts[vb := receivedAccepts[vb] + {acc}]
+    else 
+      receivedAccepts[vb := {acc}]
+  }
 
-//   predicate NextLearnStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, vb: ValBal) {
-//     && msgOps.recv.None?
-//     && vb in v.receivedAccepts  // enabling
-//     && |v.receivedAccepts[vb]| >= c.f + 1  // enabling
-//     && msgOps.send == Some(Learn(c.id, vb.b, vb.v))
-//     && v' == v  // local state unchanged
-//   }
+  predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.ReceiveAcceptLbl?
+    && v' == Variables(UpdateReceivedAccepts(v.receivedAccepts, lbl.vb, lbl.acc), v.learned)
+  }
 
-//   predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-//     && v == v'
-//     && msgOps.send == None
-//   }
+  predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, lbl: TransitionLabel) {
+    && lbl.InternalLbl?
+    && vb in v.receivedAccepts              // enabling
+    && |v.receivedAccepts[vb]| >= c.f + 1   // enabling
+    && v' == v.(learned := Some(vb.v))      // learn new value
+  }
 
-//   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
-//   {
-//     exists step :: NextStep(c, v, v', step, msgOps)
-//   }
-// }  // end module LearnerHost
+  predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.InternalLbl?
+    && v' == v
+  }
+
+  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  {
+    exists step :: NextStep(c, v, v', step, lbl)
+  }
+}  // end module LearnerHost
