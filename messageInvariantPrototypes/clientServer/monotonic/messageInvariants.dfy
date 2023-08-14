@@ -9,7 +9,7 @@ import opened Obligations
 
 // certified self inductive, modulo requires
 // Every request message in the network has a proper source
-predicate RequestMsgsValidSource(c: Constants, v: Variables) 
+ghost predicate RequestMsgsValidSource(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall req | req in v.network.sentMsgs && req.RequestMsg?
@@ -19,7 +19,7 @@ predicate RequestMsgsValidSource(c: Constants, v: Variables)
 // certified self inductive, modulo requires
 // Every request message in the network comes from the source's request set
 // Property of Send
-predicate RequestMsgsValid(c: Constants, v: Variables)
+ghost predicate RequestMsgsValid(c: Constants, v: Variables)
   requires v.WF(c)
   requires RequestMsgsValidSource(c, v)
 {
@@ -30,7 +30,7 @@ predicate RequestMsgsValid(c: Constants, v: Variables)
 // certified self inductive, modulo requires
 // The server's requests must have come from the network
 // Property of Receive
-predicate ServerRequestsValid(c: Constants, v: Variables)
+ghost predicate ServerRequestsValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx:nat, i | c.ValidServerIdx(idx) && 0 <= i < |v.hosts[idx].server.requests|
@@ -41,7 +41,7 @@ predicate ServerRequestsValid(c: Constants, v: Variables)
 // certified self inductive, modulo requires
 // Every response message in the network comes from the server's requests seq
 // Property of Send
-predicate ResponseMsgsValid(c: Constants, v: Variables)
+ghost predicate ResponseMsgsValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall resp | resp in v.network.sentMsgs && resp.ResponseMsg?
@@ -54,7 +54,7 @@ predicate ResponseMsgsValid(c: Constants, v: Variables)
 // certified self inductive, modulo requires
 // Every client's collected responses came from the network.
 // Property of Receive
-predicate ClientResponsesValid(c: Constants, v: Variables)
+ghost predicate ClientResponsesValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx:nat, respId | c.ValidClientIdx(idx) && respId in v.hosts[idx].client.responses
@@ -62,7 +62,7 @@ predicate ClientResponsesValid(c: Constants, v: Variables)
 }
 
 
-predicate MessageInv(c: Constants, v: Variables) 
+ghost predicate MessageInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
   && RequestMsgsValidSource(c, v)

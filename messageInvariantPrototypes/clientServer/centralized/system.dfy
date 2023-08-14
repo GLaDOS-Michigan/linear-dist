@@ -9,21 +9,21 @@ import ClientHost
 
 datatype Constants = Constants(hosts: seq<Host.Constants>)
 {
-  predicate WF() {
+  ghost predicate WF() {
     Host.GroupWFConstants(hosts)
   }
-  predicate ValidActorIdx(idx: nat) {
+  ghost predicate ValidActorIdx(idx: nat) {
     idx < |hosts|
   }
-  predicate ValidClientIdx(idx: nat) {
+  ghost predicate ValidClientIdx(idx: nat) {
     idx < |hosts|-1
   }
 
-  predicate ValidServerIdx(idx: nat) {
+  ghost predicate ValidServerIdx(idx: nat) {
     idx == |hosts|-1
   }
 
-  function GetServer() : Host.Constants
+  ghost function GetServer() : Host.Constants
     requires WF()
   {
     Last(hosts)
@@ -32,25 +32,25 @@ datatype Constants = Constants(hosts: seq<Host.Constants>)
 
 datatype Variables = Variables(hosts: seq<Host.Variables>)
 {
-  predicate WF(c: Constants) {
+  ghost predicate WF(c: Constants) {
     && c.WF()
     && Host.GroupWF(c.hosts, hosts)
   }
 
-  function GetServer(c: Constants) : Host.Variables
+  ghost function GetServer(c: Constants) : Host.Variables
     requires WF(c)
   {
     Last(hosts)
   }
 }
 
-predicate Init(c: Constants, v: Variables)
+ghost predicate Init(c: Constants, v: Variables)
 {
   && v.WF(c)
   && Host.GroupInit(c.hosts, v.hosts)
 }
 
-predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx: nat, reqId: nat)
+ghost predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx: nat, reqId: nat)
   requires v.WF(c) && v'.WF(c)
 {
   var req := Req(cidx, reqId);
@@ -62,7 +62,7 @@ predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx:
   && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != cidx :: v'.hosts[otherIdx] == v.hosts[otherIdx])
 }
 
-predicate NextServerProcessStep(c: Constants, v: Variables, v': Variables, req: Request)
+ghost predicate NextServerProcessStep(c: Constants, v: Variables, v': Variables, req: Request)
   requires v.WF(c) && v'.WF(c)
 {
   && var serverLbl := ServerHost.ProcessLbl(req);
@@ -79,7 +79,7 @@ datatype Step =
   | ServerProcessStep(r: Request)                 // step where server processes a request
   | StutterStep()
 
-predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
+ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
 {
   match step
@@ -88,7 +88,7 @@ predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
       case StutterStep => && v == v'
 }
 
-predicate Next(c: Constants, v: Variables, v': Variables)
+ghost predicate Next(c: Constants, v: Variables, v': Variables)
 {
   && v.WF(c)
   && v'.WF(c)

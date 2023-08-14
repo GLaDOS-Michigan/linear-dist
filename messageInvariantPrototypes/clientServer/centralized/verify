@@ -1,6 +1,6 @@
 #!/bin/sh
 
-dafny="/Users/nudzhang/installations/dafny-3.5.0/Scripts/dafny /timeLimit:20 /compile:0 /allowGlobals /vcsCores:8 /noNLarith"
+dafny="/Users/nudzhang/installations/dafny-4.2.0/dafny /timeLimit:20 /compile:0  /noNLarith /autoTriggers:1 /vcsCores:8"
 
 files="../../lib/UtilitiesLibrary.dfy types.dfy hosts.dfy system.dfy spec.dfy applicationProof.dfy"
 

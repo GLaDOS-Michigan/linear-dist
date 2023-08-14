@@ -14,14 +14,14 @@ import opened MessageInvariants
 ***************************************************************************************/
 
 // Application bundle
-predicate ApplicationInv(c: Constants, v: Variables)
+ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
   true
 }
 
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && MessageInv(c, v)
   && ApplicationInv(c, v)

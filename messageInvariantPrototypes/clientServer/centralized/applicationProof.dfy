@@ -13,7 +13,7 @@ import opened Obligations
 
 
 // The server's requests must have come from sender client
-predicate ServerRequestsValid(c: Constants, v: Variables)
+ghost predicate ServerRequestsValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
   v.GetServer(c).server.currentRequest.Some?
@@ -24,7 +24,7 @@ predicate ServerRequestsValid(c: Constants, v: Variables)
 }
 
 
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && ServerRequestsValid(c, v)
