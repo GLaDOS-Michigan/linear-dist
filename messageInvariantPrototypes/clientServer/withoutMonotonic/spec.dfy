@@ -6,7 +6,7 @@ module Obligations {
   import opened DistributedSystem
 
   // All responses received by clients are for valid requests
-  predicate Safety(c: Constants, v: Variables) 
+  ghost predicate Safety(c: Constants, v: Variables) 
     requires c.WF()
     requires v.WF(c)
   {
@@ -14,7 +14,7 @@ module Obligations {
     :: SafetySingleClient(v.hosts[cidx].client)
   }
 
-  predicate SafetySingleClient(v: ClientHost.Variables) {
+  ghost predicate SafetySingleClient(v: ClientHost.Variables) {
     v.responses <= v.requests 
   }
 }

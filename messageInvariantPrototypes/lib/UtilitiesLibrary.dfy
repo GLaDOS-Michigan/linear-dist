@@ -1,40 +1,40 @@
 module UtilitiesLibrary {
   datatype Option<T> = Some(value:T) | None
 
-  function max(x: int, y: int) : (res: int) 
+  ghost function max(x: int, y: int) : (res: int) 
     ensures res == x || res == y
     ensures res >= x && res >= y
   {
     if x > y then x else y
   }
 
-  function DropLast<T>(theSeq: seq<T>) : seq<T>
+  ghost function DropLast<T>(theSeq: seq<T>) : seq<T>
     requires 0 < |theSeq|
   {
     theSeq[..|theSeq|-1]
   }
 
-  function Last<T>(theSeq: seq<T>) : T
+  ghost function Last<T>(theSeq: seq<T>) : T
     requires 0 < |theSeq|
   {
     theSeq[|theSeq|-1]
   }
 
-  function Successor(mod: nat, idx: nat) : (ret:nat)
+  ghost function Successor(mod: nat, idx: nat) : (ret:nat)
     requires 0 < mod
     requires idx < mod
   {
     if idx == mod-1 then 0 else idx+1
   }
 
-  function Predecessor(mod: nat, idx: nat) : (ret:nat)
+  ghost function Predecessor(mod: nat, idx: nat) : (ret:nat)
     requires 0 < mod
     requires idx < mod
   {
     if idx == 0 then mod-1 else idx-1
   }
 
-  predicate StrictOrdering(s: seq<nat>) {
+  ghost predicate StrictOrdering(s: seq<nat>) {
     forall i , j | 
       && 0 <= i < |s| 
       && 0 <= j < |s| 
@@ -42,7 +42,7 @@ module UtilitiesLibrary {
     :: s[i] < s[j]
   }
 
-  predicate SeqIsComplete(s: seq<nat>, x: nat, y: nat) {
+  ghost predicate SeqIsComplete(s: seq<nat>, x: nat, y: nat) {
     && 2 <= |s|
     && s[0] == x
     && s[|s|-1] == y
@@ -82,10 +82,10 @@ module UtilitiesLibrary {
     ensures |s+s1| <= |s+s2|
   {
 
-    assume false;  //TODO
+    assume {:axiom} false;  //TODO
   }
 
-  function UnionSeqOfSets<T>(theSets: seq<set<T>>) : set<T>
+  ghost function UnionSeqOfSets<T>(theSets: seq<set<T>>) : set<T>
   {
     if |theSets| == 0 then {} else
       UnionSeqOfSets(DropLast(theSets)) + Last(theSets)
@@ -123,7 +123,7 @@ module UtilitiesLibrary {
     idx := chosenIdx;
   }
 
-  predicate SetIsQuorum<T>(clusterSize: nat, S: set<T>) {
+  ghost predicate SetIsQuorum<T>(clusterSize: nat, S: set<T>) {
     |S| > clusterSize / 2
   }
 
@@ -134,11 +134,11 @@ module UtilitiesLibrary {
     requires S2 <= cluster
     ensures e in S1 && e in S2
   {
-    assume false;  // TODO
+    assume {:axiom} false;  // TODO
     e :| e in S1 && e in S2;
   }
 
-  function {:opaque} MapRemoveOne<K,V>(m:map<K,V>, key:K) : (m':map<K,V>)
+  ghost function {:opaque} MapRemoveOne<K,V>(m:map<K,V>, key:K) : (m':map<K,V>)
     ensures forall k :: k in m && k != key ==> k in m'
     ensures forall k :: k in m' ==> k in m && k != key
     ensures forall j :: j in m' ==> m'[j] == m[j]
@@ -150,19 +150,19 @@ module UtilitiesLibrary {
     m'
   }
 
-  function StutterSeq<T>(s: seq<T>) : (s': seq<T>)
+  ghost function StutterSeq<T>(s: seq<T>) : (s': seq<T>)
     requires 0 < |s|
     ensures |s'| == |s|+1
   {
     s + [Last(s)]
   }
 
-  predicate SeqMonotoneIncreasing(s: seq<nat>) {
+  ghost predicate SeqMonotoneIncreasing(s: seq<nat>) {
     forall i, j | 0 <= i < |s| && 0 <= j < |s| && i <= j
     :: s[i] <= s[j]
   }
 
-  predicate SeqOptionMonotoneIncreasing(s: seq<Option<nat>>) {
+  ghost predicate SeqOptionMonotoneIncreasing(s: seq<Option<nat>>) {
     forall i, j | 
       && 0 <= i < |s| 
       && 0 <= j < |s| 
@@ -171,7 +171,7 @@ module UtilitiesLibrary {
     :: s[j].Some? && s[i].value <= s[j].value
   }
 
-  predicate SetMonotoneIncreasing<T>(s: seq<set<T>>) {
+  ghost predicate SetMonotoneIncreasing<T>(s: seq<set<T>>) {
     forall i, j | 0 <= i < |s| && 0 <= j < |s| && i <= j
     :: s[i] <= s[j]
   }
