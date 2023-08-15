@@ -9,7 +9,7 @@ module MessageInvariants {
   import opened Obligations
 
   // All msg have a valid ringPos as src
-  predicate VoteMsgValidSrc(c: Constants, v: Variables)
+  ghost predicate VoteMsgValidSrc(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall msg | msg in v.network.sentMsgs
@@ -17,14 +17,14 @@ module MessageInvariants {
   }
 
   // Every message's val is at least the senders HostId
-  predicate PayloadGeqSenderHostId(c: Constants, v: Variables) {
+  ghost predicate PayloadGeqSenderHostId(c: Constants, v: Variables) {
     forall msg | msg in v.network.sentMsgs && 0 <= msg.src < |c.hostConstants|
     :: msg.val >= c.hostConstants[msg.src].hostId
   }
 
   // For each host, if its highestHeard is >-1, then it must have gotten it from a message
   // from its predecessor
-  predicate ReceiveValidity(c: Constants, v: Variables) 
+  ghost predicate ReceiveValidity(c: Constants, v: Variables) 
     requires v.WF(c)
     requires VoteMsgValidSrc(c, v)
   {
@@ -34,7 +34,7 @@ module MessageInvariants {
                       && idx == Successor(|c.hostConstants|, msg.src))
   }
 
-  predicate MessageInv(c: Constants, v: Variables)
+  ghost predicate MessageInv(c: Constants, v: Variables)
   {
     && v.WF(c)
     && VoteMsgValidSrc(c, v)

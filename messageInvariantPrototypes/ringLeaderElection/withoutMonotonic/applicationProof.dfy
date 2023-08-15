@@ -15,7 +15,7 @@ import opened MessageInvariants
 ***************************************************************************************/
 
 // Application bundle
-predicate ApplicationInv(c: Constants, v: Variables)
+ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
@@ -24,7 +24,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   && ChordDominatesMsgs(c, v)
 }
 
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && MessageInv(c, v)
@@ -33,7 +33,7 @@ predicate Inv(c: Constants, v: Variables)
 }
 
 
-predicate Between(start: nat, node: nat, end: nat) 
+ghost predicate Between(start: nat, node: nat, end: nat) 
 {
   if start < end then
     start < node < end else
@@ -48,7 +48,7 @@ function Distance(n: nat, start: nat, end: nat) : nat
   else n - start + end
 }
 
-predicate ChordDominates(c: Constants, v: Variables) 
+ghost predicate ChordDominates(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall src:nat, dst:nat, mid:nat | 
@@ -62,7 +62,7 @@ predicate ChordDominates(c: Constants, v: Variables)
 
 // Extra: Given a src node and a dst node such that v.hosts[dst].highestHeard == c.hostConstants[src].hostId
 // any middle node mid between them must have sent Msg(c.hostConstants[src].hostId, mid)
-predicate ChordDominatesMsgs(c: Constants, v: Variables) 
+ghost predicate ChordDominatesMsgs(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall src:nat, dst:nat, mid:nat | 
@@ -76,7 +76,7 @@ predicate ChordDominatesMsgs(c: Constants, v: Variables)
 
 // Extra: If a node sent a msg with a value that is NOT its hostId, it must have received that 
 // value from its predecessor
-predicate SentNotMyIdImpliesReceivedId(c: Constants, v: Variables) 
+ghost predicate SentNotMyIdImpliesReceivedId(c: Constants, v: Variables) 
   requires v.WF(c)
   requires VoteMsgValidSrc(c, v)
 {

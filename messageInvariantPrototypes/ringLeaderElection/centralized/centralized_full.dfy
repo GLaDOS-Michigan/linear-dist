@@ -1,13 +1,13 @@
 datatype Constants = Constants(ids: seq<nat>) {
-    predicate ValidIdx(i: nat) {
+    ghost predicate ValidIdx(i: nat) {
         0 <= i < |ids|
     }
 
-    predicate UniqueIds() {
+    ghost predicate UniqueIds() {
         forall i:nat, j:nat | ValidIdx(i) && ValidIdx(j) && ids[i] == ids[j] :: i == j
     }
 
-    predicate WellFormed() {
+    ghost predicate WellFormed() {
         && 0 < |ids|
         && UniqueIds()
     }
@@ -15,13 +15,13 @@ datatype Constants = Constants(ids: seq<nat>) {
 }
 
 datatype Variables = Variables(highest_heard: seq<int>) {
-    predicate WellFormed(c: Constants) {
+    ghost predicate WellFormed(c: Constants) {
         && c.WellFormed()
         && |highest_heard| == |c.ids|
     }
 }
 
-predicate Init(c: Constants, v: Variables) {
+ghost predicate Init(c: Constants, v: Variables) {
     && v.WellFormed(c)
     && forall idx:nat | c.ValidIdx(idx) :: v.highest_heard[idx] == -1
 }
@@ -38,7 +38,7 @@ function Successor(c:Constants, idx: nat) : (ret:nat)
     if idx == |c.ids|-1 then 0 else idx+1
 }
 
-predicate Transmission(c: Constants, v: Variables, v':Variables, actor: nat) {
+ghost predicate Transmission(c: Constants, v: Variables, v':Variables, actor: nat) {
     && v.WellFormed(c)
     && v'.WellFormed(c)
     && c.ValidIdx(actor)
@@ -49,25 +49,25 @@ predicate Transmission(c: Constants, v: Variables, v':Variables, actor: nat) {
 
 datatype Step = TransmissionStep(actor: nat)
 
-predicate NextStep(c:Constants, v: Variables, v': Variables, step: Step) {
+ghost predicate NextStep(c:Constants, v: Variables, v': Variables, step: Step) {
     match step {
         case TransmissionStep(actor) => Transmission(c, v, v', actor)
     }
 }
 
-predicate Next(c: Constants, v: Variables, v': Variables) {
+ghost predicate Next(c: Constants, v: Variables, v': Variables) {
     exists step :: NextStep(c, v, v', step)
 }
 
 // Model ends here. Below is the definition of safety
-predicate IsLeader(c: Constants, v: Variables, idx: nat) 
+ghost predicate IsLeader(c: Constants, v: Variables, idx: nat) 
     requires v.WellFormed(c)
     requires c.ValidIdx(idx)
 {
     v.highest_heard[idx] == c.ids[idx]
 }
 
-predicate Safety(c: Constants, v: Variables) 
+ghost predicate Safety(c: Constants, v: Variables) 
     requires v.WellFormed(c)
 {
     forall idx1, idx2 | 
@@ -80,14 +80,14 @@ predicate Safety(c: Constants, v: Variables)
 
 // Safety definition ends here. Below comes the proof of safety
 
-predicate Between(start: nat, node: nat, end: nat) 
+ghost predicate Between(start: nat, node: nat, end: nat) 
 {
     if start < end then
         start < node < end else
         node < end || start < node
 }
 
-predicate ChordDominates(c: Constants, v: Variables) 
+ghost predicate ChordDominates(c: Constants, v: Variables) 
     requires v.WellFormed(c)
 {
     forall src:nat, dst:nat, mid:nat | 
@@ -99,7 +99,7 @@ predicate ChordDominates(c: Constants, v: Variables)
             :: c.ids[mid] < c.ids[src]
 }
 
-predicate Inv(c: Constants, v: Variables) {
+ghost predicate Inv(c: Constants, v: Variables) {
     && v.WellFormed(c)
     && ChordDominates(c, v)
     && Safety(c, v)
