@@ -1,9 +1,11 @@
-Updating on 7 May 2023 to remove atomic receive-and-send in same step
+# Readme
+
+Updating on 7 May 2023 to remove atomic receive-and-send in same step.
 
 Below are old message invariants that are no longer true in this non-atomic setting.
 They become application invariants
 
-```
+```dafny
 // certified self-inductive
 // Acceptor updates its promised ballot based on a Prepare/Propose message carrying 
 // that ballot

@@ -5,12 +5,12 @@ module Network {
 
   datatype Variables = Variables(sentMsgs:set<Message>)
 
-  predicate Init(v: Variables)
+  ghost predicate Init(v: Variables)
   {
     && v.sentMsgs == {}
   }
 
-  predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
   {
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
     && v'.sentMsgs ==
@@ -32,38 +32,38 @@ module DistributedSystem {
     acceptorConstants: seq<AcceptorHost.Constants>,
     learnerConstants: seq<LearnerHost.Constants>)
   {
-    predicate WF() {
+    ghost predicate WF() {
       && 0 < f
       && UniqueIds()
     }
 
-    predicate UniqueIds() {
+    ghost predicate UniqueIds() {
       && UniqueLeaderIds()
       && UniqueAcceptorIds()
       && UniqueLearnerIds()
     }
 
-    predicate ValidLeaderIdx(id: int) {
+    ghost predicate ValidLeaderIdx(id: int) {
       0 <= id < |leaderConstants|
     }
 
-    predicate ValidAcceptorIdx(id: int) {
+    ghost predicate ValidAcceptorIdx(id: int) {
       0 <= id < |acceptorConstants|
     }
 
-    predicate ValidLearnerIdx(id: int) {
+    ghost predicate ValidLearnerIdx(id: int) {
       0 <= id < |learnerConstants|
     }
     
-    predicate UniqueLeaderIds() {
+    ghost predicate UniqueLeaderIds() {
       forall i, j | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaderConstants[i].id == leaderConstants[j].id :: i == j
     }
 
-    predicate UniqueAcceptorIds() {
+    ghost predicate UniqueAcceptorIds() {
       forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptorConstants[i].id == acceptorConstants[j].id :: i == j
     }
 
-    predicate UniqueLearnerIds() {
+    ghost predicate UniqueLearnerIds() {
       forall i, j | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learnerConstants[i].id == learnerConstants[j].id :: i == j
     }
   }
@@ -74,7 +74,7 @@ module DistributedSystem {
     learners: seq<LearnerHost.Variables>,
     network: Network.Variables)
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       && c.WF()
       && LeaderHost.GroupWF(c.leaderConstants, leaders, c.f)
       && AcceptorHost.GroupWF(c.acceptorConstants, acceptors, c.f)
@@ -82,7 +82,7 @@ module DistributedSystem {
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
     && LeaderHost.GroupInit(c.leaderConstants, v.leaders, c.f)
@@ -97,7 +97,7 @@ module DistributedSystem {
     | AcceptorStep(actor: nat, msgOps: MessageOps)
     | LearnerStep(actor: nat, msgOps: MessageOps)
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
     requires v.WF(c) && v'.WF(c)
   {
     && Network.Next(v.network, v'.network, step.msgOps)
@@ -107,7 +107,7 @@ module DistributedSystem {
       case LearnerStep(actor, msgOps) => NextLearnerStep(c, v, v', actor, msgOps)
   }
 
-  predicate NextLeaderStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
+  ghost predicate NextLeaderStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
     requires v.WF(c) && v'.WF(c)
   {
     && c.ValidLeaderIdx(actor)
@@ -118,7 +118,7 @@ module DistributedSystem {
     && v'.learners == v.learners
   }
 
-  predicate NextAcceptorStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
+  ghost predicate NextAcceptorStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
     requires v.WF(c) && v'.WF(c)
   {
     && c.ValidAcceptorIdx(actor)
@@ -129,7 +129,7 @@ module DistributedSystem {
     && v'.learners == v.learners
   }
 
-  predicate NextLearnerStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
+  ghost predicate NextLearnerStep(c: Constants, v: Variables, v': Variables, actor: nat, msgOps: MessageOps) 
     requires v.WF(c) && v'.WF(c)
   {
     && c.ValidLearnerIdx(actor)
@@ -140,7 +140,7 @@ module DistributedSystem {
     && (forall other| c.ValidLearnerIdx(other) && other != actor :: v'.learners[other] == v.learners[other])
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables)
   {
     && v.WF(c)
     && v'.WF(c)

@@ -5,7 +5,7 @@ module Obligations {
   import opened DistributedSystem
 
   // All Learn messages must be of the same value
-  predicate Agreement(c: Constants, v: Variables) 
+  ghost predicate Agreement(c: Constants, v: Variables) 
     requires c.WF()
     requires v.WF(c)
   {

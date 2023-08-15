@@ -9,7 +9,7 @@ import opened Obligations
 
 // certified self-inductive
 // Every message in the network has a valid source
-predicate ValidMessageSrc(c: Constants, v: Variables) 
+ghost predicate ValidMessageSrc(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs 
@@ -25,7 +25,7 @@ predicate ValidMessageSrc(c: Constants, v: Variables)
 // certified self-inductive
 // Leader updates its highestHeard and value based on a Promise message carrying that
 // ballot and value
-predicate LeaderValidHighestHeard(c: Constants, v: Variables) 
+ghost predicate LeaderValidHighestHeard(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, b| c.ValidLeaderIdx(idx) && v.leaders[idx].highestHeardBallot == Some(b)
@@ -38,7 +38,7 @@ predicate LeaderValidHighestHeard(c: Constants, v: Variables)
 
 // certified self-inductive
 // Leader updates receivedPromises based on Promise messages
-predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx, src | c.ValidLeaderIdx(idx) && src in v.leaders[idx].receivedPromises
@@ -49,7 +49,7 @@ predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
 } 
 
 // certified self-inductive
-predicate AcceptorValidPendingMsg(c: Constants, v: Variables) 
+ghost predicate AcceptorValidPendingMsg(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx | c.ValidAcceptorIdx(idx) && v.acceptors[idx].pendingMsg.Some?
@@ -59,7 +59,7 @@ predicate AcceptorValidPendingMsg(c: Constants, v: Variables)
 // certified self-inductive
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
 // accepted ValBal pair
-predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
+ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, vb, acc | 
@@ -71,7 +71,7 @@ predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
 }
 
 // Message bundle
-predicate MessageInv(c: Constants, v: Variables) 
+ghost predicate MessageInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
   && ValidMessageSrc(c, v)
@@ -97,27 +97,27 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 *                                        Utils                                         *
 ***************************************************************************************/
 
-predicate IsPrepareMessage(v: Variables, m: Message) {
+ghost predicate IsPrepareMessage(v: Variables, m: Message) {
   && m.Prepare?
   && m in v.network.sentMsgs
 }
 
-predicate IsPromiseMessage(v: Variables, m: Message) {
+ghost predicate IsPromiseMessage(v: Variables, m: Message) {
   && m.Promise?
   && m in v.network.sentMsgs
 }
 
-predicate IsProposeMessage(v: Variables, m: Message) {
+ghost predicate IsProposeMessage(v: Variables, m: Message) {
   && m.Propose?
   && m in v.network.sentMsgs
 }
 
-predicate IsAcceptMessage(v: Variables, m: Message) {
+ghost predicate IsAcceptMessage(v: Variables, m: Message) {
   && m.Accept?
   && m in v.network.sentMsgs
 }
 
-predicate IsLearnMessage(v: Variables, m: Message) {
+ghost predicate IsLearnMessage(v: Variables, m: Message) {
   && m.Learn?
   && m in v.network.sentMsgs
 } 

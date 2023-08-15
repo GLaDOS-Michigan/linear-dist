@@ -11,7 +11,7 @@ module LeaderHost {
 
   datatype Constants = Constants(id: LeaderId, f: nat, preferredValue: Value)
 
-  predicate ConstantsValidForLeader(c: Constants, id: LeaderId, f: nat) {
+  ghost predicate ConstantsValidForLeader(c: Constants, id: LeaderId, f: nat) {
     && c.id == id
     && c.f == f
   }
@@ -22,24 +22,24 @@ module LeaderHost {
     highestHeardBallot: Option<LeaderId>
   )
 
-  predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
     && 0 < |grp_c|
     && (forall idx: nat | idx < |grp_c|
         :: ConstantsValidForLeader(grp_c[idx], idx, f))
   }
 
-  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && 0 < f
     && GroupWFConstants(grp_c, f)
     && |grp_v| == |grp_c|
   }
 
-  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWF(grp_c, grp_v, f)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
   }
 
-  predicate Init(c: Constants, v: Variables) {
+  ghost predicate Init(c: Constants, v: Variables) {
     && v.receivedPromises == {}
     && v.value == c.preferredValue
     && v.highestHeardBallot == None
@@ -48,7 +48,7 @@ module LeaderHost {
   datatype Step =
     PrepareStep() | ReceiveStep() | ProposeStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case PrepareStep => NextPrepareStep(c, v, v', msgOps)
@@ -57,13 +57,13 @@ module LeaderHost {
       case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
-  predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send == Some(Prepare(c.id))
     && v' == v
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && match msgOps.recv.value
@@ -90,7 +90,7 @@ module LeaderHost {
         NextStutterStep(c, v, v', msgOps)
   }
 
-  predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && |v.receivedPromises| >= c.f+1  // enabling condition
     // Enabling condition that my hightest heard 
@@ -104,12 +104,12 @@ module LeaderHost {
     && v' == v
   }
 
-  predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && v == v'
     && msgOps.send == None
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
@@ -126,7 +126,7 @@ module AcceptorHost {
 
   datatype Constants = Constants(id: AcceptorId)
 
-  predicate ConstantsValidForAcceptor(c: Constants, id: AcceptorId) {
+  ghost predicate ConstantsValidForAcceptor(c: Constants, id: AcceptorId) {
     && c.id == id
   }
 
@@ -135,29 +135,29 @@ module AcceptorHost {
     promised: Option<LeaderId>,
     acceptedVB: Option<ValBal>
   ) {
-    predicate WF() {
+    ghost predicate WF() {
       pendingMsg.Some? ==> (pendingMsg.value.Prepare? || pendingMsg.value.Propose?)
     }
   }
 
-  predicate GroupWFConstants(grp_c: seq<Constants>) {
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|
     && (forall idx: nat | idx < |grp_c|
         :: ConstantsValidForAcceptor(grp_c[idx], idx))
   }
 
-  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWFConstants(grp_c)
     && |grp_v| == |grp_c| == 2*f+1
     && forall i | 0 <= i < |grp_v| :: grp_v[i].WF()
   }
 
-  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWF(grp_c, grp_v, f)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
   }
 
-  predicate Init(c: Constants, v: Variables) {
+  ghost predicate Init(c: Constants, v: Variables) {
     && v.promised == None
     && v.acceptedVB == None
     && v.pendingMsg == None
@@ -166,7 +166,7 @@ module AcceptorHost {
   datatype Step =
     ReceiveStep() | MaybePromiseStep() | MaybeAcceptStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
@@ -175,7 +175,7 @@ module AcceptorHost {
       case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && v.pendingMsg.None?
     && msgOps.recv.Some?
     && msgOps.send.None?
@@ -188,7 +188,7 @@ module AcceptorHost {
           NextStutterStep(c, v, v', msgOps)
   }
 
-  predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && v.pendingMsg.Some?
     && v.pendingMsg.value.Prepare?
@@ -204,7 +204,7 @@ module AcceptorHost {
           && msgOps.send == None
   }
 
-  predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && v.pendingMsg.Some?
     && v.pendingMsg.value.Propose?
@@ -222,12 +222,12 @@ module AcceptorHost {
           && msgOps.send == None
   }
 
-  predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && v == v'
     && msgOps.send == None
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
@@ -244,7 +244,7 @@ module LearnerHost {
 
   datatype Constants = Constants(id: LearnerId, f: nat)
 
-  predicate ConstantsValidForLearner(c: Constants, id: LearnerId, f: nat) {
+  ghost predicate ConstantsValidForLearner(c: Constants, id: LearnerId, f: nat) {
     && c.id == id
     && c.f == f
   }
@@ -254,31 +254,31 @@ module LearnerHost {
     receivedAccepts: map<ValBal, set<AcceptorId>>
   )
 
-  predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
     && 0 < |grp_c|
     && (forall idx: nat | idx < |grp_c|
         :: ConstantsValidForLearner(grp_c[idx], idx, f))
   }
 
-  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && 0 < f
     && GroupWFConstants(grp_c, f)
     && |grp_v| == |grp_c|
   }
 
-  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWF(grp_c, grp_v, f)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
   }
 
-  predicate Init(c: Constants, v: Variables) {
+  ghost predicate Init(c: Constants, v: Variables) {
     v.receivedAccepts == map[]
   }
 
   datatype Step =
     ReceiveStep() | LearnStep(vb: ValBal) | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
@@ -300,7 +300,7 @@ module LearnerHost {
       receivedAccepts[vb := {acc}]
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && match msgOps.recv.value
@@ -310,7 +310,7 @@ module LearnerHost {
         NextStutterStep(c, v, v', msgOps)
   }
 
-  predicate NextLearnStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, vb: ValBal) {
+  ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, vb: ValBal) {
     && msgOps.recv.None?
     && vb in v.receivedAccepts  // enabling
     && |v.receivedAccepts[vb]| >= c.f + 1  // enabling
@@ -318,12 +318,12 @@ module LearnerHost {
     && v' == v  // local state unchanged
   }
 
-  predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && v == v'
     && msgOps.send == None
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }

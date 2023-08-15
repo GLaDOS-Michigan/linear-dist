@@ -15,7 +15,7 @@ import opened PaxosMessageInvariants
 
 
 // Application bundle
-predicate ApplicationInv(c: Constants, v: Variables)
+ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
@@ -27,7 +27,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
   && ChosenValImpliesProposeOnlyVal(c, v)
 }
 
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && MessageInv(c, v)
   && ApplicationInv(c, v)
@@ -35,7 +35,7 @@ predicate Inv(c: Constants, v: Variables)
 }
 
 // Leader local state's monotonic properties
-predicate LeaderStateMonotonic(c: Constants, v: Variables) 
+ghost predicate LeaderStateMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx | c.ValidLeaderIdx(idx)
@@ -45,7 +45,7 @@ predicate LeaderStateMonotonic(c: Constants, v: Variables)
 
 
 // Highest heard ballot and value backed by received promises, corresponds to HighestHeardBackedByReceivedPromises
-predicate LeaderHighestHeardBackedByReceivedPromises(c: Constants, v: Variables) 
+ghost predicate LeaderHighestHeardBackedByReceivedPromises(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, i |
@@ -55,7 +55,7 @@ predicate LeaderHighestHeardBackedByReceivedPromises(c: Constants, v: Variables)
     LeaderPromiseSetProperties(c, v, idx, i)
 }
 
-predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int, i: int) 
+ghost predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int, i: int) 
   requires v.WF(c)
   requires c.ValidLeaderIdx(idx)
   requires 0 <= i < |v.leaders[idx].highestHeardBal|
@@ -72,7 +72,7 @@ predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int, i: in
 
 // Corresponds to ProposeImpliesLeaderState. This implies LeaderProposesOneValue, 
 // which in turn helps imply at most one value is chosen
-predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
+ghost predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx, i | 
@@ -82,7 +82,7 @@ predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
     LeaderStateValid(c, v, idx, i)
 }
 
-predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
+ghost predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
   requires v.WF(c)
   requires c.ValidLeaderIdx(idx)
   requires 0 <= i < |v.leaders[idx].proposed|
@@ -92,7 +92,7 @@ predicate LeaderStateValid(c: Constants, v: Variables, idx: nat, i: nat)
 }
 
 // This is a corollary of ProposeImpliesLeaderState, and implies at most one value is chosen
-predicate LeaderProposesOneValue(c: Constants, v: Variables)
+ghost predicate LeaderProposesOneValue(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx, i, j | 
@@ -106,7 +106,7 @@ predicate LeaderProposesOneValue(c: Constants, v: Variables)
 // Acceptor local state's monotonic properties
 // This covers AcceptorPromisedMonotonic and AcceptorPromisedLargerThanAccepted and
 // PromiseBalLargerThanAccepted and AcceptMsgImpliesLargerPromiseCarriesVb
-predicate AcceptorStateMonotonic(c: Constants, v: Variables) 
+ghost predicate AcceptorStateMonotonic(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx | c.ValidAcceptorIdx(idx) 
@@ -123,7 +123,7 @@ predicate AcceptorStateMonotonic(c: Constants, v: Variables)
 }
 
 // Corresponds to LearnMsgsValid in non-monotonic land
-predicate LearnedValuesValid(c: Constants, v: Variables) 
+ghost predicate LearnedValuesValid(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, vb | 
@@ -139,7 +139,7 @@ predicate LearnedValuesValid(c: Constants, v: Variables)
 
 // The heavy-hitter inv: If vb is chosen, then for all Leader hosts l such that l's ballot > vb.b, all 
 // values in l.proposed messages equals vb.v
-predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) 
+ghost predicate ChosenValImpliesProposeOnlyVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall vb, idx, i | 
@@ -446,25 +446,25 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
 
 
 // A quorum of Acceptors accepted the same vb
-predicate Chosen(c: Constants, v: Variables, vb: ValBal) 
+ghost predicate Chosen(c: Constants, v: Variables, vb: ValBal) 
   requires v.WF(c)
 {
   exists quorum :: IsAcceptorQuorum(c, v, quorum, vb)
 }
 
 
-predicate AtMostOneChosenVal(c: Constants, v: Variables) 
+ghost predicate AtMostOneChosenVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall vb1, vb2 | Chosen(c, v, vb1) && Chosen(c, v, vb2) 
   :: vb1.v == vb2.v
 }
 
-predicate IsAcceptorSet(c: Constants, aset: set<AcceptorId>) {
+ghost predicate IsAcceptorSet(c: Constants, aset: set<AcceptorId>) {
   forall id | id in aset :: c.ValidAcceptorIdx(id)
 }
 
-predicate IsAcceptorQuorum(c: Constants, v: Variables, aset: set<AcceptorId>, vb: ValBal) 
+ghost predicate IsAcceptorQuorum(c: Constants, v: Variables, aset: set<AcceptorId>, vb: ValBal) 
   requires v.WF(c)
 {
   && |aset| >= c.f+1
@@ -545,7 +545,7 @@ lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables)
   }
 }
 
-predicate SeqOptionVBMonotoneIncreasing(s: seq<Option<ValBal>>) {
+ghost predicate SeqOptionVBMonotoneIncreasing(s: seq<Option<ValBal>>) {
   forall i, j | 
     && 0 <= i < |s| 
     && 0 <= j < |s| 
@@ -554,38 +554,38 @@ predicate SeqOptionVBMonotoneIncreasing(s: seq<Option<ValBal>>) {
   :: s[j].Some? && s[i].value.b <= s[j].value.b
 }
 
-predicate IsPromiseSet(pset: set<Message>, bal: LeaderId) {
+ghost predicate IsPromiseSet(pset: set<Message>, bal: LeaderId) {
   && (forall m | m in pset ::
     && m.Promise?     // changed from IsPromiseMsg(v, m), to avoid application definitions mentioning network
     && m.bal == bal)
   && PromiseSetDistinctAccs(pset)
 }
 
-predicate IsPromiseQuorum(c: Constants, quorum: set<Message>, bal: LeaderId) {
+ghost predicate IsPromiseQuorum(c: Constants, quorum: set<Message>, bal: LeaderId) {
   && |quorum| >= c.f+1
   && IsPromiseSet(quorum, bal)
 }
 
-predicate PromiseSetDistinctAccs(pset: set<Message>) 
+ghost predicate PromiseSetDistinctAccs(pset: set<Message>) 
   requires forall m | m in pset :: m.Promise?
 {
   forall m1, m2 | m1 in pset && m2 in pset && m1.acc == m2.acc
       :: m1 == m2
 }
 
-predicate PromiseSetEmptyVB(pset: set<Message>, qbal: LeaderId)
+ghost predicate PromiseSetEmptyVB(pset: set<Message>, qbal: LeaderId)
   requires IsPromiseSet(pset, qbal)
 {
   forall m | m in pset :: m.vbOpt == None
 }
 
-predicate PromiseSetHighestVB(pset: set<Message>, qbal: LeaderId, vb: ValBal)
+ghost predicate PromiseSetHighestVB(pset: set<Message>, qbal: LeaderId, vb: ValBal)
   requires IsPromiseSet(pset, qbal)
 {
   exists m :: WinningPromiseMessageInQuorum(pset, qbal, vb, m)
 }
 
-predicate WinningPromiseMessageInQuorum(pset: set<Message>, qbal: LeaderId, vb: ValBal, m: Message)
+ghost predicate WinningPromiseMessageInQuorum(pset: set<Message>, qbal: LeaderId, vb: ValBal, m: Message)
   requires IsPromiseSet(pset, qbal)
 {
     && m in pset 
@@ -598,7 +598,7 @@ predicate WinningPromiseMessageInQuorum(pset: set<Message>, qbal: LeaderId, vb: 
       )
 }
 
-predicate AcceptorQuorumSeesVb(c: Constants, v: Variables, quorum: set<AcceptorId>, vb: ValBal) 
+ghost predicate AcceptorQuorumSeesVb(c: Constants, v: Variables, quorum: set<AcceptorId>, vb: ValBal) 
   requires v.WF(c)
   requires IsAcceptorSet(c, quorum)
 {
@@ -623,7 +623,7 @@ lemma AcceptorSetComprehensionSize(n: nat)
 // Collorary of Inv
 // Tony: IsPromiseMessage refers to network, but this is ok as this is not an application
 // invariant. This is simply needed to get promisingAccs <= allAccs;
-predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
+ghost predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall vb, quorum, pbal | 

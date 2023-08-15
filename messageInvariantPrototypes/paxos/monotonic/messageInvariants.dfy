@@ -9,7 +9,7 @@ import opened Obligations
 
 // certified self-inductive
 // Every message in the network has a valid source
-predicate ValidMessageSrc(c: Constants, v: Variables) 
+ghost predicate ValidMessageSrc(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs 
@@ -23,7 +23,7 @@ predicate ValidMessageSrc(c: Constants, v: Variables)
 }
 
 // Message bundle
-predicate MessageInv(c: Constants, v: Variables) 
+ghost predicate MessageInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
   && ValidMessageSrc(c, v)
@@ -63,7 +63,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 // certified self-inductive
 // Leader updates receivedPromises based on Promise messages
 // Property of Receive
-predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx, i, p | 
@@ -76,7 +76,7 @@ predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
 
 // certified self-inductive
 // Property of Send
-predicate ValidProposeMesssage(c: Constants, v: Variables)
+ghost predicate ValidProposeMesssage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
@@ -103,7 +103,7 @@ predicate ValidProposeMesssage(c: Constants, v: Variables)
 // certified self-inductive
 // Acceptor updates its acceptedVB based on a Propose message carrying that ballot 
 // and value, and there is also a corresponding Accept message
-predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
+ghost predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx, i | 
@@ -120,7 +120,7 @@ predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
 // Every Promise message ballot reflects acceptor's local promised history, and 
 // it's vbOpt represents a prior accepted value
 // Property of Send
-predicate ValidPromiseMessage(c: Constants, v: Variables) 
+ghost predicate ValidPromiseMessage(c: Constants, v: Variables) 
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
@@ -129,7 +129,7 @@ predicate ValidPromiseMessage(c: Constants, v: Variables)
   (exists i :: PromiseMessageMatchesHistory(c, v, prom, i))
 }
 
-predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)
+ghost predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
   requires IsPromiseMessage(v, prom)
@@ -144,7 +144,7 @@ predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message
 // certified self-inductive
 // Every Accept message reflects acceptor state history
 // Property of Send
-predicate ValidAcceptMessage(c: Constants, v: Variables)
+ghost predicate ValidAcceptMessage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
@@ -166,7 +166,7 @@ predicate ValidAcceptMessage(c: Constants, v: Variables)
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
 // accepted ValBal pair
 // Property of Receive
-predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
+ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, vb, acc, i | 
@@ -179,7 +179,7 @@ predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
 }
 
 // certified self-inductive
-predicate ValidLearnMessage(c: Constants, v: Variables)
+ghost predicate ValidLearnMessage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
@@ -329,27 +329,27 @@ lemma InvNextValidAcceptMessage(c: Constants, v: Variables, v': Variables)
 *                                        Utils                                         *
 ***************************************************************************************/
 
-predicate IsPrepareMessage(v: Variables, m: Message) {
+ghost predicate IsPrepareMessage(v: Variables, m: Message) {
   && m.Prepare?
   && m in v.network.sentMsgs
 }
 
-predicate IsPromiseMessage(v: Variables, m: Message) {
+ghost predicate IsPromiseMessage(v: Variables, m: Message) {
   && m.Promise?
   && m in v.network.sentMsgs
 }
 
-predicate IsProposeMessage(v: Variables, m: Message) {
+ghost predicate IsProposeMessage(v: Variables, m: Message) {
   && m.Propose?
   && m in v.network.sentMsgs
 }
 
-predicate IsAcceptMessage(v: Variables, m: Message) {
+ghost predicate IsAcceptMessage(v: Variables, m: Message) {
   && m.Accept?
   && m in v.network.sentMsgs
 }
 
-predicate IsLearnMessage(v: Variables, m: Message) {
+ghost predicate IsLearnMessage(v: Variables, m: Message) {
   && m.Learn?
   && m in v.network.sentMsgs
 } 
