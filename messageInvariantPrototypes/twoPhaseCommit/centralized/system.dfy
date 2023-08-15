@@ -10,31 +10,31 @@ module System {
 
   datatype Constants = Constants(hosts: seq<Host.Constants>)
   {
-    predicate WF() {
+    ghost predicate WF() {
       Host.GroupWFConstants(hosts)
     }
-    predicate ValidHostId(id: HostId) {
+    ghost predicate ValidHostId(id: HostId) {
       id < |hosts|
     }
 
-    predicate ValidParticipantId(id: HostId) {
+    ghost predicate ValidParticipantId(id: HostId) {
       id < |hosts|-1
     }
 
-    predicate ValidCoordinatorId(id: HostId) {
+    ghost predicate ValidCoordinatorId(id: HostId) {
       id == |hosts|-1
     }
   }
 
   datatype Variables = Variables(hosts: seq<Host.Variables>)
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       && c.WF()
       && Host.GroupWF(c.hosts, hosts)
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
     && Host.GroupInit(c.hosts, v.hosts)
@@ -47,7 +47,7 @@ module System {
     | StutterStep()
 
     
-  predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, cidx: HostId) 
+  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, cidx: HostId) 
     requires v.WF(c) && v'.WF(c)
   {
     var cLbl := CoordinatorHost.VoteReqLbl();
@@ -59,7 +59,7 @@ module System {
     )
   }
 
-  predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, pidx: HostId, cidx: HostId, vote: Vote) 
+  ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, pidx: HostId, cidx: HostId, vote: Vote) 
     requires v.WF(c) && v'.WF(c)
   {
     var cLbl := CoordinatorHost.ReceiveVoteLbl(vote, pidx);
@@ -73,7 +73,7 @@ module System {
     )
   }
 
-  predicate NextDecideStep(c: Constants, v: Variables, v': Variables, cidx: HostId, decision: Decision)
+  ghost predicate NextDecideStep(c: Constants, v: Variables, v': Variables, cidx: HostId, decision: Decision)
     requires v.WF(c) && v'.WF(c)
   {
     var cLbl := CoordinatorHost.DecideLbl(decision);
@@ -85,7 +85,7 @@ module System {
     )
   }
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
     requires v.WF(c) && v'.WF(c)
   {
     match step
@@ -95,7 +95,7 @@ module System {
       case StutterStep => && v == v'
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables)
   {
     && v.WF(c)
     && v'.WF(c)

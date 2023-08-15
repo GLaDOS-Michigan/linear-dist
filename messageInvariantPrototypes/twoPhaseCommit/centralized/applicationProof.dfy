@@ -12,15 +12,14 @@ import opened Obligations
 ***************************************************************************************/
 
 // Application bundle
-predicate ApplicationInv(c: Constants, v: Variables)
+ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
-  // requires MessageInv(c, v)
 {
   LeaderTallyReflectsPreferences(c, v)
 }
 
 // Leader's local tally reflect participant preferences
-predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
+ghost predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
   requires v.WF(c)
 {
   var n := |c.hosts|;
@@ -31,7 +30,7 @@ predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
 }
 
 // User-level invariant
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && ApplicationInv(c, v)
@@ -67,13 +66,8 @@ lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Va
   requires Next(c, v, v')
   ensures LeaderTallyReflectsPreferences(c, v')
 {
-  // triggers
+  // trigger
   var step :| NextStep(c, v, v', step);
-  var n := |c.hosts|;
-  assert (forall hostId | hostId in GetCoordinator(c, v').yesVotes ::
-        0 <= hostId < n-1 && GetParticipantPreference(c, hostId) == Yes );
-  assert (forall hostId | hostId in GetCoordinator(c, v').noVotes ::
-        0 <= hostId < n-1 && GetParticipantPreference(c, hostId) == No );
 }
 
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
@@ -99,7 +93,7 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
 lemma AC4Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures SafetyAC4(c, v');
+  ensures SafetyAC4(c, v')
 {
   if AllPreferYes(c, v') {
     var n := |v.hosts|;

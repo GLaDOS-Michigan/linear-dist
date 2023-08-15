@@ -18,12 +18,12 @@ module Network {
   // also doubles as how multiple parties can hear the message.)
   datatype Variables = Variables(sentMsgs:set<Message>)
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.sentMsgs == {}
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     // Only allow receipt of a message if we've seen it has been sent.
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
@@ -51,10 +51,10 @@ module DistributedSystem {
     hosts: seq<Host.Constants>,
     network: Network.Constants)
   {
-    predicate WF() {
+    ghost predicate WF() {
       Host.GroupWFConstants(hosts)
     }
-    predicate ValidHostId(id: HostId) {
+    ghost predicate ValidHostId(id: HostId) {
       id < |hosts|
     }
   }
@@ -63,20 +63,20 @@ module DistributedSystem {
     hosts: seq<Host.Variables>,
     network: Network.Variables)
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       && c.WF()
       && Host.GroupWF(c.hosts, hosts)
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
     && Host.GroupInit(c.hosts, v.hosts)
     && Network.Init(c.network, v.network)
   }
 
-  predicate HostAction(c: Constants, v: Variables, v': Variables, hostid: HostId, msgOps: MessageOps)
+  ghost predicate HostAction(c: Constants, v: Variables, v': Variables, hostid: HostId, msgOps: MessageOps)
   {
     && v.WF(c)
     && v'.WF(c)
@@ -90,14 +90,14 @@ module DistributedSystem {
   datatype Step =
     | HostActionStep(hostid: HostId, msgOps: MessageOps)
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   {
     && HostAction(c, v, v', step.hostid, step.msgOps)
     // network agrees recv has been sent and records sent
     && Network.Next(c.network, v.network, v'.network, step.msgOps)
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables)
   {
     exists step :: NextStep(c, v, v', step)
   }
@@ -191,7 +191,7 @@ module DistributedSystem {
   }
 
 
-  function InitGroup(c: Constants) : (group: seq<Host.Variables>) 
+  ghost function InitGroup(c: Constants) : (group: seq<Host.Variables>) 
     requires c.WF()
     requires |c.hosts| == 2 // There's exactly one voting participant...
     requires c.hosts[0].participant.preference.Yes? // ... who wants a Yes.

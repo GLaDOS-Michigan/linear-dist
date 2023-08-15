@@ -15,7 +15,7 @@ import opened MessageInvariants
 ***************************************************************************************/
 
 // Application bundle
-predicate ApplicationInv(c: Constants, v: Variables)
+ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
@@ -23,7 +23,7 @@ predicate ApplicationInv(c: Constants, v: Variables)
 }
 
 // Leader's local tally reflect participant preferences
-predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
+ghost predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
   requires v.WF(c)
 {
   var n := |c.hosts|;
@@ -34,7 +34,7 @@ predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
 }
 
 // User-level invariant
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && MessageInv(c, v)
@@ -112,7 +112,7 @@ lemma AC4Proof(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   requires MessageInv(c, v')
   requires LeaderTallyReflectsPreferences(c, v')
-  ensures SafetyAC4(c, v');
+  ensures SafetyAC4(c, v')
 {
   if AllPreferYes(c, v') {
     var n := |v.hosts|;

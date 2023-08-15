@@ -6,7 +6,7 @@ module CoordinatorHost {
 
   datatype Constants = Constants(numParticipants: nat)
 
-  predicate ConstantsValidForGroup(c: Constants, participantCount: nat)
+  ghost predicate ConstantsValidForGroup(c: Constants, participantCount: nat)
   {
     c.numParticipants == participantCount
   }
@@ -17,12 +17,12 @@ module CoordinatorHost {
     noVotes: set<HostId>
   )
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       true
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
     && v.decision.None?
@@ -36,7 +36,7 @@ module CoordinatorHost {
   datatype Step =
     VoteReqStep() | ReceiveStep() | DecisionStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
       case VoteReqStep => NextVoteReqStep(v, v', lbl)
@@ -46,12 +46,12 @@ module CoordinatorHost {
                           && lbl.InternalLbl?
   }
 
-  predicate NextVoteReqStep(v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextVoteReqStep(v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.VoteReqLbl?
     && v' == v  // coordinator local state unchanged
   }
 
-  predicate NextReceiveStep(v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextReceiveStep(v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.ReceiveVoteLbl?
     &&  if lbl.vote == Yes then 
         v' == v.(
@@ -63,7 +63,7 @@ module CoordinatorHost {
         )
   }
 
-  predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.DecideLbl?
     && v.decision.None?  // enabling condition
     && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
@@ -77,7 +77,7 @@ module CoordinatorHost {
         && v' == v
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
     exists step :: NextStep(c, v, v', step, lbl)
   }
@@ -90,7 +90,7 @@ module ParticipantHost {
 
   datatype Constants = Constants(hostId: HostId, preference: Vote)
 
-  predicate ConstantsValidForGroup(c: Constants, hostId: HostId)
+  ghost predicate ConstantsValidForGroup(c: Constants, hostId: HostId)
   {
     c.hostId == hostId
   }
@@ -102,12 +102,12 @@ module ParticipantHost {
     decision: Option<Decision>
   )
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       true
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.sendVote == false
     && v.decision == None
@@ -119,7 +119,7 @@ module ParticipantHost {
   datatype Step =
     ReceiveStep() | SendVoteStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', lbl)
@@ -129,7 +129,7 @@ module ParticipantHost {
           && lbl.InternalLbl?
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && match lbl
         case VoteReqLbl =>
           && v == v'.(sendVote := true)
@@ -140,13 +140,13 @@ module ParticipantHost {
           false
   }
 
-  predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.SendVoteLbl?
     && lbl.vote == c.preference
     && v' == v.(sendVote := false)
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
     exists step :: NextStep(c, v, v', step, lbl)
   }
@@ -168,7 +168,7 @@ module Host {
     | CoordinatorVariables(coordinator: CoordinatorHost.Variables)
     | ParticipantVariables(participant: ParticipantHost.Variables)
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       && (CoordinatorVariables? <==> c.CoordinatorConstants?) // types of c & v agree
       && (match c
             case CoordinatorConstants(_) => coordinator.WF(c.coordinator)
@@ -177,7 +177,7 @@ module Host {
     }
   }
 
-  predicate GroupWFConstants(grp_c: seq<Constants>)
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>)
   {
     // There must at least be a coordinator
     && 0 < |grp_c|
@@ -194,7 +194,7 @@ module Host {
         :: ParticipantHost.ConstantsValidForGroup(grp_c[hostid].participant, hostid))
   }
 
-  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
   {
     && GroupWFConstants(grp_c)
     // Variables size matches group size defined by grp_c
@@ -203,7 +203,7 @@ module Host {
     && (forall hostid:HostId | hostid < |grp_c| :: grp_v[hostid].WF(grp_c[hostid]))
   }
 
-  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
   {
     // constants & variables are well-formed (same number of host slots as constants expect)
     && GroupWF(grp_c, grp_v)
@@ -220,7 +220,7 @@ module Host {
     | PL(p: ParticipantHost.TransitionLabel)
 
   // Dispatch Next to appropriate underlying implementation.
-  predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
     && v.WF(c)
     && v'.WF(c)

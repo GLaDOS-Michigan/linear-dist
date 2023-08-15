@@ -6,7 +6,7 @@ module CoordinatorHost {
 
   datatype Constants = Constants(numParticipants: nat)
 
-  predicate ConstantsValidForGroup(c: Constants, participantCount: nat)
+  ghost predicate ConstantsValidForGroup(c: Constants, participantCount: nat)
   {
     c.numParticipants == participantCount
   }
@@ -17,12 +17,12 @@ module CoordinatorHost {
     noVotes: set<HostId>
   )
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       true
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
     && v.decision.None?
@@ -33,7 +33,7 @@ module CoordinatorHost {
   datatype Step =
     VoteReqStep() | ReceiveStep() | DecisionStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case VoteReqStep => NextVoteReqStep(v, v', msgOps)
@@ -43,13 +43,13 @@ module CoordinatorHost {
                           && msgOps.send == msgOps.recv == None
   }
 
-  predicate NextVoteReqStep(v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextVoteReqStep(v: Variables, v': Variables, msgOps: MessageOps) {
     && v' == v  // coordinator local state unchanged
     && msgOps.recv.None?
     && msgOps.send == Some(VoteReqMsg)
   }
 
-  predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && match msgOps.recv.value
@@ -65,7 +65,7 @@ module CoordinatorHost {
         case _ => v' == v //stutter
   } 
 
-  predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && v.decision.None?  // enabling condition
     && if |v.noVotes| > 0 then
@@ -79,7 +79,7 @@ module CoordinatorHost {
         && msgOps.send.None?
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
@@ -92,7 +92,7 @@ module ParticipantHost {
 
   datatype Constants = Constants(hostId: HostId, preference: Vote)
 
-  predicate ConstantsValidForGroup(c: Constants, hostId: HostId)
+  ghost predicate ConstantsValidForGroup(c: Constants, hostId: HostId)
   {
     c.hostId == hostId
   }
@@ -104,12 +104,12 @@ module ParticipantHost {
     decision: Option<Decision>
   )
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       true
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.sendVote == false
     && v.decision == None
@@ -118,7 +118,7 @@ module ParticipantHost {
   datatype Step =
     ReceiveStep() | SendVoteStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
@@ -128,7 +128,7 @@ module ParticipantHost {
           && msgOps.send == msgOps.recv == None
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && match msgOps.recv.value
@@ -140,13 +140,13 @@ module ParticipantHost {
             v' == v
   }
 
-  predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && v' == v.(sendVote := false)
     && msgOps.send == Some(VoteMsg(c.preference, c.hostId))
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
@@ -168,7 +168,7 @@ module Host {
     | CoordinatorVariables(coordinator: CoordinatorHost.Variables)
     | ParticipantVariables(participant: ParticipantHost.Variables)
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       && (CoordinatorVariables? <==> c.CoordinatorConstants?) // types of c & v agree
       && (match c
             case CoordinatorConstants(_) => coordinator.WF(c.coordinator)
@@ -179,7 +179,7 @@ module Host {
 
 
 
-  predicate GroupWFConstants(grp_c: seq<Constants>)
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>)
   {
     // There must at least be a coordinator
     && 0 < |grp_c|
@@ -196,7 +196,7 @@ module Host {
         :: ParticipantHost.ConstantsValidForGroup(grp_c[hostid].participant, hostid))
   }
 
-  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
   {
     && GroupWFConstants(grp_c)
     // Variables size matches group size defined by grp_c
@@ -205,7 +205,7 @@ module Host {
     && (forall hostid:HostId | hostid < |grp_c| :: grp_v[hostid].WF(grp_c[hostid]))
   }
 
-  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
   {
     // constants & variables are well-formed (same number of host slots as constants expect)
     && GroupWF(grp_c, grp_v)
@@ -218,7 +218,7 @@ module Host {
   }
 
   // Dispatch Next to appropriate underlying implementation.
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     && v.WF(c)
     && v'.WF(c)

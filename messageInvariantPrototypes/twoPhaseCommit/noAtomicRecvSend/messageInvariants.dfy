@@ -9,7 +9,7 @@ import opened DistributedSystem
 import opened Obligations
 
 // All VoteMsg have a valid participant HostId as src
-predicate VoteMsgValidSrc(c: Constants, v: Variables)
+ghost predicate VoteMsgValidSrc(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs && msg.VoteMsg? 
@@ -18,7 +18,7 @@ predicate VoteMsgValidSrc(c: Constants, v: Variables)
 
 // VoteMsg reflects the preference of the voter 
 // Note that "0 <= msg.src < |c.hosts|-1" is prereq of GetParticipantPreference
-predicate VoteMsgAgreeWithVoter(c: Constants, v: Variables)
+ghost predicate VoteMsgAgreeWithVoter(c: Constants, v: Variables)
   requires v.WF(c)
   requires VoteMsgValidSrc(c, v)
 {
@@ -28,7 +28,7 @@ predicate VoteMsgAgreeWithVoter(c: Constants, v: Variables)
 
 // DecideMsgs should reflect the decision of the leader
 // Note that this hinges on fact that leader does not equivocate
-predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
+ghost predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs && msg.DecideMsg? 
@@ -36,7 +36,7 @@ predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
 }
 
 // If a participant has decided, then there must be a corresponding DecideMsg
-predicate ParticipantsDecisionImpliesDecideMsg(c: Constants, v: Variables) 
+ghost predicate ParticipantsDecisionImpliesDecideMsg(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   var n := |v.hosts|;
@@ -45,7 +45,7 @@ predicate ParticipantsDecisionImpliesDecideMsg(c: Constants, v: Variables)
     && (HostDecidedAbort(v.hosts[i]) ==> DecideMsg(Abort) in v.network.sentMsgs)
 }
 
-predicate MessageInv(c: Constants, v: Variables)
+ghost predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && VoteMsgValidSrc(c, v)

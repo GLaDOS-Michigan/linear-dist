@@ -1,5 +1,5 @@
-//#title Two Phase Commit Safety Specification Predicate
-//#desc Express the English Atomic Commit safety properties as predicates
+//#title Two Phase Commit Safety Specification ghost predicate
+//#desc Express the English Atomic Commit safety properties as ghost predicates
 //#desc over the compound state machine model from exercise01.
 
 // 2PC should satisfy the Atomic Commit specification. English design doc:
@@ -26,7 +26,7 @@ module Obligations {
   import opened DistributedSystem
 
   // AC-1: All processes that reach a decision reach the same one.
-  predicate SafetyAC1(c: Constants, v: Variables)
+  ghost predicate SafetyAC1(c: Constants, v: Variables)
     requires v.WF(c)
   {
     // All hosts that reach a decision reach the same one
@@ -35,10 +35,10 @@ module Obligations {
     :: HostsReachSameDecision(v.hosts[i], v.hosts[j])
   }
 
-  // AC2 is sort of a history predicate; we're going to ignore it.
+  // AC2 is sort of a history ghost predicate; we're going to ignore it.
 
   // AC-3: The Commit decision can only be reached if all processes prefer Yes.
-  predicate SafetyAC3(c: Constants, v: Variables)
+  ghost predicate SafetyAC3(c: Constants, v: Variables)
     requires v.WF(c)
   {
     var n := |v.hosts|;
@@ -48,7 +48,7 @@ module Obligations {
   }
 
   // This one is easier to prove
-  predicate AC3Contrapos(c: Constants, v: Variables)
+  ghost predicate AC3Contrapos(c: Constants, v: Variables)
     requires v.WF(c)
   {
     var n := |v.hosts|;
@@ -58,7 +58,7 @@ module Obligations {
   }
 
   // AC-4: If all processes prefer Yes, then the decision must be Commit.
-  predicate SafetyAC4(c: Constants, v: Variables)
+  ghost predicate SafetyAC4(c: Constants, v: Variables)
     requires v.WF(c)
   {
     var n := |v.hosts|;
@@ -69,7 +69,7 @@ module Obligations {
 
   // AC5 is a liveness proprety, we're definitely going to ignore it.
 
-  predicate Safety(c: Constants, v: Variables)
+  ghost predicate Safety(c: Constants, v: Variables)
     requires v.WF(c)
   {
     && SafetyAC1(c, v)
@@ -84,52 +84,52 @@ module Obligations {
   *                                      Utils                                           *
   ***************************************************************************************/
 
-  function GetCoordinator(c: Constants, v: Variables) : CoordinatorHost.Variables
+  ghost function GetCoordinator(c: Constants, v: Variables) : CoordinatorHost.Variables
     requires v.WF(c)
   {
     Last(v.hosts).coordinator
   }
 
-  function GetParticipant(c: Constants, v: Variables, i: int) : ParticipantHost.Variables
+  ghost function GetParticipant(c: Constants, v: Variables, i: int) : ParticipantHost.Variables
     requires v.WF(c)
     requires 0 <= i < |v.hosts|-1
   {
     v.hosts[i].participant
   }
 
-  function GetParticipantPreference(c: Constants, i: int) : Vote
+  ghost function GetParticipantPreference(c: Constants, i: int) : Vote
     requires c.WF()
     requires 0 <= i < |c.hosts|-1
   {
     c.hosts[i].participant.preference
   }
 
-  predicate HostHasDecided(h: Host.Variables) {
+  ghost predicate HostHasDecided(h: Host.Variables) {
     match h
       case CoordinatorVariables(c) => c.decision.Some?
       case ParticipantVariables(p) => p.decision.Some?
   }
 
-  predicate HostDecidedCommit(h: Host.Variables) {
+  ghost predicate HostDecidedCommit(h: Host.Variables) {
     match h
       case CoordinatorVariables(c) => c.decision == Some(Commit)
       case ParticipantVariables(p) => p.decision == Some(Commit)
   }
 
-  predicate HostDecidedAbort(h: Host.Variables) {
+  ghost predicate HostDecidedAbort(h: Host.Variables) {
     match h
       case CoordinatorVariables(c) => c.decision == Some(Abort)
       case ParticipantVariables(p) => p.decision == Some(Abort)
   }
 
-  predicate HostsReachSameDecision(h1: Host.Variables, h2: Host.Variables) 
+  ghost predicate HostsReachSameDecision(h1: Host.Variables, h2: Host.Variables) 
     requires HostHasDecided(h1)
     requires HostHasDecided(h2)
   {
     (HostDecidedCommit(h1) && HostDecidedCommit(h2)) || (HostDecidedAbort(h1) && HostDecidedAbort(h2))
   }
 
-  predicate AllPreferYes(c: Constants, v: Variables) 
+  ghost predicate AllPreferYes(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     var n := |c.hosts|;

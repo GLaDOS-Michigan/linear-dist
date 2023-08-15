@@ -11,7 +11,7 @@ module TwoPCInvariantProof {
   import opened Obligations
 
   // All VoteMsg have a valid participant HostId as src
-  predicate VoteMsgValidSrc(c: Constants, v: Variables)
+  ghost predicate VoteMsgValidSrc(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall msg | msg in v.network.sentMsgs && msg.VoteMsg? 
@@ -19,7 +19,7 @@ module TwoPCInvariantProof {
   }
 
   // VoteMsg reflects the preference of the voter 
-  predicate VoteMsgAgreeWithVoter(c: Constants, v: Variables)
+  ghost predicate VoteMsgAgreeWithVoter(c: Constants, v: Variables)
     requires v.WF(c)
     requires VoteMsgValidSrc(c, v)
   {
@@ -28,7 +28,7 @@ module TwoPCInvariantProof {
   }
 
   // Leader's local tally reflect actual messages
-  predicate LeaderTallyReflectsMsgs(c: Constants, v: Variables)
+  ghost predicate LeaderTallyReflectsMsgs(c: Constants, v: Variables)
     requires v.WF(c)
   {
     && (forall hostId | hostId in GetCoordinator(c, v).yesVotes ::
@@ -39,7 +39,7 @@ module TwoPCInvariantProof {
 
   // DecideMsgs should reflect the decision of the leader
   // Tony: Boilerplate
-  predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
+  ghost predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall msg | msg in v.network.sentMsgs && msg.DecideMsg? 
@@ -48,7 +48,7 @@ module TwoPCInvariantProof {
 
   // If a participant has decided, then there must be a corresponding DecideMsg
   // Tony: Boilerplate
-  predicate ParticipantsDecisionImpliesDecideMsg(c: Constants, v: Variables) 
+  ghost predicate ParticipantsDecisionImpliesDecideMsg(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     var n := |v.hosts|;
@@ -57,7 +57,7 @@ module TwoPCInvariantProof {
       && (HostDecidedAbort(v.hosts[i]) ==> DecideMsg(Abort) in v.network.sentMsgs)
   }
 
-  predicate Inv(c: Constants, v: Variables)
+  ghost predicate Inv(c: Constants, v: Variables)
   {
     && v.WF(c)
     && VoteMsgValidSrc(c, v)
@@ -113,7 +113,7 @@ module TwoPCInvariantProof {
   lemma AC4Proof(c: Constants, v: Variables, v': Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
-    ensures SafetyAC4(c, v');
+    ensures SafetyAC4(c, v')
   {
     if AllPreferYes(c, v') {
       var n := |v.hosts|;
