@@ -8,7 +8,7 @@ import opened DistributedSystem
 
 // Message Invariant: self inductive
 // Property of send
-predicate ValidMessageSource(c: Constants, v: Variables) 
+ghost predicate ValidMessageSource(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs 
@@ -21,7 +21,7 @@ predicate ValidMessageSource(c: Constants, v: Variables)
 
 // Message Invariant: self inductive
 // Property of Send
-predicate LeaderMsgImpliesLocalQuorum(c: Constants, v: Variables) 
+ghost predicate LeaderMsgImpliesLocalQuorum(c: Constants, v: Variables) 
   requires v.WF(c)
   requires ValidMessageSource(c, v)
 {
@@ -31,7 +31,7 @@ predicate LeaderMsgImpliesLocalQuorum(c: Constants, v: Variables)
 
 // Message Invariant: self inductive
 // Property of Receive
-predicate ReceivedVotesValidity(c: Constants, v: Variables) 
+ghost predicate ReceivedVotesValidity(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, voter | c.ValidIdx(idx) && voter in v.hosts[idx].receivedVotes 
@@ -40,7 +40,7 @@ predicate ReceivedVotesValidity(c: Constants, v: Variables)
 
 // Message Invariant: self inductive
 // Property of Send
-predicate VoteMsgImpliesVoterVoted(c: Constants, v: Variables)
+ghost predicate VoteMsgImpliesVoterVoted(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSource(c, v)
 {
@@ -48,7 +48,7 @@ predicate VoteMsgImpliesVoterVoted(c: Constants, v: Variables)
   :: v.hosts[msg.voter].voted
 }
 
-predicate MessageInv(c: Constants, v: Variables) 
+ghost predicate MessageInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
   && ValidMessageSource(c, v)

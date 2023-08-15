@@ -16,7 +16,7 @@ import opened Obligations
 
 // Application Invariant: requires message invariants to be inductive
 // Compared to the version without Monotonic Transformation, we now only talk about host state
-predicate VotersVoteOnce(c: Constants, v: Variables) 
+ghost predicate VotersVoteOnce(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx | c.ValidIdx(idx)
@@ -24,14 +24,14 @@ predicate VotersVoteOnce(c: Constants, v: Variables)
 }
 
 // Application bundle
-predicate ApplicationInv(c: Constants, v: Variables)
+ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
   VotersVoteOnce(c, v)
 }
 
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && MessageInv(c, v)
   && ApplicationInv(c, v)

@@ -19,7 +19,7 @@ module Host {
 
   datatype Constants = Constants(hostId: HostId, clusterSize: nat)
 
-  predicate ConstantsValidForGroup(c: Constants, hostId: HostId, clusterSize: nat)
+  ghost predicate ConstantsValidForGroup(c: Constants, hostId: HostId, clusterSize: nat)
   {
     && c.hostId == hostId
     && c.clusterSize == clusterSize
@@ -30,24 +30,24 @@ module Host {
     receivedVotes: set<HostId>  // monotonic set
   )
 
-  predicate GroupWFConstants(grp_c: seq<Constants>) {
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|
     && (forall idx: nat | idx < |grp_c|
         :: ConstantsValidForGroup(grp_c[idx], idx, |grp_c|))
   }
 
-  predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>) {
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>) {
     && GroupWFConstants(grp_c)
     // Variables size matches group size defined by grp_c
     && |grp_v| == |grp_c|
   }
 
-  predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>) {
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>) {
     && GroupWF(grp_c, grp_v)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.voted == false
     && v.receivedVotes == {}
@@ -56,7 +56,7 @@ module Host {
   datatype Step =
     ReceiveStep() | VictoryStep() | StutterStep()
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
@@ -66,7 +66,7 @@ module Host {
           && msgOps.send == msgOps.recv == None
   }
 
-  predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && match msgOps.recv.value
         case StartElection =>
@@ -101,14 +101,14 @@ module Host {
             && v == v'
   }
 
-  predicate NextVictoryStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextVictoryStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && SetIsQuorum(c.clusterSize, v.receivedVotes)
     && msgOps.send == Some(Leader(c.hostId))
     && v == v'
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }

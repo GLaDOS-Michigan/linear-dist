@@ -5,12 +5,12 @@ module Network {
 
   datatype Variables = Variables(sentMsgs:set<Message>)
 
-  predicate Init(v: Variables)
+  ghost predicate Init(v: Variables)
   {
     && v.sentMsgs == {StartElection}
   }
 
-  predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
   {
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
     && v'.sentMsgs ==
@@ -26,15 +26,15 @@ module DistributedSystem {
 
   datatype Constants = Constants(hostConstants: seq<Host.Constants>)
   {
-    predicate ValidIdx(id: int) {
+    ghost predicate ValidIdx(id: int) {
       0 <= id < |hostConstants|
     }
 
-    predicate UniqueIds() {
+    ghost predicate UniqueIds() {
       forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i].hostId == hostConstants[j].hostId :: i == j
     }
 
-    predicate WF() {
+    ghost predicate WF() {
       && 0 < |hostConstants|
       && UniqueIds()
     }
@@ -44,20 +44,20 @@ module DistributedSystem {
     hosts: seq<Host.Variables>,
     network: Network.Variables)
   {
-    predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) {
       && c.WF()
       && Host.GroupWF(c.hostConstants, hosts)
     }
   }
 
-  predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
     && Host.GroupInit(c.hostConstants, v.hosts)
     && Network.Init(v.network)
   }
 
-  predicate HostAction(c: Constants, v: Variables, v': Variables, actorIdx: int, msgOps: MessageOps)
+  ghost predicate HostAction(c: Constants, v: Variables, v': Variables, actorIdx: int, msgOps: MessageOps)
   {
     && v.WF(c)
     && v'.WF(c)
@@ -69,13 +69,13 @@ module DistributedSystem {
 
   datatype Step = HostActionStep(actorIdx: int, msgOps: MessageOps)
 
-  predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   {
     && HostAction(c, v, v', step.actorIdx, step.msgOps)
     && Network.Next(v.network, v'.network, step.msgOps)
   }
 
-  predicate Next(c: Constants, v: Variables, v': Variables)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables)
   {
     exists step :: NextStep(c, v, v', step)
   }

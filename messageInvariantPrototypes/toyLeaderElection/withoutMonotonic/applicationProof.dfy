@@ -15,7 +15,7 @@ import opened Obligations
 ***************************************************************************************/
 
 // Application Invariant: requires message invariants to be inductive
-predicate VotersVoteOnce(c: Constants, v: Variables) 
+ghost predicate VotersVoteOnce(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall m1, m2 |
@@ -26,14 +26,14 @@ predicate VotersVoteOnce(c: Constants, v: Variables)
 }
 
 // Application bundle
-predicate ApplicationInv(c: Constants, v: Variables)
+ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
   VotersVoteOnce(c, v)
 }
 
-predicate Inv(c: Constants, v: Variables)
+ghost predicate Inv(c: Constants, v: Variables)
 {
   && MessageInv(c, v)
   && ApplicationInv(c, v)

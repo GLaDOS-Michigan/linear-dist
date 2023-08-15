@@ -1,3 +1,5 @@
+# Readme
+
 The Toy Leader Election Protocol, sourced from "Modularity for Decidability of
 Deductive Verification with Applications to Distributed Systems" (PLDI'18)
 

@@ -9,7 +9,7 @@ import opened UtilitiesLibrary
 import opened DistributedSystem
 
 // Message Invariant: self inductive
-predicate ValidMessages(c: Constants, v: Variables) 
+ghost predicate ValidMessages(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs 
@@ -21,7 +21,7 @@ predicate ValidMessages(c: Constants, v: Variables)
 }
 
 // Message Invariant: self inductive
-predicate LeaderMsgImpliesLocalQuorum(c: Constants, v: Variables) 
+ghost predicate LeaderMsgImpliesLocalQuorum(c: Constants, v: Variables) 
   requires v.WF(c)
   requires ValidMessages(c, v)
 {
@@ -30,7 +30,7 @@ predicate LeaderMsgImpliesLocalQuorum(c: Constants, v: Variables)
 }
 
 // Message Invariant: self inductive
-predicate ReceivedVotesValidity(c: Constants, v: Variables) 
+ghost predicate ReceivedVotesValidity(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, voter | c.ValidIdx(idx) && voter in v.hosts[idx].receivedVotes 
@@ -38,7 +38,7 @@ predicate ReceivedVotesValidity(c: Constants, v: Variables)
 }
 
 // Message Invariant: self inductive
-predicate VoteMsgImpliesVoterVotedForCandidate(c: Constants, v: Variables)
+ghost predicate VoteMsgImpliesVoterVotedForCandidate(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessages(c, v)
 {
@@ -46,7 +46,7 @@ predicate VoteMsgImpliesVoterVotedForCandidate(c: Constants, v: Variables)
   :: msg.candidate in v.hosts[msg.voter].voted
 }
 
-predicate MessageInv(c: Constants, v: Variables) 
+ghost predicate MessageInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
   && ValidMessages(c, v)
@@ -64,7 +64,9 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires MessageInv(c, v)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
-{}
+{
+  assert MessageInv(c, v');
+}
 
 }
 
