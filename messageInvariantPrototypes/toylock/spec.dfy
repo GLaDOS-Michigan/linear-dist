@@ -6,7 +6,7 @@ module Obligations {
   import opened DistributedSystem
 
 
-  predicate HoldsLock(c: Constants, v: Variables, idx: int)
+  ghost predicate HoldsLock(c: Constants, v: Variables, idx: int)
     requires c.WF()
     requires v.WF(c)
     requires c.ValidIdx(idx)
@@ -14,7 +14,7 @@ module Obligations {
     v.hosts[idx].hasLock
   }
 
-  predicate Safety(c: Constants, v: Variables) 
+  ghost predicate Safety(c: Constants, v: Variables) 
     requires c.WF()
     requires v.WF(c)
   {

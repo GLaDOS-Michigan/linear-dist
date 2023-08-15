@@ -8,7 +8,7 @@ module ConventionalToylockProof {
   import opened DistributedSystem
   import opened Obligations
 
-  predicate MsgInFlight(c: Constants, v: Variables, msg: Message) 
+  ghost predicate MsgInFlight(c: Constants, v: Variables, msg: Message) 
     requires v.WF(c)
   {
     && msg in v.network.sentMsgs
@@ -16,7 +16,7 @@ module ConventionalToylockProof {
     && msg.epoch > v.hosts[msg.dst].myEpoch
   }
 
-  predicate AtMostOneInFlight(c: Constants, v: Variables)
+  ghost predicate AtMostOneInFlight(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall m1, m2 | 
@@ -26,14 +26,14 @@ module ConventionalToylockProof {
       m1 == m2
   }
 
-  predicate NoneHasLock(c: Constants, v: Variables) 
+  ghost predicate NoneHasLock(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     forall idx | c.ValidIdx(idx) :: !HoldsLock(c, v, idx)
   }
   
 
-  predicate HasLockImpliesNoneInFlight(c: Constants, v: Variables)
+  ghost predicate HasLockImpliesNoneInFlight(c: Constants, v: Variables)
     requires v.WF(c)
   {
     (!NoneHasLock(c, v))
@@ -42,7 +42,7 @@ module ConventionalToylockProof {
   }
 
   
-  predicate Inv(c: Constants, v: Variables)
+  ghost predicate Inv(c: Constants, v: Variables)
   {
     && v.WF(c)
     && AtMostOneInFlight(c, v)
