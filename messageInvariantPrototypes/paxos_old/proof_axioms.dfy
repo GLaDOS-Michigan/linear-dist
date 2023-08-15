@@ -19,7 +19,7 @@ lemma {:axiom} axiom_FiniteBallots(b1:Ballot, b2:Ballot) returns (s:seq<Ballot>)
     ensures b2 == s[|s|-1]
     ensures TotalOrderBal(s)
 
-predicate TotalOrderBal(s:seq<Ballot>) 
+ghost predicate TotalOrderBal(s:seq<Ballot>) 
     requires |s| > 0
 {
     && (forall i, j | 0 <= i < j < |s| :: BalLt(s[i], s[j]))

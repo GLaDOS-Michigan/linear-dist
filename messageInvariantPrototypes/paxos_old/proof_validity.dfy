@@ -15,21 +15,21 @@ import opened Synod
 *****************************************************************************************/
 
 /* If all processes propose v, then every process that decides a value decides v */
-predicate Validity(c:Constants, ds:DistrSys, v:Value) 
+ghost predicate Validity(c:Constants, ds:DistrSys, v:Value) 
     requires c.WF()
     requires ds.WF(c)
 {
     AllProcessesInitV(c, ds, v) ==> AllDecidedProcessesDecidesV(c, ds, v)
 }
 
-predicate AllProcessesInitV(c:Constants, ds:DistrSys, v:Value) 
+ghost predicate AllProcessesInitV(c:Constants, ds:DistrSys, v:Value) 
     requires c.WF()
     requires ds.WF(c)
 {
     forall i | c.ValidLdrIdx(i) :: c.ldr_vals[i] == v
 }
 
-predicate AllDecidedProcessesDecidesV(c:Constants, ds:DistrSys, v:Value)
+ghost predicate AllDecidedProcessesDecidesV(c:Constants, ds:DistrSys, v:Value)
     requires c.WF()
     requires ds.WF(c)
 {
@@ -38,7 +38,7 @@ predicate AllDecidedProcessesDecidesV(c:Constants, ds:DistrSys, v:Value)
 
 
 /* Invariants for establishing Validity */
-predicate Validity_Inv(c:Constants, ds:DistrSys, v:Value) 
+ghost predicate Validity_Inv(c:Constants, ds:DistrSys, v:Value) 
 {
     && c.WF()
     && ds.WF(c)
@@ -48,14 +48,14 @@ predicate Validity_Inv(c:Constants, ds:DistrSys, v:Value)
     && Validity_Inv_AllMessegesContainV(c, ds, v)
 }
 
-predicate Validity_Inv_AllMessegesContainV(c:Constants, ds:DistrSys, v:Value) 
+ghost predicate Validity_Inv_AllMessegesContainV(c:Constants, ds:DistrSys, v:Value) 
     requires c.WF()
     requires ds.WF(c)
 {
     AllProcessesInitV(c, ds, v) ==> forall pkt | pkt in ds.network.sentPackets :: MessageContainsV(pkt.msg, v)
 }
 
-predicate MessageContainsV(m: Message, v:Value) {
+ghost predicate MessageContainsV(m: Message, v:Value) {
     match m {
         case Prepare(bal) => true
         case Promise(bal, vb) => vb.v != v ==> vb.v == Nil
@@ -65,14 +65,14 @@ predicate MessageContainsV(m: Message, v:Value) {
     }
 }
 
-predicate Validity_Inv_AllAccAcceptsV(c:Constants, ds:DistrSys, v:Value) 
+ghost predicate Validity_Inv_AllAccAcceptsV(c:Constants, ds:DistrSys, v:Value) 
     requires c.WF()
     requires ds.WF(c)
 {
     AllProcessesInitV(c, ds, v) ==> forall i | c.ValidAccIdx(i) :: ds.acceptors[i].accepted.v != v ==> ds.acceptors[i].accepted.v == Nil 
 }
 
-predicate Validity_Inv_AllLdrProposeV(c:Constants, ds:DistrSys, v:Value)
+ghost predicate Validity_Inv_AllLdrProposeV(c:Constants, ds:DistrSys, v:Value)
     requires c.WF()
     requires ds.WF(c)
 {

@@ -16,14 +16,14 @@ datatype Acceptor = Acceptor(
     accepted:ValBal)
 
 /* Acceptor initial state */
-predicate AcceptorInit(a:Acceptor, id:Id) {
+ghost predicate AcceptorInit(a:Acceptor, id:Id) {
     && a.consts == AConsts(id)
     && a.promised == Bottom
     && a.accepted == VB(Nil, Bottom)
 }
 
 /* Acceptor next state */
-predicate AcceptorNext(a:Acceptor, a':Acceptor, recvIos:seq<Packet>, sendIos:seq<Packet>) {
+ghost predicate AcceptorNext(a:Acceptor, a':Acceptor, recvIos:seq<Packet>, sendIos:seq<Packet>) {
     && a'.consts == a.consts
     && |recvIos| == 1
     && match recvIos[0].msg {
@@ -34,7 +34,7 @@ predicate AcceptorNext(a:Acceptor, a':Acceptor, recvIos:seq<Packet>, sendIos:seq
 }
 
 /* Acceptor next state, process Prepare message */
-predicate AcceptorNext_RcvPrepare(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
+ghost predicate AcceptorNext_RcvPrepare(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
     requires recvIo.msg.Prepare?
 {   
     if BalLt(a.promised, recvIo.msg.bal) then
@@ -44,7 +44,7 @@ predicate AcceptorNext_RcvPrepare(a:Acceptor, a':Acceptor, recvIo:Packet, sendIo
 }
 
 /* Acceptor next state, process Accept message */
-predicate AcceptorNext_RcvPropose(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
+ghost predicate AcceptorNext_RcvPropose(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
     requires recvIo.msg.Propose?
 {
     if BalLtEq(a.promised, recvIo.msg.bal)  then
@@ -54,7 +54,7 @@ predicate AcceptorNext_RcvPropose(a:Acceptor, a':Acceptor, recvIo:Packet, sendIo
 }
 
 /* Acceptor send Promise */
-predicate AcceptorPromise(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
+ghost predicate AcceptorPromise(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
     requires recvIo.msg.Prepare?
 {
     && a'.promised == recvIo.msg.bal
@@ -66,7 +66,7 @@ predicate AcceptorPromise(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Pa
 }
 
 /* Acceptor send Accept */
-predicate AcceptorAccept(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
+ghost predicate AcceptorAccept(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
     requires recvIo.msg.Propose?
 {
     && a'.promised == recvIo.msg.bal 
@@ -78,7 +78,7 @@ predicate AcceptorAccept(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Pac
 }
 
 /* Acceptor send Preempt */
-predicate AcceptorPreempt(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
+ghost predicate AcceptorPreempt(a:Acceptor, a':Acceptor, recvIo:Packet, sendIos:seq<Packet>) 
     requires recvIo.msg.Prepare? || recvIo.msg.Propose?
 {
     && |sendIos| == 1
@@ -108,7 +108,7 @@ datatype Leader = Leader(
 )
 
 /* Leader initial state */
-predicate LeaderInit(l:Leader, id:Id, accConf:seq<Id>, f:nat, initval:Value) {
+ghost predicate LeaderInit(l:Leader, id:Id, accConf:seq<Id>, f:nat, initval:Value) {
     && l.consts == LConsts(id, accConf, f, initval)
     && l.state == P1a
     && l.ballot == Ballot(0, id.idx)
@@ -118,7 +118,7 @@ predicate LeaderInit(l:Leader, id:Id, accConf:seq<Id>, f:nat, initval:Value) {
 }
 
 /* Leader next state */
-predicate LeaderNext(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) {
+ghost predicate LeaderNext(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) {
     && l'.consts == l.consts
     && match l.state {
         case P1a => LeaderNext_P1a(l, l', recvIos, sendIos)
@@ -131,7 +131,7 @@ predicate LeaderNext(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packe
 
 
 /* Leader next state, broadcast Prepare messages */
-predicate LeaderNext_P1a(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
+ghost predicate LeaderNext_P1a(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
     requires l.state == P1a
 {
     && l'.state == P1b
@@ -143,7 +143,7 @@ predicate LeaderNext_P1a(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<P
     && LeaderSendPrepare(l, sendIos)
 }
 
-predicate LeaderSendPrepare(l:Leader, sendIos:seq<Packet>) {
+ghost predicate LeaderSendPrepare(l:Leader, sendIos:seq<Packet>) {
     && |sendIos| == |l.consts.accConf|
     && forall i | 0 <= i < |sendIos| 
         :: sendIos[i] == Packet(l.consts.id, l.consts.accConf[i], Prepare(l.ballot))
@@ -151,7 +151,7 @@ predicate LeaderSendPrepare(l:Leader, sendIos:seq<Packet>) {
 
 
 /* Leader next state, wait for quorum of Promise messages */
-predicate LeaderNext_P1b(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
+ghost predicate LeaderNext_P1b(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
     requires l.state == P1b
 {
     && |recvIos| == 1 
@@ -164,11 +164,11 @@ predicate LeaderNext_P1b(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<P
     }
 }
 
-predicate LeaderStutter(l:Leader, l':Leader, sendIos:seq<Packet>) {
+ghost predicate LeaderStutter(l:Leader, l':Leader, sendIos:seq<Packet>) {
     l' == l && sendIos == []
 }
 
-predicate LeaderProcessPromise(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Packet>) 
+ghost predicate LeaderProcessPromise(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Packet>) 
     requires pkt.msg.Promise?
     requires l.state == P1b
 {
@@ -180,7 +180,7 @@ predicate LeaderProcessPromise(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Pack
         LeaderStutter(l, l', sendIos)
 }
 
-predicate LeaderProcessValidPromise(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Packet>) 
+ghost predicate LeaderProcessValidPromise(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Packet>) 
     requires pkt.msg.Promise?
     requires l.state == P1b
     requires pkt.msg.bal == l.ballot
@@ -211,7 +211,7 @@ predicate LeaderProcessValidPromise(l:Leader, l':Leader, pkt:Packet, sendIos:seq
         && l'.accepts == l.accepts
 }
 
-predicate LeaderProcessPreempt(l:Leader, l':Leader, msg:Message, sendIos:seq<Packet>) 
+ghost predicate LeaderProcessPreempt(l:Leader, l':Leader, msg:Message, sendIos:seq<Packet>) 
     requires msg.Preempt?
 {
     && sendIos == []    // Bug 2: left out this line, so sendIos was unspecified
@@ -229,7 +229,7 @@ predicate LeaderProcessPreempt(l:Leader, l':Leader, msg:Message, sendIos:seq<Pac
 
 
 /* Leader next state, broadcast Propose messages */
-predicate LeaderNext_P2a(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
+ghost predicate LeaderNext_P2a(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
     requires l.state == P2a
 {
     && l'.state == P2b
@@ -241,7 +241,7 @@ predicate LeaderNext_P2a(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<P
     && LeaderSendPropose(l, sendIos)
 }
 
-predicate LeaderSendPropose(l:Leader, sendIos:seq<Packet>) 
+ghost predicate LeaderSendPropose(l:Leader, sendIos:seq<Packet>) 
     requires l.state == P2a
 {
     && |sendIos| == |l.consts.accConf|
@@ -251,7 +251,7 @@ predicate LeaderSendPropose(l:Leader, sendIos:seq<Packet>)
 
 
 /* Leader next state, wait for quorum of Accept messages */
-predicate LeaderNext_P2b(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
+ghost predicate LeaderNext_P2b(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<Packet>) 
     requires l.state == P2b
 {
     && |recvIos| == 1 
@@ -264,7 +264,7 @@ predicate LeaderNext_P2b(l:Leader, l':Leader, recvIos:seq<Packet>, sendIos:seq<P
     }
 }
 
-predicate LeaderProcessAccept(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Packet>) 
+ghost predicate LeaderProcessAccept(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Packet>) 
     requires pkt.msg.Accept?
     requires l.state == P2b
 {
@@ -276,7 +276,7 @@ predicate LeaderProcessAccept(l:Leader, l':Leader, pkt:Packet, sendIos:seq<Packe
         LeaderStutter(l, l', sendIos)
 }
 
-predicate LeaderProcessValidAccept(l:Leader, l':Leader, src:Id, msg:Message, sendIos:seq<Packet>) 
+ghost predicate LeaderProcessValidAccept(l:Leader, l':Leader, src:Id, msg:Message, sendIos:seq<Packet>) 
     requires msg.Accept?
     requires l.state == P2b
 {

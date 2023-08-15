@@ -40,7 +40,7 @@ lemma AgreementChosenInv_SomeChosen(c:Constants, ds:DistrSys, ds':DistrSys)
 }
 
 
-lemma AgreementChosenInv_SomeChosen_LdrAction(
+lemma {:timeLimitMultiplier 2} AgreementChosenInv_SomeChosen_LdrAction(
 c:Constants, ds:DistrSys, ds':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:seq<Packet>)
     requires Agreement_Chosen_Inv(c, ds)
     requires ds'.WF(c) && Trivialities(c, ds')
@@ -145,7 +145,7 @@ c:Constants, ds:DistrSys, ds':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:s
     requires SomeValueChosen(c, ds)
     requires Chosen(c, ds', b, v) 
 
-    requires Chosen(c, ds, b, v);
+    requires Chosen(c, ds, b, v)
     requires BalLtEq(b, ds'.leaders[actor.idx].ballot) 
     requires LeaderInPhase2(c, ds', actor.idx) 
     requires ds.leaders[actor.idx].state == P1b

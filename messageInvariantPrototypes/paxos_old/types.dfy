@@ -17,7 +17,7 @@ datatype Message = Prepare(bal:Ballot)
 datatype Packet = Packet(src:Id, dst:Id, msg:Message)
 
 /* True iff b1 < b2 */
-predicate BalLt(b1:Ballot, b2:Ballot) {
+ghost predicate BalLt(b1:Ballot, b2:Ballot) {
     match b1 {
         case Bottom => !b2.Bottom?
         case Ballot(seqNo, id) =>
@@ -28,12 +28,12 @@ predicate BalLt(b1:Ballot, b2:Ballot) {
 }
 
 /* True iff b1 <= b2 */
-predicate BalLtEq(b1:Ballot, b2:Ballot) {
+ghost predicate BalLtEq(b1:Ballot, b2:Ballot) {
     b1 == b2 || BalLt(b1, b2)
 }
 
 /* True iff b1 > b2 */
-predicate BalGt(b1:Ballot, b2:Ballot) {
+ghost predicate BalGt(b1:Ballot, b2:Ballot) {
     !BalLtEq(b1, b2)
 }
 
@@ -47,7 +47,7 @@ function {:opaque} NextBallot(b:Ballot, idx:nat) : (b':Ballot)
     else Ballot(b.seqNo + 1, idx)
 }
 
-predicate seqIsUnique<T>(a:seq<T>) {
+ghost predicate seqIsUnique<T>(a:seq<T>) {
     forall i, j | 0<=i<|a| && 0<=j<|a| && a[i]==a[j] :: i == j
 }
 

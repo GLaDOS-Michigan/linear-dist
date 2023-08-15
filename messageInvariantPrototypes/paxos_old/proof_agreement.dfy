@@ -103,7 +103,7 @@ lemma AgreementChosenInv_Common(c:Constants, ds:DistrSys, ds':DistrSys)
     }
 }
 
-lemma AgreementChosenInv_LdrAction(
+lemma {:timeLimitMultiplier 3} AgreementChosenInv_LdrAction(
 c:Constants, ds:DistrSys, ds':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:seq<Packet>) 
     requires Agreement_Chosen_Inv(c, ds)
     requires ds'.WF(c) && Trivialities(c, ds')
@@ -183,7 +183,7 @@ c:Constants, ds:DistrSys, ds':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:s
 {}
 
 
-lemma {:timeLimitMultiplier 2} AgreementChosenInv_LdrAction_LeaderP2ImpliesQuorumOfPromise(
+lemma {:timeLimitMultiplier 5} AgreementChosenInv_LdrAction_LeaderP2ImpliesQuorumOfPromise(
 c:Constants, ds:DistrSys, ds':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:seq<Packet>) 
     requires Agreement_Chosen_Inv(c, ds)
     requires ds'.WF(c) && Trivialities(c, ds')

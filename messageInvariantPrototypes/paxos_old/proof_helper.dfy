@@ -25,7 +25,7 @@ lemma lemma_QrmSeenBAndAllLargerBalsHaveSameV(c:Constants, ds:DistrSys, qrm:set<
     requires BalLtEq(b, b')
     requires forall p | p in qrm :: p.msg.Promise?
     requires QuorumOfPromiseMsgs(c, ds, qrm, b')
-    requires QuorumHasSeenB(c, qrm, b);
+    requires QuorumHasSeenB(c, qrm, b)
     requires forall p | isPromisePkt(ds, p) && BalLtEq(b, p.msg.vb.b) :: p.msg.vb.v == v
     ensures PromisePktWithHighestBallot(qrm).msg.vb.v == v
 {}
@@ -149,8 +149,8 @@ c:Constants, ds:DistrSys, ds':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:s
     requires c.ValidLdrId(actor)
     requires ds.leaders[actor.idx].state == P2b
     requires recvIos[0].msg.Accept?
-    ensures ds'.leaders[actor.idx].val ==  ds.leaders[actor.idx].val;
-    ensures ds'.leaders[actor.idx].ballot ==  ds.leaders[actor.idx].ballot;
+    ensures ds'.leaders[actor.idx].val ==  ds.leaders[actor.idx].val
+    ensures ds'.leaders[actor.idx].ballot ==  ds.leaders[actor.idx].ballot
 {}
 
 
@@ -355,7 +355,7 @@ lemma lemma_HighestPromiseValNilImpliesAllBottom(pset:set<Packet>)
 lemma lemma_PromisePktWithHighestBallotProperty(pset:set<Packet>, p:Packet, v:Value)
     requires |pset| > 0
     requires p.msg.Promise?
-    requires p in pset;
+    requires p in pset
     requires forall p' | p' in pset && p'.msg.Promise? && BalLtEq(p.msg.vb.b, p'.msg.vb.b) :: p'.msg.vb.v == v
     ensures PromisePktWithHighestBallot(pset).msg.vb.v == v
 {}
@@ -393,25 +393,25 @@ lemma lemma_BalLtTransitivity2(b1:Ballot, b2:Ballot, b3:Ballot)
 {}
 
 lemma lemma_UnequalBallots(b1:Ballot, b2:Ballot) 
-    requires b1 != b2;
+    requires b1 != b2
     ensures BalLt(b1, b2) || BalLt(b2, b1)
 {}
 
 
 lemma lemma_SingleElemList1<T>(s:seq<T>, e:T) 
-    requires |s| == 1;
+    requires |s| == 1
     requires e == s[0]
     ensures forall e' | e' in s :: e' == e
 {}
 
 lemma lemma_SingleElemList2<T>(s:seq<T>, e:T) 
-    requires |s| == 1;
+    requires |s| == 1
     requires e in s
     ensures e == s[0]
 {}
 
 lemma lemma_SingleElemList3<T>(s:seq<T>, e:T, x:T) 
-    requires |s| == 1;
+    requires |s| == 1
     requires e in s
     requires x != e
     ensures x !in s

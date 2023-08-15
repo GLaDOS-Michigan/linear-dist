@@ -68,7 +68,7 @@ c:Constants, ds:DistrSys, ds':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:s
     requires PaxosNextOneAgent(c, ds, ds', actor, recvIos, sendIos)
     requires c.ValidAccId(actor)
     requires Chosen(c, ds', b, v)
-    requires OneValuePerBallot(c, ds');
+    requires OneValuePerBallot(c, ds')
     ensures Agreement_Chosen_Inv_SomeValChosen(c, ds', b, v)
 {
     AgreementChosenInv_NoneChosen_AccAction_NewChosenV_LargerBallotsPromiseQrms(c, ds, ds', actor, recvIos, sendIos, b, v);

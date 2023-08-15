@@ -9,7 +9,7 @@ import opened Types
 
 
 datatype Constants = Constants(f:nat, ldr_ids:seq<Id>, ldr_vals:seq<Value>, acc_ids:seq<Id>) {
-    predicate WF() {
+    ghost predicate WF() {
         && f >= 1
         && |ldr_ids| >= 1
         && |acc_ids| == 2*f+1
@@ -19,40 +19,40 @@ datatype Constants = Constants(f:nat, ldr_ids:seq<Id>, ldr_vals:seq<Value>, acc_
         && UniqueIds()
     }
 
-    predicate ValidLdrIdx(i:int) {
+    ghost predicate ValidLdrIdx(i:int) {
         0<=i<|ldr_ids|
     }
 
-    predicate ValidAccIdx(i:int) {
+    ghost predicate ValidAccIdx(i:int) {
         0<=i<|acc_ids|
     }
 
-    predicate ValidLdrId(id:Id) {
+    ghost predicate ValidLdrId(id:Id) {
         id.agt == Ldr && ValidLdrIdx(id.idx)
     }
 
-    predicate ValidAccId(id:Id) {
+    ghost predicate ValidAccId(id:Id) {
         id.agt == Acc && ValidAccIdx(id.idx)
     }
 
-    predicate ValidTypes() {
+    ghost predicate ValidTypes() {
         && (forall l | l in ldr_ids :: l.agt.Ldr?)
         && (forall l | l in acc_ids :: l.agt.Acc?)
     }
 
-    predicate ValidLdrVals() {
+    ghost predicate ValidLdrVals() {
         && |ldr_vals| == |ldr_ids|
         && forall i | ValidLdrIdx(i) :: ldr_vals[i] != Nil
     }
 
-    predicate UniqueIds() {
+    ghost predicate UniqueIds() {
         && seqIsUnique(ldr_ids)
         && seqIsUnique(acc_ids)
         // && (forall i, j | ValidLdrIdx(i) && ValidLdrIdx(j) && ldr_ids[i]==ldr_ids[j] :: i == j)
         // && (forall i, j | ValidAccIdx(i) && ValidAccIdx(j) && acc_ids[i]==acc_ids[j] :: i == j)
     }
 
-    predicate ValidIds() {
+    ghost predicate ValidIds() {
         && (forall i | ValidLdrIdx(i) :: ldr_ids[i].idx == i)
         && (forall i | ValidAccIdx(i) :: acc_ids[i].idx == i)
     }
@@ -63,7 +63,7 @@ datatype DistrSys = DistrSys(
     leaders: seq<Leader>,
     acceptors: seq<Acceptor>
 ) {
-    predicate WF(c: Constants)
+    ghost predicate WF(c: Constants)
         requires c.WF()
     {
         && |leaders| == |c.ldr_ids|
@@ -80,7 +80,7 @@ datatype DistrSys = DistrSys(
 /*****************************************************************************************
 *                                        DS Init                                         *
 *****************************************************************************************/
-predicate Init(c:Constants, s:DistrSys) 
+ghost predicate Init(c:Constants, s:DistrSys) 
 {
     && c.WF()
     && s.WF(c)
@@ -96,7 +96,7 @@ predicate Init(c:Constants, s:DistrSys)
 *                                        DS Next                                         *
 *****************************************************************************************/
 
-predicate Next(c:Constants, s:DistrSys, s':DistrSys) {
+ghost predicate Next(c:Constants, s:DistrSys, s':DistrSys) {
     && c.WF()
     && s.WF(c)
     && s'.WF(c)
@@ -104,7 +104,7 @@ predicate Next(c:Constants, s:DistrSys, s':DistrSys) {
 }
 
 
-predicate PaxosNextOneAgent(c:Constants, s:DistrSys, s':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:seq<Packet>) 
+ghost predicate PaxosNextOneAgent(c:Constants, s:DistrSys, s':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:seq<Packet>) 
     requires c.WF() && s.WF(c) && s'.WF(c)
 {
     && ValidActor(c, actor)
@@ -113,7 +113,7 @@ predicate PaxosNextOneAgent(c:Constants, s:DistrSys, s':DistrSys, actor:Id, recv
     && EnvironmentNext(s.network, s'.network)
 }
 
-predicate PaxosNextOneAgent_Agent(c:Constants, s:DistrSys, s':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:seq<Packet>)
+ghost predicate PaxosNextOneAgent_Agent(c:Constants, s:DistrSys, s':DistrSys, actor:Id, recvIos:seq<Packet>, sendIos:seq<Packet>)
     requires c.WF() && s.WF(c) && s'.WF(c)
     requires ValidActor(c, actor)
 {
@@ -131,7 +131,7 @@ predicate PaxosNextOneAgent_Agent(c:Constants, s:DistrSys, s':DistrSys, actor:Id
     }
 }
 
-predicate ValidActor(c:Constants, actor:Id) 
+ghost predicate ValidActor(c:Constants, actor:Id) 
     requires c.WF()
 {
      match actor.agt {
@@ -146,7 +146,7 @@ predicate ValidActor(c:Constants, actor:Id)
 *****************************************************************************************/
 
 
-predicate Chosen(c:Constants, ds:DistrSys, b:Ballot, v:Value) 
+ghost predicate Chosen(c:Constants, ds:DistrSys, b:Ballot, v:Value) 
     requires c.WF() && ds.WF(c)
     requires AllPacketsValid(c, ds)
 {
@@ -155,14 +155,14 @@ predicate Chosen(c:Constants, ds:DistrSys, b:Ballot, v:Value)
         && AccPacketsHaveValueV(qrm, v)
 }
 
-predicate AccPacketsHaveValueV(S:set<Packet>, v:Value) 
+ghost predicate AccPacketsHaveValueV(S:set<Packet>, v:Value) 
     requires forall p | p in S :: p.msg.Accept?
 {   
     forall p:Packet | p in S :: p.msg.val == v
 }
 
 
-predicate SomeValueChosen(c:Constants, ds:DistrSys) 
+ghost predicate SomeValueChosen(c:Constants, ds:DistrSys) 
     requires c.WF() && ds.WF(c)
     requires AllPacketsValid(c, ds)
 {
@@ -170,24 +170,24 @@ predicate SomeValueChosen(c:Constants, ds:DistrSys)
 }
 
 
-predicate QuorumOfAcceptors(c:Constants, q:set<int>) 
+ghost predicate QuorumOfAcceptors(c:Constants, q:set<int>) 
     requires c.WF() 
 {
     && |q| >= c.f + 1
     && forall idx | idx in q :: c.ValidAccIdx(idx)
 }
 
-predicate UniqueSources(qrm:set<Packet>) {
+ghost predicate UniqueSources(qrm:set<Packet>) {
     forall p1, p2 | p1 in qrm && p2 in qrm 
     :: p1.src == p2.src ==> p1 == p2
 }
 
-predicate SameDest(qrm:set<Packet>) {
+ghost predicate SameDest(qrm:set<Packet>) {
     forall p1, p2 | p1 in qrm && p2 in qrm :: p1.dst == p2.dst
 }
 
 /* qrm is a quorum of promise messages with ballot b */
-predicate QuorumOfPromiseMsgs(c:Constants, ds:DistrSys, qrm:set<Packet>, b:Ballot) 
+ghost predicate QuorumOfPromiseMsgs(c:Constants, ds:DistrSys, qrm:set<Packet>, b:Ballot) 
     requires c.WF() && ds.WF(c)
 {
     && |qrm| >= c.f + 1
@@ -200,7 +200,7 @@ predicate QuorumOfPromiseMsgs(c:Constants, ds:DistrSys, qrm:set<Packet>, b:Ballo
 }
 
 /* acc_qrm is a quorum of acceptors with promised ballot >= b */
-predicate QuorumOfAcceptorsPromised(c:Constants, ds:DistrSys, acc_qrm:set<Id>, b:Ballot) 
+ghost predicate QuorumOfAcceptorsPromised(c:Constants, ds:DistrSys, acc_qrm:set<Id>, b:Ballot) 
     requires c.WF() && ds.WF(c)
 {
     && |acc_qrm| >= c.f + 1
@@ -211,7 +211,7 @@ predicate QuorumOfAcceptorsPromised(c:Constants, ds:DistrSys, acc_qrm:set<Id>, b
 }
 
 /* acc_qrm is a quorum of acceptors with accepted (b, _) */
-predicate QuorumOfAcceptorsAccepted(c:Constants, ds:DistrSys, acc_qrm:set<Id>, b:Ballot) 
+ghost predicate QuorumOfAcceptorsAccepted(c:Constants, ds:DistrSys, acc_qrm:set<Id>, b:Ballot) 
     requires c.WF() && ds.WF(c)
 {
     && |acc_qrm| >= c.f + 1
@@ -222,7 +222,7 @@ predicate QuorumOfAcceptorsAccepted(c:Constants, ds:DistrSys, acc_qrm:set<Id>, b
 }
 
 /* qrm is a quorum of accept messages with ballot b, value v */
-predicate QuorumOfAcceptMsgs(c:Constants, ds:DistrSys, qrm:set<Packet>, b:Ballot) 
+ghost predicate QuorumOfAcceptMsgs(c:Constants, ds:DistrSys, qrm:set<Packet>, b:Ballot) 
     requires c.WF()
 {
     && |qrm| >= c.f + 1
@@ -230,7 +230,7 @@ predicate QuorumOfAcceptMsgs(c:Constants, ds:DistrSys, qrm:set<Packet>, b:Ballot
 }
 
 /* S is a set of accept messages with ballot b, value v */
-predicate SetOfAcceptMsgs(c:Constants, ds:DistrSys, S:set<Packet>, b:Ballot) 
+ghost predicate SetOfAcceptMsgs(c:Constants, ds:DistrSys, S:set<Packet>, b:Ballot) 
     requires c.WF()
 {
     && UniqueSources(S)
@@ -241,7 +241,7 @@ predicate SetOfAcceptMsgs(c:Constants, ds:DistrSys, S:set<Packet>, b:Ballot)
 }
 
 
-predicate AllPacketsValid(c:Constants, ds:DistrSys) 
+ghost predicate AllPacketsValid(c:Constants, ds:DistrSys) 
     requires c.WF() && ds.WF(c)
 {
     forall p | p in ds.network.sentPackets
@@ -249,7 +249,7 @@ predicate AllPacketsValid(c:Constants, ds:DistrSys)
 }
 
 
-predicate ValidPacketSourceDest(c:Constants, ds:DistrSys, p:Packet) 
+ghost predicate ValidPacketSourceDest(c:Constants, ds:DistrSys, p:Packet) 
     requires c.WF() && ds.WF(c)
 {
     match p.msg {
@@ -271,35 +271,35 @@ predicate ValidPacketSourceDest(c:Constants, ds:DistrSys, p:Packet)
     }
 }
 
-predicate ValidAcceptorSource(c:Constants, ds:DistrSys, p:Packet) 
+ghost predicate ValidAcceptorSource(c:Constants, ds:DistrSys, p:Packet) 
     requires c.WF() && ds.WF(c)
 {
     && p.src.agt == Acc 
     && c.ValidAccIdx(p.src.idx)
 }
 
-predicate ValidLeaderSource(c:Constants, ds:DistrSys, p:Packet) 
+ghost predicate ValidLeaderSource(c:Constants, ds:DistrSys, p:Packet) 
     requires c.WF() && ds.WF(c)
 {
     && p.src.agt == Ldr 
     && c.ValidLdrIdx(p.src.idx)
 }
 
-predicate ValidAcceptorDest(c:Constants, ds:DistrSys, p:Packet) 
+ghost predicate ValidAcceptorDest(c:Constants, ds:DistrSys, p:Packet) 
     requires c.WF() && ds.WF(c)
 {
     && p.dst.agt == Acc 
     && c.ValidAccIdx(p.dst.idx)
 }
 
-predicate ValidLeaderDest(c:Constants, ds:DistrSys, p:Packet) 
+ghost predicate ValidLeaderDest(c:Constants, ds:DistrSys, p:Packet) 
     requires c.WF() && ds.WF(c)
 {
     && p.dst.agt == Ldr 
     && c.ValidLdrIdx(p.dst.idx)
 }
 
-predicate LeaderInPhase1(c:Constants, ds:DistrSys, idx:int) 
+ghost predicate LeaderInPhase1(c:Constants, ds:DistrSys, idx:int) 
     requires c.WF() && ds.WF(c)
     requires c.ValidLdrIdx(idx)
 {
@@ -307,49 +307,49 @@ predicate LeaderInPhase1(c:Constants, ds:DistrSys, idx:int)
 }
 
 
-predicate LeaderInPhase2(c:Constants, ds:DistrSys, idx:int) 
+ghost predicate LeaderInPhase2(c:Constants, ds:DistrSys, idx:int) 
     requires c.WF() && ds.WF(c)
     requires c.ValidLdrIdx(idx)
 {
     ds.leaders[idx].state == P2a || ds.leaders[idx].state == P2b
 }
 
-predicate LeaderHasDecided(c:Constants, ds:DistrSys, idx:int) 
+ghost predicate LeaderHasDecided(c:Constants, ds:DistrSys, idx:int) 
     requires c.WF() && ds.WF(c)
     requires c.ValidLdrIdx(idx)
 {
     ds.leaders[idx].state == Decided
 }
 
-predicate LeaderHasBallotB(c:Constants, ds:DistrSys, idx:int, b:Ballot) 
+ghost predicate LeaderHasBallotB(c:Constants, ds:DistrSys, idx:int, b:Ballot) 
     requires c.WF() && ds.WF(c)
     requires c.ValidLdrIdx(idx)
 {
     ds.leaders[idx].ballot == b
 }
 
-predicate LeaderHasValueV(c:Constants, ds:DistrSys, idx:int, v:Value) 
+ghost predicate LeaderHasValueV(c:Constants, ds:DistrSys, idx:int, v:Value) 
     requires c.WF() && ds.WF(c)
     requires c.ValidLdrIdx(idx)
 {
     ds.leaders[idx].val == v
 }
 
-predicate AcceptorHasValueV(c:Constants, ds:DistrSys, idx:int, v:Value) 
+ghost predicate AcceptorHasValueV(c:Constants, ds:DistrSys, idx:int, v:Value) 
     requires c.WF() && ds.WF(c)
     requires c.ValidAccIdx(idx)
 {
     ds.acceptors[idx].accepted.v == v
 }
 
-predicate TwoLeadersHaveSameV(c:Constants, ds:DistrSys, i1:int, i2:int) 
+ghost predicate TwoLeadersHaveSameV(c:Constants, ds:DistrSys, i1:int, i2:int) 
     requires c.WF() && ds.WF(c)
     requires c.ValidLdrIdx(i1) && c.ValidLdrIdx(i2)
 {
     LeaderHasValueV(c, ds, i1, ds.leaders[i2].val)
 }
 
-predicate LeaderIdxDecidedV(c:Constants, ds:DistrSys, idx:int, b:Ballot, v:Value) 
+ghost predicate LeaderIdxDecidedV(c:Constants, ds:DistrSys, idx:int, b:Ballot, v:Value) 
     requires c.WF() && ds.WF(c)
     requires c.ValidLdrIdx(idx)
 {
@@ -358,28 +358,28 @@ predicate LeaderIdxDecidedV(c:Constants, ds:DistrSys, idx:int, b:Ballot, v:Value
     && LeaderHasBallotB(c, ds, idx, b)
 }
 
-predicate SomeLeaderHasDecided(c:Constants, ds:DistrSys) 
+ghost predicate SomeLeaderHasDecided(c:Constants, ds:DistrSys) 
     requires c.WF() && ds.WF(c)
 {
     exists i :: c.ValidLdrIdx(i) && LeaderHasDecided(c, ds, i)
 }
 
-predicate isPreparePkt(ds:DistrSys, p:Packet)
+ghost predicate isPreparePkt(ds:DistrSys, p:Packet)
 {
     p in ds.network.sentPackets && p.msg.Prepare?
 }
 
-predicate isPromisePkt(ds:DistrSys, p:Packet)
+ghost predicate isPromisePkt(ds:DistrSys, p:Packet)
 {
     p in ds.network.sentPackets && p.msg.Promise?
 }
 
-predicate isAcceptPkt(ds:DistrSys, p:Packet)
+ghost predicate isAcceptPkt(ds:DistrSys, p:Packet)
 {
     p in ds.network.sentPackets && p.msg.Accept?
 }
 
-predicate isProposePkt(ds:DistrSys, p:Packet)
+ghost predicate isProposePkt(ds:DistrSys, p:Packet)
 {
     p in ds.network.sentPackets && p.msg.Propose?
 }
