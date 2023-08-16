@@ -76,7 +76,6 @@ module Host {
         case Vote(voter, candidate) =>
           if candidate == c.hostId then
             // I received a vote
-            && msgOps.send == None
             && v' == v.(receivedVotes := v.receivedVotes + {voter})
           else
             // Stutter
