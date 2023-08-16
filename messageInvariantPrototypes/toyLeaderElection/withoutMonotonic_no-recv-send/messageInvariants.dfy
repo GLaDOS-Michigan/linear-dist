@@ -40,12 +40,12 @@ ghost predicate ReceivedVotesValidity(c: Constants, v: Variables)
 
 // Message Invariant: self inductive
 // Property of Send
-ghost predicate VoteMsgImpliesVoterVoted(c: Constants, v: Variables)
+ghost predicate VoteMsgImpliesNominee(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSource(c, v)
 {
   forall msg | msg in v.network.sentMsgs && msg.Vote?
-  :: v.hosts[msg.voter].voted
+  :: v.hosts[msg.voter].nominee == Some(msg.candidate)
 }
 
 ghost predicate MessageInv(c: Constants, v: Variables) 
@@ -54,7 +54,7 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && ValidMessageSource(c, v)
   && LeaderMsgImpliesLocalQuorum(c, v)
   && ReceivedVotesValidity(c, v)
-  && VoteMsgImpliesVoterVoted(c, v)
+  && VoteMsgImpliesNominee(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)

@@ -20,7 +20,7 @@ ghost predicate VotersVoteOnce(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx | c.ValidIdx(idx)
-  :: |v.hosts[idx].voted| <= 1
+  :: |v.hosts[idx].nominee| <= 1
 }
 
 // Application bundle

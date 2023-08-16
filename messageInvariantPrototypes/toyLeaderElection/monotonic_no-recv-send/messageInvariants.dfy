@@ -38,12 +38,15 @@ ghost predicate ReceivedVotesValidity(c: Constants, v: Variables)
 }
 
 // Message Invariant: self inductive
-ghost predicate VoteMsgImpliesVoterVotedForCandidate(c: Constants, v: Variables)
+ghost predicate VoteMsgImpliesNominee(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessages(c, v)
 {
   forall msg | msg in v.network.sentMsgs && msg.Vote?
-  :: msg.candidate in v.hosts[msg.voter].voted
+  :: (exists i :: 
+      && 0 <= i < |v.hosts[msg.voter].nominee| 
+      && v.hosts[msg.voter].nominee[i] == msg.candidate
+  )
 }
 
 ghost predicate MessageInv(c: Constants, v: Variables) 
@@ -52,7 +55,7 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && ValidMessages(c, v)
   && LeaderMsgImpliesLocalQuorum(c, v)
   && ReceivedVotesValidity(c, v)
-  && VoteMsgImpliesVoterVotedForCandidate(c, v)
+  && VoteMsgImpliesNominee(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
@@ -65,9 +68,10 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
 {
-  // triggers
-  assert LeaderMsgImpliesLocalQuorum(c, v');
-  assert MessageInv(c, v');
+  // trigger
+  forall msg | msg in v'.network.sentMsgs && msg.Leader?
+  ensures SetIsQuorum(c.hostConstants[msg.src].clusterSize, v'.hosts[msg.src].receivedVotes)
+  {}
 }
 
 }
