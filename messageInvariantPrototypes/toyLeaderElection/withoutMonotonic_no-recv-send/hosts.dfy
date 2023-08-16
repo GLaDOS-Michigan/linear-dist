@@ -72,7 +72,18 @@ module Host {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && v.pending.None?
-    && v' == v.(pending := Some(msgOps.recv.value))
+    && match msgOps.recv.value 
+        case Vote(voter, candidate) =>
+          if candidate == c.hostId then
+            // I received a vote
+            && msgOps.send == None
+            && v' == v.(receivedVotes := v.receivedVotes + {voter})
+          else
+            // Stutter
+            && v' == v
+        case _ =>
+          // Store message to pending buffer
+          v' == v.(pending := Some(msgOps.recv.value))
   }
 
   ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -96,14 +107,8 @@ module Host {
             && msgOps.send == Some(Vote(c.hostId, candidate))
             && v' == v.(voted := true, pending := None)
         case Vote(voter, candidate) =>
-          if candidate == c.hostId then
-            // I received a vote
-            && msgOps.send == None
-            && v' == v.(receivedVotes := v.receivedVotes + {voter}, pending := None)
-          else
-            // Stutter
-            && msgOps.send == None
-            && v' == v.(pending := None)
+          // This case is unreachable based on NextReceiveStep
+          && false
         case Leader(_) =>
             // Stutter
             && msgOps.send == None
