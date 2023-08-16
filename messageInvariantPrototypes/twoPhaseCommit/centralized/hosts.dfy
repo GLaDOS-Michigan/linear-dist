@@ -141,6 +141,7 @@ module ParticipantHost {
   }
 
   ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && v.sendVote == true
     && lbl.SendVoteLbl?
     && lbl.vote == c.preference
     && v' == v.(sendVote := false)
