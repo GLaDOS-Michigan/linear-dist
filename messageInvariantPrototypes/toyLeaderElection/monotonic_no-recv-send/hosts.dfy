@@ -26,8 +26,9 @@ module Host {
   datatype Variables = Variables(
     // Apply monotonic transformation here. Rather than a single boolean "voted" flag, 
     // keep track of all candidates I voted for. There should be at most one.
-    voted: seq<HostId>,             // monotonic seq
-    receivedVotes: set<HostId>      // monotonic set
+    voted: seq<HostId>,               // monotonic seq
+    receivedVotes: set<HostId>,       // monotonic set
+    pending: Option<Message>          // received message buffer
   )
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
@@ -54,12 +55,13 @@ module Host {
   }
 
   datatype Step =
-    ReceiveStep() | VictoryStep() | StutterStep()
+    ReceiveStep() | ProcessStep() | VictoryStep() | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case ProcessStep => NextProcessStep(c, v, v', msgOps)
       case VictoryStep => NextVictoryStep(c, v, v', msgOps)
       case StutterStep => 
           && v == v'
@@ -68,7 +70,25 @@ module Host {
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
+    && msgOps.send.None?
+    && v.pending.None?
     && match msgOps.recv.value
+        case Vote(voter, candidate) =>
+          if candidate == c.hostId then
+            // I received a vote
+            && v' == v.(receivedVotes := v.receivedVotes + {voter})
+          else
+            // Stutter
+            && v == v'
+        case _ =>
+          // Store message to pending buffer
+          v' == v.(pending := Some(msgOps.recv.value))
+  }
+
+  ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && v.pending.Some?
+    && match v.pending.value
         case StartElection =>
           if 0 < |v.voted| then 
             && msgOps.send == None
@@ -87,14 +107,8 @@ module Host {
             && msgOps.send == Some(Vote(c.hostId, candidate))
             && v' == v.(voted := v.voted + [candidate])  // record the candidate I voted for
         case Vote(voter, candidate) =>
-          if candidate == c.hostId then
-            // I received a vote
-            && msgOps.send == None
-            && v' == v.(receivedVotes := v.receivedVotes + {voter})
-          else
-            // Stutter
-            && msgOps.send == None
-            && v == v'
+          // This case is unreachable based on NextReceiveStep
+          && false
         case Leader(_) =>
             // Stutter
             && msgOps.send == None

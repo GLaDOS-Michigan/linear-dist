@@ -65,6 +65,8 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
 {
+  // triggers
+  assert LeaderMsgImpliesLocalQuorum(c, v');
   assert MessageInv(c, v');
 }
 
