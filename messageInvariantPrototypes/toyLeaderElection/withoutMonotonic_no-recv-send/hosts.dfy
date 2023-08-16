@@ -26,8 +26,9 @@ module Host {
   }
 
   datatype Variables = Variables(
-    voted: bool,                // monotonic boolean
-    receivedVotes: set<HostId>  // monotonic set
+    voted: bool,                  // monotonic boolean
+    receivedVotes: set<HostId>,   // monotonic set
+    pending: Option<Message>      // received message buffer
   )
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
@@ -54,12 +55,13 @@ module Host {
   }
 
   datatype Step =
-    ReceiveStep() | VictoryStep() | StutterStep()
+    ReceiveStep() | ProcessStep() | VictoryStep() | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case ProcessStep => NextProcessStep(c, v, v', msgOps)
       case VictoryStep => NextVictoryStep(c, v, v', msgOps)
       case StutterStep => 
           && v == v'
@@ -68,37 +70,44 @@ module Host {
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
-    && match msgOps.recv.value
+    && msgOps.send.None?
+    && v.pending.None?
+    && v' == v.(pending := Some(msgOps.recv.value))
+  }
+
+  ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && v.pending.Some?
+    && match v.pending.value
         case StartElection =>
-          if v.voted then 
-            && msgOps.send == None
-            && v == v'
-          else
-            // Nominate myself as leader
-            && msgOps.send == Some(VoteReq(c.hostId))
-            && v == v'
+          && v' == v.(pending := None)
+          && if v.voted then 
+              && msgOps.send == None
+            else
+              // Nominate myself as leader
+              && msgOps.send == Some(VoteReq(c.hostId))
         case VoteReq(candidate) => 
           if v.voted then
             // Stutter
             && msgOps.send == None
-            && v == v'
+            && v' == v.(pending := None)
           else
             // Vote for candidate
             && msgOps.send == Some(Vote(c.hostId, candidate))
-            && v' == v.(voted := true)
+            && v' == v.(voted := true, pending := None)
         case Vote(voter, candidate) =>
           if candidate == c.hostId then
             // I received a vote
             && msgOps.send == None
-            && v' == v.(receivedVotes := v.receivedVotes + {voter})
+            && v' == v.(receivedVotes := v.receivedVotes + {voter}, pending := None)
           else
             // Stutter
             && msgOps.send == None
-            && v == v'
+            && v' == v.(pending := None)
         case Leader(_) =>
             // Stutter
             && msgOps.send == None
-            && v == v'
+            && v' == v.(pending := None)
   }
 
   ghost predicate NextVictoryStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
