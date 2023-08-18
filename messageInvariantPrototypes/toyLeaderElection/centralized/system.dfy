@@ -5,13 +5,13 @@ module System {
   import opened Types
   import Host
 
-  datatype Constants = Constants(hosts: seq<Host.Constants>)
+  datatype Constants = Constants(hostConstants: seq<Host.Constants>)
   {
     ghost predicate WF() {
-      Host.GroupWFConstants(hosts)
+      Host.GroupWFConstants(hostConstants)
     }
     ghost predicate ValidHostId(id: HostId) {
-      id < |hosts|
+      id < |hostConstants|
     }
   }
 
@@ -19,7 +19,7 @@ module System {
   {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hosts, hosts)
+      && Host.GroupWF(c.hostConstants, hosts)
     }
 
     ghost predicate IsLeader(c: Constants, h: HostId) 
@@ -33,7 +33,7 @@ module System {
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && Host.GroupInit(c.hosts, v.hosts)
+    && Host.GroupInit(c.hostConstants, v.hosts)
   }
 
   datatype Step =
@@ -48,7 +48,7 @@ module System {
   {
     && var lbl := Host.InternalLbl();
     && c.ValidHostId(host)
-    && Host.Next(c.hosts[host], v.hosts[host], v'.hosts[host], lbl)
+    && Host.Next(c.hostConstants[host], v.hosts[host], v'.hosts[host], lbl)
     && (forall idx: HostId | c.ValidHostId(idx) && idx != host
         :: v'.hosts[idx] == v.hosts[idx]
     )
@@ -62,8 +62,8 @@ module System {
     && nominee != receiver  // important to not introduce false
     && c.ValidHostId(nominee)
     && c.ValidHostId(receiver)
-    && Host.Next(c.hosts[nominee], v.hosts[nominee], v'.hosts[nominee], nomineeLbl)
-    && Host.Next(c.hosts[receiver], v.hosts[receiver], v'.hosts[receiver], receiverLbl)
+    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], nomineeLbl)
+    && Host.Next(c.hostConstants[receiver], v.hosts[receiver], v'.hosts[receiver], receiverLbl)
     && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx != receiver
         :: v'.hosts[idx] == v.hosts[idx]
     )
@@ -77,8 +77,8 @@ module System {
     && nominee != voter  // important to not introduce false
     && c.ValidHostId(voter)
     && c.ValidHostId(nominee)
-    && Host.Next(c.hosts[voter], v.hosts[voter], v'.hosts[voter], voterLbl)
-    && Host.Next(c.hosts[nominee], v.hosts[nominee], v'.hosts[nominee], nomineeLbl)
+    && Host.Next(c.hostConstants[voter], v.hosts[voter], v'.hosts[voter], voterLbl)
+    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], nomineeLbl)
     && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx != voter
         :: v'.hosts[idx] == v.hosts[idx]
     )

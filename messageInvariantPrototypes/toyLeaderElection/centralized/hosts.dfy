@@ -24,7 +24,17 @@ module Host {
     receivedVotes: set<HostId>,   // monotonic set
     nominee: Option<HostId>,      // monotonic option
     isLeader: bool                // am I the leader?
-  )
+  ) {
+    ghost predicate HasVoteFrom(voter: HostId) 
+    {
+      voter in receivedVotes
+    }
+
+    ghost predicate Nominates(h: HostId) 
+    {
+      nominee == Some(h)
+    }
+  }
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|
