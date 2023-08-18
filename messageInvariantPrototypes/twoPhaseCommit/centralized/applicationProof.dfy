@@ -1,6 +1,5 @@
 include "spec.dfy"
 
-
 module TwoPCInvariantProof {
 import opened Types
 import opened UtilitiesLibrary

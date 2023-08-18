@@ -2,8 +2,7 @@
 
 include "messageInvariants.dfy"
 
-
-module RingLeaderElectionProof {
+module ToyLeaderElectionProof {
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
