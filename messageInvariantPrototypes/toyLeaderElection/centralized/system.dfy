@@ -21,6 +21,13 @@ module System {
       && c.WF()
       && Host.GroupWF(c.hosts, hosts)
     }
+
+    ghost predicate IsLeader(c: Constants, h: HostId) 
+      requires WF(c)
+      requires c.ValidHostId(h)
+    {
+      hosts[h].isLeader
+    }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
