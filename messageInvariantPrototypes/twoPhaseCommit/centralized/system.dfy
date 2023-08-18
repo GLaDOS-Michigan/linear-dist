@@ -92,7 +92,7 @@ module System {
       case VoteReqStep(cidx) => NextVoteReqStep(c, v, v', cidx)
       case SendVoteStep(pidx, cidx, vote) => NextSendVoteStep(c, v, v', pidx, cidx, vote)
       case DecideStep(cidx, decision) => NextDecideStep(c, v, v', cidx, decision)
-      case StutterStep => && v == v'
+      case StutterStep => v' == v
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)

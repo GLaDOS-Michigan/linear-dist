@@ -5,9 +5,6 @@ module Types {
 
   type HostId = nat
 
-  datatype Message =
-    StartElection | VoteReq(candidate: HostId) | Vote(voter: HostId, candidate: HostId) | Leader(src: HostId)
-
 } // end module Types
 
 
@@ -54,11 +51,10 @@ module Host {
   }
 
   datatype TransitionLabel =
-    | NominateLbl(candidate: HostId) 
-    | SendVoteReqLbl(candidate: HostId)
-    | RecvVoteReqLbl(candidate: HostId)
-    | SendVoteLbl(voter: HostId, candidate: HostId) 
-    | RecvVoteLbl(voter: HostId, candidate: HostId) 
+    | SendVoteReqLbl(nominee: HostId)
+    | RecvVoteReqLbl(nominee: HostId)
+    | SendVoteLbl(voter: HostId, nominee: HostId) 
+    | RecvVoteLbl(voter: HostId, nominee: HostId) 
     | InternalLbl()
 
   datatype Step =
@@ -76,33 +72,30 @@ module Host {
 
   ghost predicate NextHostStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && match lbl
-        case NominateLbl(candidate) =>
+        case InternalLbl() =>
             && v.nominee.None?
             && v' == v.(
                   nominee := Some(c.hostId),
                   receivedVotes := v.receivedVotes + {c.hostId}
                 )
-        case SendVoteReqLbl(candidate) =>
+        case SendVoteReqLbl(nominee) =>
             && v.nominee.Some?
-            && candidate == v.nominee.value == c.hostId
+            && nominee == v.nominee.value == c.hostId
             && v' == v
-        case RecvVoteReqLbl(candidate) =>
+        case RecvVoteReqLbl(nominee) =>
             if v.nominee.None? then
-              v' == v.(nominee := Some(candidate))
+              v' == v.(nominee := Some(nominee))
             else 
               v' == v
-        case SendVoteLbl(voter: HostId, candidate: HostId) => 
+        case SendVoteLbl(voter: HostId, nominee: HostId) => 
           && voter == c.hostId
           && v.nominee.Some?
-          && candidate == v.nominee.value
+          && nominee == v.nominee.value
           && v' == v
-        case RecvVoteLbl(voter, candidate) =>
+        case RecvVoteLbl(voter, nominee) =>
           // I received a vote
-          && candidate == c.hostId
+          && nominee == c.hostId
           && v' == v.(receivedVotes := v.receivedVotes + {voter})
-        case InternalLbl() =>
-            // Stutter
-            && v' == v
   }
 
   ghost predicate NextVictoryStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
