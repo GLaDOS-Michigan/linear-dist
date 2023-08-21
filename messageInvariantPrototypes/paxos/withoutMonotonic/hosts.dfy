@@ -17,7 +17,7 @@ module LeaderHost {
   }
 
   datatype Variables = Variables(
-    receivedPromises: set<LeaderId>, 
+    receivedPromises: set<AcceptorId>,
     value: Value, 
     highestHeardBallot: Option<LeaderId>
   )
