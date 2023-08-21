@@ -24,11 +24,19 @@ module Host {
   }
 
   datatype Variables = Variables(
-    receivedVotes: set<HostId>,   // monotonic set
-    // Apply monotonic transformation here. Rather than a single nominee, 
-    // keep track of all candidates I potentially voted for. There should be at most one.
-    nominee: seq<HostId>          // monotonic seq
-  )
+    receivedVotes: set<HostId>,   // monotonic seq
+    nominee: Option<HostId>       // monotonic option
+  ) {
+    ghost predicate HasVoteFrom(voter: HostId) 
+    {
+      voter in receivedVotes
+    }
+
+    ghost predicate Nominates(h: HostId) 
+    {
+      nominee == Some(h)
+    }
+  }
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|
@@ -50,7 +58,7 @@ module Host {
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.receivedVotes == {}
-    && v.nominee == []
+    && v.nominee == None
   }
 
   datatype Step =
@@ -72,16 +80,16 @@ ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOp
     && msgOps.send.None?
     && match msgOps.recv.value
         case StartElection =>
-          if v.nominee == [] then
+          if v.nominee.None? then
             // Nominate myself as leader
-            && v' == v.(nominee := v.nominee + [c.hostId])
+            && v' == v.(nominee := Some(c.hostId))
           else
             // Stutter
             && v' == v
         case VoteReq(candidate) => 
-          if v.nominee == [] then
+          if v.nominee.None? then
             // Save candidate as nominee
-            && v' == v.(nominee := v.nominee + [candidate])
+            && v' == v.(nominee := Some(candidate))
           else
             // Stutter
             && v' == v
@@ -99,9 +107,9 @@ ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOp
 
   ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    && 0 < |v.nominee|
+    && v.nominee.Some?
     // Vote for nominee
-    && msgOps.send == Some(Vote(c.hostId, Last(v.nominee)))
+    && msgOps.send == Some(Vote(c.hostId, v.nominee.value))
     && v' == v
   }
 

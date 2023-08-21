@@ -38,15 +38,13 @@ ghost predicate ReceivedVotesValidity(c: Constants, v: Variables)
 }
 
 // Message Invariant: self inductive
+// Property of Send
 ghost predicate VoteMsgImpliesNominee(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessages(c, v)
 {
   forall msg | msg in v.network.sentMsgs && msg.Vote?
-  :: (exists i :: 
-      && 0 <= i < |v.hosts[msg.voter].nominee| 
-      && v.hosts[msg.voter].nominee[i] == msg.candidate
-  )
+  :: v.hosts[msg.voter].nominee == Some(msg.candidate)
 }
 
 ghost predicate MessageInv(c: Constants, v: Variables) 
