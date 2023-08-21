@@ -14,24 +14,12 @@ import opened Obligations
 *                                Application Invariants                                *
 ***************************************************************************************/
 
-// Application Invariant: Host having a vote implies voter nominated that host
-ghost predicate HasVoteImpliesVoterNominates(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall nominee, voter | 
-    && c.ValidIdx(nominee)
-    && c.ValidIdx(voter)
-    && v.hosts[nominee].HasVoteFrom(voter)
-  ::
-    v.hosts[voter].Nominates(nominee)
-}
-
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
-  HasVoteImpliesVoterNominates(c, v)
+  true
 }
 
 ghost predicate Inv(c: Constants, v: Variables)
@@ -67,7 +55,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
 lemma SafetyProof(c: Constants, v: Variables) 
   requires MessageInv(c, v)
-  requires HasVoteImpliesVoterNominates(c, v)
   ensures Safety(c, v)
 {
   /* Proof by contradiction: Assume two leaders were elected in v', L1 and L2.
