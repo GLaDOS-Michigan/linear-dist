@@ -34,9 +34,10 @@ module LeaderHost {
     && |grp_v| == |grp_c|
   }
 
-  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-    && GroupWF(grp_c, grp_v, f)
-    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 
+    requires GroupWF(grp_c, grp_v, f)
+  {
+    forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i])
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
@@ -152,9 +153,10 @@ module AcceptorHost {
     && forall i | 0 <= i < |grp_v| :: grp_v[i].WF()
   }
 
-  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-    && GroupWF(grp_c, grp_v, f)
-    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 
+    requires GroupWF(grp_c, grp_v, f)
+  {
+    forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i])
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
@@ -266,9 +268,10 @@ module LearnerHost {
     && |grp_v| == |grp_c|
   }
 
-  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
-    && GroupWF(grp_c, grp_v, f)
-    && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 
+    requires GroupWF(grp_c, grp_v, f)
+  {
+    forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i])
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
