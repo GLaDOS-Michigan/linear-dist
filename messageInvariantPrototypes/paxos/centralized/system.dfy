@@ -115,9 +115,39 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
         LeadersUnchanged(v, v')
 }
 
+ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables, 
+    ldr: LeaderId, acc: AcceptorId,
+    val: Value) 
+  requires v.WF(c) && v'.WF(c)
+{
+  var ldrLbl := LeaderHost.ProposeLbl(val);
+  var accLbl := AcceptorHost.ReceiveProposeLbl(ldr, val);
+  && c.ValidLeaderIdx(ldr)
+  && c.ValidAcceptorIdx(acc)
+  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
+  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
+  && LeadersUnchangedExcept(c, v, v', ldr)
+  && AcceptorsUnchangedExcept(c, v, v', acc)
+  && LearnersUnchanged(v, v')
+}
 
-
-
+ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables, 
+    acc: AcceptorId, lnr: LearnerId,
+    vbOpt: Option<ValBal>)
+  requires v.WF(c) && v'.WF(c)
+{
+  var accLbl := AcceptorHost.MaybeAcceptLbl(vbOpt);
+  && c.ValidAcceptorIdx(acc)
+  && c.ValidLearnerIdx(lnr)
+  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
+  && AcceptorsUnchangedExcept(c, v, v', acc)
+  && LeadersUnchanged(v, v')
+  && if vbOpt.Some? then
+        && var lnrLbl := LearnerHost.ReceiveAcceptLbl(vbOpt.value, acc);
+        && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], lnrLbl)
+      else
+        LearnersUnchanged(v, v')
+}
 
 ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
@@ -125,8 +155,8 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   match step
     case P1aStep(ldr, acc) => NextP1aStep(c, v, v', ldr, acc)
     case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v, v', acc, ldr, balOpt, vbOptOpt)
-    case P2aStep(ldr, acc, val) => v' == v
-    case P2bStep(acc, lnr, vbOpt) => v' == v
+    case P2aStep(ldr, acc, val) => NextP2aStep(c, v, v', ldr, acc, val)
+    case P2bStep(acc, lnr, vbOpt) => NextP2bStep(c, v, v', acc, lnr, vbOpt)
     case StutterStep => v' == v
 }
 
