@@ -78,9 +78,11 @@ datatype Step =
   | P1aStep(leader: LeaderId, acceptor: AcceptorId)
   | P1bStep(acceptor: AcceptorId, leader: LeaderId, balOpt:Option<LeaderId>, vbOptOpt:Option<Option<ValBal>>)
   | P2aStep(leader: LeaderId, acceptor: AcceptorId, val: Value)
-  | P2bStep(acceptor: AcceptorId, learner: LearnerId, vbOpt: Option<ValBal>)
+  | P2bStep(acceptor: AcceptorId, learner: LearnerId, acceptedVb: ValBal)
   | StutterStep()
 
+
+// Leader sends Prepare message to Acceptor. Acceptor buffers it in its pendingPrepare field 
 ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: LeaderId, acc: AcceptorId) 
   requires v.WF(c) && v'.WF(c)
 {
@@ -94,6 +96,7 @@ ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: Lead
   && LearnersUnchanged(v, v')
 }
 
+// Acceptor processes its pendingPrepare, and maybe sends a Promise to the leader
 ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables, 
     ldr: LeaderId, acc: AcceptorId,
     balOpt: Option<LeaderId>, vbOptOpt: Option<Option<ValBal>>) 
@@ -105,8 +108,7 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
   && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LearnersUnchanged(v, v')
-  && if balOpt.Some? then
-        && assert vbOptOpt.Some?;  // Tony: I am surprised Dafny sees this
+  && if balOpt.Some? && vbOptOpt.Some? then
         && var ldrLbl := LeaderHost.ReceivePromiseLbl(acc, vbOptOpt.value);
         && ldr == balOpt.value
         && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
@@ -115,13 +117,14 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
         LeadersUnchanged(v, v')
 }
 
+// Leader sends Proposal to an acceptor. The acceptor processes the proposal
 ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables, 
     ldr: LeaderId, acc: AcceptorId,
     val: Value) 
   requires v.WF(c) && v'.WF(c)
 {
   var ldrLbl := LeaderHost.ProposeLbl(val);
-  var accLbl := AcceptorHost.ReceiveProposeLbl(ldr, val);
+  var accLbl := AcceptorHost.MaybeAcceptLbl(ldr, val);
   && c.ValidLeaderIdx(ldr)
   && c.ValidAcceptorIdx(acc)
   && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
@@ -131,22 +134,21 @@ ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables,
   && LearnersUnchanged(v, v')
 }
 
+// Acceptor sends acceptedVB to some Learner
 ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables, 
     acc: AcceptorId, lnr: LearnerId,
-    vbOpt: Option<ValBal>)
+    acceptedVb: ValBal)
   requires v.WF(c) && v'.WF(c)
 {
-  var accLbl := AcceptorHost.MaybeAcceptLbl(vbOpt);
+  var accLbl := AcceptorHost.BroadcastAcceptedLbl(acceptedVb);
+  var lnrLbl := LearnerHost.ReceiveAcceptLbl(acceptedVb, acc);
   && c.ValidAcceptorIdx(acc)
   && c.ValidLearnerIdx(lnr)
   && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LeadersUnchanged(v, v')
-  && if vbOpt.Some? then
-        && var lnrLbl := LearnerHost.ReceiveAcceptLbl(vbOpt.value, acc);
-        && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], lnrLbl)
-      else
-        LearnersUnchanged(v, v')
+  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], lnrLbl)
+  && LearnersUnchangedExcept(c, v, v', lnr)
 }
 
 ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
@@ -156,7 +158,7 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
     case P1aStep(ldr, acc) => NextP1aStep(c, v, v', ldr, acc)
     case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v, v', acc, ldr, balOpt, vbOptOpt)
     case P2aStep(ldr, acc, val) => NextP2aStep(c, v, v', ldr, acc, val)
-    case P2bStep(acc, lnr, vbOpt) => NextP2bStep(c, v, v', acc, lnr, vbOpt)
+    case P2bStep(acc, lnr, vb) => NextP2bStep(c, v, v', acc, lnr, vb)
     case StutterStep => v' == v
 }
 

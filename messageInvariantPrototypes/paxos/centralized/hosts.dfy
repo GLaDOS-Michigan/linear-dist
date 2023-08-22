@@ -82,7 +82,7 @@ module LeaderHost {
               || (v.highestHeardBallot.Some? && vbOpt.value.b > v.highestHeardBallot.value));
     && v' == v.(
         receivedPromises := v.receivedPromises + {acc},
-        value :=  if doUpdate then vbOpt.value.v else v.value,
+        value := if doUpdate then vbOpt.value.v else v.value,
         highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
       )
   }
@@ -124,13 +124,19 @@ module AcceptorHost {
     && c.id == id
   }
 
-  datatype PendingMsg = Prepare(bal:LeaderId) | Propose(bal:LeaderId, val:Value)
+  datatype PendingPrepare = Prepare(bal:LeaderId)
 
   datatype Variables = Variables(
-    pendingMsg: Option<PendingMsg>,
+    pendingPrepare: Option<PendingPrepare>,
     promised: Option<LeaderId>,
-    acceptedVB: Option<ValBal>
-  )
+    acceptedVB: Option<ValBal>) 
+  {
+
+    ghost predicate HasAccepted(vb: ValBal) {
+      && acceptedVB.Some?
+      && acceptedVB.value == vb
+    }
+  } // end datatype Variables (acceptor)
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
     && 0 < |grp_c|
@@ -152,74 +158,77 @@ module AcceptorHost {
   ghost predicate Init(c: Constants, v: Variables) {
     && v.promised == None
     && v.acceptedVB == None
-    && v.pendingMsg == None
+    && v.pendingPrepare == None
   }
 
   datatype TransitionLabel =
     | ReceivePrepareLbl(bal:LeaderId)
-    | ReceiveProposeLbl(bal:LeaderId, val:Value)
     | MaybePromiseLbl(balOpt:Option<LeaderId>, vbOptOpt:Option<Option<ValBal>>)
-    | MaybeAcceptLbl(vb:Option<ValBal>)
+    | MaybeAcceptLbl(bal:LeaderId, val:Value)
+    | BroadcastAcceptedLbl(vb: ValBal)
     | InternalLbl()
 
   datatype Step =
-    ReceivePrepareStep() | ReceiveProposeStep() | MaybePromiseStep() | MaybeAcceptStep() | StutterStep()
+    ReceivePrepareStep() 
+    | MaybePromiseStep() 
+    | MaybeAcceptStep() 
+    | BroadcastAcceptedStep() 
+    | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
       case ReceivePrepareStep => NextReceivePrepareStep(c, v, v', lbl)
-      case ReceiveProposeStep => NextReceiveProposeStep(c, v, v', lbl)
       case MaybePromiseStep => NextMaybePromiseStep(c, v, v', lbl)
       case MaybeAcceptStep => NextMaybeAcceptStep(c, v, v', lbl)
+      case BroadcastAcceptedStep => v' == v  // TODO
       case StutterStep => NextStutterStep(c, v, v', lbl)
   }
 
   ghost predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.ReceivePrepareLbl?
-    && v.pendingMsg.None?
-    && v' == v.(pendingMsg := Some(Prepare(lbl.bal)))
-  }
-
-  ghost predicate NextReceiveProposeStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.ReceiveProposeLbl?
-    && v.pendingMsg.None?
-    && v' == v.(pendingMsg := Some(Propose(lbl.bal, lbl.val)))
+    && v.pendingPrepare.None?
+    && v' == v.(pendingPrepare := Some(Prepare(lbl.bal)))
   }
 
   ghost predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
     && lbl.MaybePromiseLbl?
-    && v.pendingMsg.Some?
-    && v.pendingMsg.value.Prepare?
-    && var bal := v.pendingMsg.value.bal;
+    && v.pendingPrepare.Some?
+    && var bal := v.pendingPrepare.value.bal;
     && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
     && if doPromise then
           && v' == v.(
             promised := Some(bal),
-            pendingMsg := None)
+            pendingPrepare := None)
           && lbl == MaybePromiseLbl(Some(bal), Some(v.acceptedVB))
         else
-          && v' == v.(pendingMsg := None)
+          && v' == v.(pendingPrepare := None)
           && lbl == MaybePromiseLbl(None, None)
   }
 
   ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.MaybeAcceptLbl?
-    && v.pendingMsg.Some?
-    && v.pendingMsg.value.Propose?
-    && var bal := v.pendingMsg.value.bal;
-    && var val := v.pendingMsg.value.val;
+    && v.pendingPrepare.None?
+    && var bal := lbl.bal;
+    && var val := lbl.val;
     && var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
     &&  if doAccept then
           && v' == v.(
                 promised := Some(bal), 
-                acceptedVB := Some(VB(val, bal)),
-                pendingMsg := None)
-          && lbl == MaybeAcceptLbl(Some(VB(val, bal)))
+                acceptedVB := Some(VB(val, bal))
+              )
         else
-          && v' == v.(pendingMsg := None)
-          && lbl == MaybeAcceptLbl(None)
+          && v' == v
+  }
+
+  ghost predicate NextBroadcastAcceptedStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  {
+    && lbl.BroadcastAcceptedLbl?
+    && v.pendingPrepare.None?
+    && v.acceptedVB.Some?
+    && lbl.vb == v.acceptedVB.value
+    && v' == v
   }
 
   ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
