@@ -79,6 +79,7 @@ datatype Step =
   | P1bStep(acceptor: AcceptorId, leader: LeaderId, balOpt:Option<LeaderId>, vbOptOpt:Option<Option<ValBal>>)
   | P2aStep(leader: LeaderId, acceptor: AcceptorId, val: Value)
   | P2bStep(acceptor: AcceptorId, learner: LearnerId, acceptedVb: ValBal)
+  | LearnerInternalStep(learner: LearnerId)
   | StutterStep()
 
 
@@ -92,7 +93,8 @@ ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: Lead
   && c.ValidAcceptorIdx(acc)
   && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
   && AcceptorsUnchangedExcept(c, v, v', acc)
-  && LeadersUnchanged(v, v')
+  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
+  && LeadersUnchangedExcept(c, v, v', ldr)
   && LearnersUnchanged(v, v')
 }
 
@@ -108,7 +110,8 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
   && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LearnersUnchanged(v, v')
-  && if balOpt.Some? && vbOptOpt.Some? then
+  && if balOpt.Some? then
+        assert vbOptOpt.Some?;
         && var ldrLbl := LeaderHost.ReceivePromiseLbl(acc, vbOptOpt.value);
         && ldr == balOpt.value
         && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
@@ -151,6 +154,17 @@ ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables,
   && LearnersUnchangedExcept(c, v, v', lnr)
 }
 
+ghost predicate NextLearnerInternalStep(c: Constants, v: Variables, v': Variables, lnr: LearnerId)
+  requires v.WF(c) && v'.WF(c)
+{
+  var lnrLbl := LearnerHost.InternalLbl();
+  && c.ValidLearnerIdx(lnr)
+  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], lnrLbl)
+  && LearnersUnchangedExcept(c, v, v', lnr)
+  && LeadersUnchanged(v, v')
+  && AcceptorsUnchanged(v, v')
+}
+
 ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
 {
@@ -159,6 +173,7 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
     case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v, v', acc, ldr, balOpt, vbOptOpt)
     case P2aStep(ldr, acc, val) => NextP2aStep(c, v, v', ldr, acc, val)
     case P2bStep(acc, lnr, vb) => NextP2bStep(c, v, v', acc, lnr, vb)
+    case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v, v', lnr)
     case StutterStep => v' == v
 }
 

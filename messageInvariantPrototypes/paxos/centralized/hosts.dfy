@@ -181,7 +181,7 @@ module AcceptorHost {
       case ReceivePrepareStep => NextReceivePrepareStep(c, v, v', lbl)
       case MaybePromiseStep => NextMaybePromiseStep(c, v, v', lbl)
       case MaybeAcceptStep => NextMaybeAcceptStep(c, v, v', lbl)
-      case BroadcastAcceptedStep => v' == v  // TODO
+      case BroadcastAcceptedStep => NextBroadcastAcceptedStep(c, v, v', lbl)
       case StutterStep => NextStutterStep(c, v, v', lbl)
   }
 
