@@ -262,7 +262,12 @@ module LearnerHost {
     // maps ValBal to acceptors that accepted such pair
     receivedAccepts: map<ValBal, set<AcceptorId>>,
     learned: Option<Value>
-  )
+  ) {
+    
+    ghost predicate HasLearnedValue(v: Value) {
+      learned == Some(v)
+    }
+  } // end datatype Variables (Learner)
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
     && 0 < |grp_c|
