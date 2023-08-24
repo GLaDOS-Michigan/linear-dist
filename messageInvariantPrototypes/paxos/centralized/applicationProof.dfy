@@ -33,12 +33,39 @@ ghost predicate LearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables)
       && IsAcceptorQuorum(c, v.learners[lnr].receivedAccepts[vb])
 }
 
+// Each entry in a learner's receivedAccepts implies that an acceptor accepted it
+ghost predicate LearnerReceivedAcceptImpliesAcceptorAccepted(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, vb:ValBal, acc:AcceptorId |
+    && c.ValidLearnerIdx(lnr)
+    && c.ValidAcceptorIdx(acc)
+    && vb in v.learners[lnr].receivedAccepts
+    && acc in v.learners[lnr].receivedAccepts[vb]
+  ::
+    v.acceptors[acc].HasAcceptedAtLeast(vb.b) 
+}
+
+// If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
+ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall acc | 
+    && c.ValidAcceptorIdx(acc) 
+    && v.acceptors[acc].acceptedVB.Some?
+  :: 
+    && v.acceptors[acc].promised.Some?
+    && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
+}
+
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
   && LearnerValidReceivedAccepts(c, v)
   && LearnedImpliesQuorumOfAcceptors(c, v)
+  && LearnerReceivedAcceptImpliesAcceptorAccepted(c, v)
+  && AcceptorPromisedLargerThanAccepted(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)

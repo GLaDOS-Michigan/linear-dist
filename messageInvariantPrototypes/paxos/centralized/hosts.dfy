@@ -136,6 +136,16 @@ module AcceptorHost {
       && acceptedVB.Some?
       && acceptedVB.value == vb
     }
+
+    ghost predicate HasPromisedAtLeast(b: LeaderId) {
+      && promised.Some?
+      && b <= promised.value
+    }
+
+    ghost predicate HasAcceptedAtLeast(b: LeaderId) {
+      && acceptedVB.Some?
+      && b <= acceptedVB.value.b
+    }
   } // end datatype Variables (acceptor)
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>) {
