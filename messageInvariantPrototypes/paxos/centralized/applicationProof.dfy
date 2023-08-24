@@ -29,22 +29,23 @@ ghost predicate LearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables)
   ::
     exists b: LeaderId ::
       && var vb := VB(val, b);
-      && vb in v.learners[lnr].receivedAccepts
-      && IsAcceptorQuorum(c, v.learners[lnr].receivedAccepts[vb])
+      && ChosenAtLearner(c, v, vb, lnr)
 }
 
+
+// TODO: Not sure if needed
 // Each entry in a learner's receivedAccepts implies that an acceptor accepted it
-ghost predicate LearnerReceivedAcceptImpliesAcceptorAccepted(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall lnr:LearnerId, vb:ValBal, acc:AcceptorId |
-    && c.ValidLearnerIdx(lnr)
-    && c.ValidAcceptorIdx(acc)
-    && vb in v.learners[lnr].receivedAccepts
-    && acc in v.learners[lnr].receivedAccepts[vb]
-  ::
-    v.acceptors[acc].HasAcceptedAtLeast(vb.b) 
-}
+// ghost predicate LearnerReceivedAcceptImpliesAcceptorAccepted(c: Constants, v: Variables)
+//   requires v.WF(c)
+// {
+//   forall lnr:LearnerId, vb:ValBal, acc:AcceptorId |
+//     && c.ValidLearnerIdx(lnr)
+//     && c.ValidAcceptorIdx(acc)
+//     && vb in v.learners[lnr].receivedAccepts
+//     && acc in v.learners[lnr].receivedAccepts[vb]
+//   ::
+//     v.acceptors[acc].HasAcceptedAtLeast(vb.b) 
+// }
 
 // If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
 ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
@@ -64,7 +65,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
 {
   && LearnerValidReceivedAccepts(c, v)
   && LearnedImpliesQuorumOfAcceptors(c, v)
-  && LearnerReceivedAcceptImpliesAcceptorAccepted(c, v)
+  // && LearnerReceivedAcceptImpliesAcceptorAccepted(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
 }
 
@@ -101,6 +102,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
   // TODO
   assume false;
+  assert Agreement(c, v');
 }
 
 
@@ -120,8 +122,7 @@ lemma InvNextLearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables, v': Var
   ensures
     exists b: LeaderId ::
       && var vb := VB(val, b);
-      && vb in v'.learners[lnr].receivedAccepts
-      && IsAcceptorQuorum(c, v'.learners[lnr].receivedAccepts[vb])
+      && ChosenAtLearner(c, v, vb, lnr)
   {
     var sysStep :| NextStep(c, v, v', sysStep);
     if sysStep.P2bStep? {
@@ -141,6 +142,38 @@ lemma InvNextLearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables, v': Var
 ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
   && |quorum| >= c.f+1
   && (forall id | id in quorum :: c.ValidAcceptorIdx(id))
+}
+
+// A learner holds an accept quorum for vb
+ghost predicate Chosen(c: Constants, v: Variables, vb: ValBal) 
+  requires v.WF(c)
+{
+  exists lnr:LearnerId :: ChosenAtLearner(c, v, vb, lnr)
+}
+
+// Learner lnr witnessed a vb being chosen
+ghost predicate ChosenAtLearner(c: Constants, v: Variables, vb: ValBal, lnr:LearnerId) 
+  requires v.WF(c)
+{
+  && c.ValidLearnerIdx(lnr)
+  && vb in v.learners[lnr].receivedAccepts
+  && IsAcceptorQuorum(c, v.learners[lnr].receivedAccepts[vb])
+}
+
+
+//// Helper Lemmas ////
+
+// A value being learned implies it was chosen at some ballot, and skolemize this ballot
+lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Value) returns (vb: ValBal)
+  requires v.WF(c)
+  requires c.ValidLearnerIdx(lnr)
+  requires v.learners[lnr].HasLearnedValue(val)
+  requires LearnedImpliesQuorumOfAcceptors(c, v)
+  ensures Chosen(c, v, vb)
+{
+  // Witness, given by LearnedImpliesQuorumOfAcceptors
+  var bal :| ChosenAtLearner(c, v, VB(val, bal), lnr);
+  return VB(val, bal);
 }
 
 } // end module PaxosProof
