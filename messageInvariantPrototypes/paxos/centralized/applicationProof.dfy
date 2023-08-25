@@ -160,6 +160,13 @@ ghost predicate ChosenAtLearner(c: Constants, v: Variables, vb: ValBal, lnr:Lear
   && IsAcceptorQuorum(c, v.learners[lnr].receivedAccepts[vb])
 }
 
+// At most one value can become Chosen
+ghost predicate AtMostOneChosenVal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb1, vb2 | Chosen(c, v, vb1) && Chosen(c, v, vb2) 
+  :: vb1.v == vb2.v
+}
 
 //// Helper Lemmas ////
 
@@ -169,11 +176,33 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   requires c.ValidLearnerIdx(lnr)
   requires v.learners[lnr].HasLearnedValue(val)
   requires LearnedImpliesQuorumOfAcceptors(c, v)
+  ensures vb.v == val
   ensures Chosen(c, v, vb)
 {
   // Witness, given by LearnedImpliesQuorumOfAcceptors
   var bal :| ChosenAtLearner(c, v, VB(val, bal), lnr);
   return VB(val, bal);
+}
+
+lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires AtMostOneChosenVal(c, v)
+  requires LearnedImpliesQuorumOfAcceptors(c, v)
+  ensures Agreement(c, v)
+{
+  // Proof by contradiction
+  if !Agreement(c, v) {
+    var l1, l2 :| 
+        && c.ValidLearnerIdx(l1)
+        && c.ValidLearnerIdx(l2)
+        && v.learners[l1].learned.Some?
+        && v.learners[l2].learned.Some?
+        && v.learners[l1].learned != v.learners[l2].learned
+    ;
+    var vb1 := LearnedImpliesChosen(c, v, l1, v.learners[l1].learned.value);
+    var vb2 := LearnedImpliesChosen(c, v, l2, v.learners[l2].learned.value);
+    assert false;
+  }
 }
 
 } // end module PaxosProof
