@@ -59,6 +59,33 @@ ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables)
     && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
 }
 
+// For all ldr, acc such that acc in ldr.receivedPromises, acc's current promise
+// must be >= ldr's ballot
+ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr:LeaderId, acc:AcceptorId |
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && acc in v.leaders[ldr].receivedPromises
+  ::
+    v.acceptors[acc].HasPromisedAtLeast(ldr)
+}
+
+// TODO: From prior experience, this is the ultimate invariant
+// If vb is chosen, then for all leaders that can propose, they must have value == vb.v
+ghost predicate ChosenValImpliesLeadersProposeOnlyVal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, ldrBal:LeaderId | 
+    && Chosen(c, v, vb)
+    && c.ValidLeaderIdx(ldrBal)
+    && vb.b < ldrBal
+    && v.leaders[ldrBal].CanPropose(c.leaderConstants[ldrBal])
+  ::
+    v.leaders[ldrBal].value == vb.v
+}
+
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
@@ -67,6 +94,8 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnedImpliesQuorumOfAcceptors(c, v)
   // && LearnerReceivedAcceptImpliesAcceptorAccepted(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
+  && LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  && ChosenValImpliesLeadersProposeOnlyVal(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)
@@ -98,10 +127,12 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   InvNextLearnedImpliesQuorumOfAcceptors(c, v, v');
+  InvNextImpliesChosenValImpliesLeadersProposeOnlyVal(c, v, v');
   assert ApplicationInv(c, v');
 
   // TODO
-  assume false;
+  assume AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  AtMostOneChosenImpliesSafety(c, v');
   assert Agreement(c, v');
 }
 
@@ -131,6 +162,31 @@ lemma InvNextLearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables, v': Var
         assert v.learners[lnr].HasLearnedValue(val);
       }
     }
+  }
+}
+
+lemma InvNextImpliesChosenValImpliesLeadersProposeOnlyVal(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ChosenValImpliesLeadersProposeOnlyVal(c, v')
+{
+  var sysStep :| NextStep(c, v, v', sysStep);
+  if sysStep.P1aStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  } else if sysStep.P1bStep? {
+
+    // TODO
+    assume false;
+    assert ChosenValImpliesLeadersProposeOnlyVal(c, v');
+  } else if sysStep.P2aStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  } else if sysStep.P2bStep? {
+
+    // TODO
+    assume false;
+    assert ChosenValImpliesLeadersProposeOnlyVal(c, v');
+  } else if sysStep.LearnerInternalStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
   }
 }
 
@@ -184,6 +240,7 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   return VB(val, bal);
 }
 
+// If only one value can be chosen, then Agreement must be satisfied
 lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
   requires AtMostOneChosenVal(c, v)
@@ -202,6 +259,22 @@ lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
     var vb1 := LearnedImpliesChosen(c, v, l1, v.learners[l1].learned.value);
     var vb2 := LearnedImpliesChosen(c, v, l2, v.learners[l2].learned.value);
     assert false;
+  }
+}
+
+// Lemma: The only system step in which a new vb can be chosen is a P2bStep 
+lemma NewChosenOnlyInP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires NextStep(c, v, v', sysStep)
+  requires !sysStep.P2bStep?
+  ensures forall vb | Chosen(c, v', vb) :: Chosen(c, v, vb)
+{
+  forall vb | Chosen(c, v', vb)
+  ensures Chosen(c, v, vb)
+  {
+    var lnr:LearnerId :| ChosenAtLearner(c, v', vb, lnr);   // witness
+    assert ChosenAtLearner(c, v, vb, lnr);                  // trigger
   }
 }
 

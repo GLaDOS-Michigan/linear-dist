@@ -19,8 +19,17 @@ module LeaderHost {
   datatype Variables = Variables(
     receivedPromises: set<AcceptorId>, 
     value: Value, 
-    highestHeardBallot: Option<LeaderId>
-  )
+    highestHeardBallot: Option<LeaderId>) 
+  {
+    
+    ghost predicate CanPropose(c: Constants) {
+      && |receivedPromises| >= c.f+1
+      // Enabling condition that my hightest heard 
+      // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
+      // It is equivalent to being preempted
+      && (highestHeardBallot.None? || highestHeardBallot.value <= c.id)
+    }
+  } // end datatype Variables (Leader)
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
     && 0 < |grp_c|
@@ -90,11 +99,7 @@ module LeaderHost {
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.ProposeLbl?
     && lbl.val == v.value
-    && |v.receivedPromises| >= c.f+1  // enabling condition
-    // Enabling condition that my hightest heard 
-    // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
-    // It is equivalent to being preempted
-    && (v.highestHeardBallot.None? || v.highestHeardBallot.value <= c.id)
+    && v.CanPropose(c)
     && v' == v
   }
 
