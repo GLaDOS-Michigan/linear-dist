@@ -364,8 +364,6 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
         assert AcceptorHost.Next(ac, a, a', accLbl);
         if ldr > vb.b {
           assert l.CanPropose(lc);
-
-
           // TODO: These are the statements to prove
           assume false;
           assert l.highestHeardBallot.Some?;
@@ -374,25 +372,7 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
 
           assert l.value == vb.v;
           assert v'.acceptors[acc].acceptedVB.value.v == vb.v;
-        } else {
-          // Case where ldr == vb.b
-          // Should be true because propose only one value per ballot?
-          // Then this is proven, as chosen(c, v, vb) means that leader has value v.
-
-          // assume OneProposedValuePerBallot(c, v);
-          var lnr :| ChosenAtLearner(c, v, vb, lnr);
-
-
-          assume false;
-          assume c.ValidLeaderIdx(vb.b);
-
-          assume v.leaders[vb.b].CanPropose(c.leaderConstants[vb.b]);
-
-          assert vb.b == ldr;
-          assert l.value == vb.v;
-
-          assert v'.acceptors[acc].acceptedVB.value.v == vb.v;
-        }
+        } 
       }
     }
     assert ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
