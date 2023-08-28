@@ -147,9 +147,11 @@ ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables,
   var lnrLbl := LearnerHost.ReceiveAcceptLbl(acceptedVb, acc);
   && c.ValidAcceptorIdx(acc)
   && c.ValidLearnerIdx(lnr)
+  // acceptor simply stutters
   && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LeadersUnchanged(v, v')
+  // learner receives accepted vb from acceptor
   && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], lnrLbl)
   && LearnersUnchangedExcept(c, v, v', lnr)
 }
