@@ -66,28 +66,26 @@ ghost predicate OneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables
 ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, lnr, v1, v2 |
+  forall ldr, lnr, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidLearnerIdx(lnr)
     && v.leaders[ldr].CanPropose(c.leaderConstants[ldr])
-    && v.leaders[ldr].value == v1
-    && VB(v2, ldr) in v.learners[lnr].receivedAccepts
+    && VB(acceptedVal, ldr) in v.learners[lnr].receivedAccepts
   ::
-    v1 == v2
+    acceptedVal == v.leaders[ldr].value
 }
 
 // Leaders and Acceptors only have one value for each ballot
 ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, acc, v1, v2 |
+  forall ldr, acc, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
     && v.leaders[ldr].CanPropose(c.leaderConstants[ldr])
-    && v.leaders[ldr].value == v1
-    && v.acceptors[acc].acceptedVB == Some(VB(v2, ldr))
+    && v.acceptors[acc].acceptedVB == Some(VB(acceptedVal, ldr))
   ::
-    v1 == v2
+    acceptedVal == v.leaders[ldr].value
 }
 
 // Learner's receivedAccepts contain valid acceptor ids
@@ -307,9 +305,7 @@ lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires AcceptorAcceptedMeansLeaderCanPropose(c, v)
   requires Next(c, v, v')
   ensures OneValuePerBallot(c, v')
-{
-  assume false;
-}
+{}
 
 lemma InvNextLearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
