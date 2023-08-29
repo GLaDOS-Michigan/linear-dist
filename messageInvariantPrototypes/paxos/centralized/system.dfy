@@ -62,6 +62,13 @@ datatype Variables = Variables(
     && AcceptorHost.GroupWF(c.acceptorConstants, acceptors, c.f)
     && LearnerHost.GroupWF(c.learnerConstants, learners, c.f)
   }
+
+  ghost predicate LeaderCanPropose(c: Constants, ldr: LeaderId) 
+    requires WF(c)
+    requires c.ValidLeaderIdx(ldr)
+  {
+    leaders[ldr].CanPropose(c.leaderConstants[ldr])
+  }
 } // end datatype Variables
 
 

@@ -69,7 +69,7 @@ ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
   forall ldr, lnr, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidLearnerIdx(lnr)
-    && v.leaders[ldr].CanPropose(c.leaderConstants[ldr])
+    && v.LeaderCanPropose(c, ldr)
     && VB(acceptedVal, ldr) in v.learners[lnr].receivedAccepts
   ::
     acceptedVal == v.leaders[ldr].value
@@ -82,7 +82,7 @@ ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
   forall ldr, acc, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
-    && v.leaders[ldr].CanPropose(c.leaderConstants[ldr])
+    && v.LeaderCanPropose(c, ldr)
     && v.acceptors[acc].acceptedVB == Some(VB(acceptedVal, ldr))
   ::
     acceptedVal == v.leaders[ldr].value
@@ -119,12 +119,11 @@ ghost predicate LearnerReceivedAcceptMeansLeaderCanPropose(c: Constants, v: Vari
     && c.ValidLearnerIdx(lnr)
     && vb in v.learners[lnr].receivedAccepts
   ::
-    var lc, l := c.leaderConstants[vb.b], v.leaders[vb.b];
-    l.CanPropose(lc)
+    v.LeaderCanPropose(c, vb.b)
 }
 
 // Learner's learned value must be backed by a quorum of accepts
-ghost predicate LearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables)
+ghost predicate LearnedImpliesQuorumOfAccepts(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall lnr:LearnerId, val:Value |
@@ -185,8 +184,7 @@ ghost predicate AcceptorAcceptedMeansLeaderCanPropose(c: Constants, v: Variables
     && c.ValidAcceptorIdx(acc)
     && v.acceptors[acc].acceptedVB == Some(vb)
   ::
-    var lc, l := c.leaderConstants[vb.b], v.leaders[vb.b];
-    l.CanPropose(lc)
+    v.LeaderCanPropose(c, vb.b)
 }
 
 // For all ldr, acc such that acc in ldr.receivedPromises, acc's current promise
@@ -214,6 +212,21 @@ ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variable
      v.acceptors[acc].acceptedVB.value.v == vb.v
 }
 
+// If vb is chosen, then for all leaders > vb.b and ready to propose, they must have highest 
+// heard >= b
+ghost predicate ChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall vb, ldrBal:LeaderId | 
+    && Chosen(c, v, vb)
+    && c.ValidLeaderIdx(ldrBal)
+    && ldrBal > vb.b
+    && v.LeaderCanPropose(c, ldrBal)
+  ::
+    && v.leaders[ldrBal].highestHeardBallot.Some?
+    && v.leaders[ldrBal].highestHeardBallot.value >= vb.b
+}
+
 // If vb is chosen, then for all leaders has a highest heard >= vb.b, the value must be vb.v
 ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables) 
   requires v.WF(c)
@@ -234,7 +247,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && OneValuePerBallot(c, v)
   && LearnerValidReceivedAccepts(c, v)
   && LearnerValidReceivedAcceptsKeys(c, v)
-  && LearnedImpliesQuorumOfAcceptors(c, v)
+  && LearnedImpliesQuorumOfAccepts(c, v)
   && LearnerReceivedAcceptMeansLeaderCanPropose(c, v)
   // && LearnerReceivedAcceptImpliesAcceptorAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
@@ -242,6 +255,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorAcceptedMeansLeaderCanPropose(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
   && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
   && ChosenValImpliesLeaderOnlyHearsVal(c, v)
 }
 
@@ -273,20 +287,18 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  InvNextLearnedImpliesQuorumOfAcceptors(c, v, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
 
   assert LearnerReceivedAcceptMeansLeaderCanPropose(c, v');
   assert AcceptorAcceptedMeansLeaderCanPropose(c, v');
-
-
   InvNextOneValuePerBallot(c, v, v');
 
-  assert ApplicationInv(c, v');
+  assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
 
-  // TODO
-  assume AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  assert ApplicationInv(c, v');
+  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
   AtMostOneChosenImpliesSafety(c, v');
   assert Agreement(c, v');
 }
@@ -307,12 +319,12 @@ lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   ensures OneValuePerBallot(c, v')
 {}
 
-lemma InvNextLearnedImpliesQuorumOfAcceptors(c: Constants, v: Variables, v': Variables)
+lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires LearnerValidReceivedAccepts(c, v)
-  requires LearnedImpliesQuorumOfAcceptors(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
   requires Next(c, v, v')
-  ensures LearnedImpliesQuorumOfAcceptors(c, v')
+  ensures LearnedImpliesQuorumOfAccepts(c, v')
 {
   forall lnr:LearnerId, val:Value |
     c.ValidLearnerIdx(lnr) && v'.learners[lnr].HasLearnedValue(val)
@@ -337,52 +349,11 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
   ensures ChosenValImpliesAcceptorOnlyAcceptsVal(c, v')
 {
   var sysStep :| NextStep(c, v, v', sysStep);
-  if sysStep.P1aStep? {
+  if sysStep.P1aStep? || sysStep.P1bStep? || sysStep.P2aStep? || sysStep.LearnerInternalStep? {
     NewChosenOnlyInP2bStep(c, v, v', sysStep);
-  } else if sysStep.P1bStep? {
-    NewChosenOnlyInP2bStep(c, v, v', sysStep);
-  } else if sysStep.P2aStep? {
-
-    NewChosenOnlyInP2bStep(c, v, v', sysStep);
-    forall vb, acc:AcceptorId | 
-      && Chosen(c, v', vb)
-      && c.ValidAcceptorIdx(acc)
-      && v'.acceptors[acc].acceptedVB.Some?
-      && v'.acceptors[acc].acceptedVB.value.b >= vb.b
-    ensures
-      v'.acceptors[acc].acceptedVB.value.v == vb.v
-    {
-      assert Chosen(c, v, vb);
-      if acc == sysStep.acceptor {
-        var ldr := sysStep.leader;
-        var lc, l, l' := c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr];
-        var ac, a, a' := c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc];
-        assert l == l';
-
-        var val := l.value;
-        var accLbl := AcceptorHost.MaybeAcceptLbl(ldr, val);
-        assert AcceptorHost.Next(ac, a, a', accLbl);
-        if ldr > vb.b {
-          assert l.CanPropose(lc);
-          // TODO: These are the statements to prove
-          assume false;
-          assert l.highestHeardBallot.Some?;
-          assert l.highestHeardBallot.value >= vb.b;
-
-
-          assert l.value == vb.v;
-          assert v'.acceptors[acc].acceptedVB.value.v == vb.v;
-        } 
-      }
-    }
-    assert ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
   } else if sysStep.P2bStep? {
-    // TODO
+    // TODO: Something new may be chosen here
     assume false;
-    assert ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
-  } else if sysStep.LearnerInternalStep? {
-    NewChosenOnlyInP2bStep(c, v, v', sysStep);
-
     assert ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
   }
 }
@@ -398,8 +369,14 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
     NewChosenOnlyInP2bStep(c, v, v', sysStep);
   } else {
     // P2bStep
-    
+    /* 
+    Proof by contradicton. Suppose a new vb is chosen, and leader L hears a value v' != vb.v.
+    Leader already hears this value in the pre-state. Then another leader, with ballot B 
+    such that vb.v <= B < L must have proposed v'.
 
+    Then do recursion?
+
+    */
 
 
     // TODO
@@ -449,11 +426,11 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   requires v.WF(c)
   requires c.ValidLearnerIdx(lnr)
   requires v.learners[lnr].HasLearnedValue(val)
-  requires LearnedImpliesQuorumOfAcceptors(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
   ensures vb.v == val
   ensures Chosen(c, v, vb)
 {
-  // Witness, given by LearnedImpliesQuorumOfAcceptors
+  // Witness, given by LearnedImpliesQuorumOfAccepts
   var bal :| ChosenAtLearner(c, v, VB(val, bal), lnr);
   return VB(val, bal);
 }
@@ -462,7 +439,7 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
 lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
   requires AtMostOneChosenVal(c, v)
-  requires LearnedImpliesQuorumOfAcceptors(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
   ensures Agreement(c, v)
 {
   // Proof by contradiction
