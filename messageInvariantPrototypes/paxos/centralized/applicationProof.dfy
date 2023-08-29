@@ -187,6 +187,17 @@ ghost predicate AcceptorAcceptedMeansLeaderCanPropose(c: Constants, v: Variables
     v.LeaderCanPropose(c, vb.b)
 }
 
+// For all leaders, its highestHeardBallot is upper bounded by its own ballot
+ghost predicate LeaderHighestHeardUpperBound(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall ldr:LeaderId | 
+    && c.ValidLeaderIdx(ldr)
+    && v.leaders[ldr].highestHeardBallot.Some?
+  :: 
+    v.leaders[ldr].highestHeardBallot.value < ldr
+}
+
 // For all ldr, acc such that acc in ldr.receivedPromises, acc's current promise
 // must be >= ldr's ballot
 ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables)
@@ -253,6 +264,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorValidPromisedAndAccepted(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedMeansLeaderCanPropose(c, v)
+  && LeaderHighestHeardUpperBound(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
   && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
