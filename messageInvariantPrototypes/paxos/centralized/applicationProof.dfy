@@ -198,6 +198,22 @@ ghost predicate LeaderHighestHeardUpperBound(c: Constants, v: Variables)
     v.leaders[ldr].highestHeardBallot.value < ldr
 }
 
+// If a leader has a highestHeardBallot B, then its value has been proposed by the leader 
+// with ballot B
+ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall ldr:LeaderId | 
+    && c.ValidLeaderIdx(ldr)
+    && v.leaders[ldr].highestHeardBallot.Some?
+  ::
+    // note that once a leader CanPropose(), its value does not change
+    var b := v.leaders[ldr].highestHeardBallot.value;
+    && c.ValidLeaderIdx(b)
+    && v.LeaderCanPropose(c, b)
+    && v.leaders[b].value == v.leaders[ldr].value
+}
+
 // For all ldr, acc such that acc in ldr.receivedPromises, acc's current promise
 // must be >= ldr's ballot
 ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables)
@@ -265,6 +281,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedMeansLeaderCanPropose(c, v)
   && LeaderHighestHeardUpperBound(c, v)
+  && LeaderHearedImpliesProposed(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
   && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -300,14 +317,19 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
-  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
-  InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
+
 
   assert LearnerReceivedAcceptMeansLeaderCanPropose(c, v');
   assert AcceptorAcceptedMeansLeaderCanPropose(c, v');
+  assert LeaderHearedImpliesProposed(c, v');
+
   InvNextOneValuePerBallot(c, v, v');
 
+
+  // TODO
   assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
+  InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
 
   assert ApplicationInv(c, v');
   assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
@@ -370,10 +392,13 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
   }
 }
 
-
 lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
   ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
 {
   var sysStep :| NextStep(c, v, v', sysStep);
@@ -381,20 +406,47 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
     NewChosenOnlyInP2bStep(c, v, v', sysStep);
   } else {
     // P2bStep
-    /* 
-    Proof by contradicton. Suppose a new vb is chosen, and leader L hears a value v' != vb.v.
-    Leader already hears this value in the pre-state. Then another leader, with ballot B 
-    such that vb.v <= B < L must have proposed v'.
-
-    Then do recursion?
-
-    */
-
-
-    // TODO
-    assume false;
+    if !ChosenValImpliesLeaderOnlyHearsVal(c, v') {
+      var vb, ldrBal:LeaderId :|
+          && Chosen(c, v', vb)
+          && c.ValidLeaderIdx(ldrBal)
+          && v'.leaders[ldrBal].highestHeardBallot.Some?
+          && v'.leaders[ldrBal].highestHeardBallot.value >= vb.b
+          // This is the contradiction
+          && v'.leaders[ldrBal].value != vb.v;
+      if vb.b < ldrBal {
+        LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldrBal, vb);
+      }
+      // Otherwise, when vb.b < ldrBal, violates OneValuePerBallot(c, v')
+    }
     assert ChosenValImpliesLeaderOnlyHearsVal(c, v');
   }
+}
+
+// Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
+lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
+  requires v.WF(c)
+  requires Chosen(c, v, chosen)
+  requires c.ValidLeaderIdx(ldr)
+  requires v.leaders[ldr].highestHeardBallot.Some?
+  requires v.leaders[ldr].highestHeardBallot.value >= chosen.b
+  requires v.leaders[ldr].value != chosen.v
+  requires chosen.b < ldr
+  requires OneValuePerBallot(c, v)
+  requires LeaderHighestHeardUpperBound(c, v)
+  requires LeaderHearedImpliesProposed(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  ensures false
+{
+  /* 
+    Suppose leader L hears a value v' != vb.v. Then by LeaderHearedImpliesProposed, another leader L' 
+    such that vb.v <= L' < L must have proposed v', 
+    Then do recursion all the way down.
+  */
+  var ldr' := v.leaders[ldr].highestHeardBallot.value;
+  assert v.leaders[ldr'].value == v.leaders[ldr].value;
+  assert chosen.b <= ldr' < ldr;
+  LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
 }
 
 
