@@ -181,10 +181,11 @@ ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables)
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
 {
-  forall acc:AcceptorId, vb:ValBal |
+  forall acc:AcceptorId |
     && c.ValidAcceptorIdx(acc)
-    && v.acceptors[acc].acceptedVB == Some(vb)
+    && v.acceptors[acc].acceptedVB.Some?
   ::
+    var vb := v.acceptors[acc].acceptedVB.value;
     && v.LeaderCanPropose(c, vb.b)
     && v.leaders[vb.b].value == vb.v
 }
@@ -370,8 +371,7 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
     var sysStep :| NextStep(c, v, v', sysStep);
     if sysStep.P2bStep? {
       if sysStep.learner == lnr {
-        // trigger
-        assert v.learners[lnr].HasLearnedValue(val);
+        assert v.learners[lnr].HasLearnedValue(val);  // trigger
       }
     }
   }
@@ -406,17 +406,39 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Vari
 }
 
 lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+  requires v.WF(c) && v'.WF(c)
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')  // prereq for AcceptorAcceptedImpliesProposed
+  
+  // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
+  requires AcceptorAcceptedImpliesProposed(c, v')
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+
+  // post-condition
   ensures ChosenValImpliesAcceptorOnlyAcceptsVal(c, v')
 {
   var sysStep :| NextStep(c, v, v', sysStep);
   if sysStep.P1aStep? || sysStep.P1bStep? || sysStep.P2aStep? || sysStep.LearnerInternalStep? {
     NewChosenOnlyInP2bStep(c, v, v', sysStep);
   } else if sysStep.P2bStep? {
-    // TODO: Something new may be chosen here
-    assume false;
-    assert ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
+    if !ChosenValImpliesAcceptorOnlyAcceptsVal(c, v') {
+      var vb, acc:AcceptorId :|
+        && Chosen(c, v', vb)
+        && c.ValidAcceptorIdx(acc)
+        && v'.acceptors[acc].acceptedVB.Some?
+        && vb.b <= v'.acceptors[acc].acceptedVB.value.b 
+        // This is the contradiction
+        && v'.acceptors[acc].acceptedVB.value.v != vb.v;
+      
+      // Then there is a leader that proposed the accepted value, by AcceptorAcceptedImpliesProposed
+      var ldr := v'.acceptors[acc].acceptedVB.value.b;
+      LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldr, vb);
+    }
   }
 }
 
@@ -447,7 +469,6 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
       }
       // Otherwise, when vb.b < ldrBal, violates OneValuePerBallot(c, v')
     }
-    assert ChosenValImpliesLeaderOnlyHearsVal(c, v');
   }
 }
 
@@ -551,7 +572,7 @@ lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
 
 // Lemma: The only system step in which a new vb can be chosen is a P2bStep 
 lemma NewChosenOnlyInP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step) 
-  requires Inv(c, v)
+  requires v.WF(c)
   requires Next(c, v, v')
   requires NextStep(c, v, v', sysStep)
   requires !sysStep.P2bStep?
