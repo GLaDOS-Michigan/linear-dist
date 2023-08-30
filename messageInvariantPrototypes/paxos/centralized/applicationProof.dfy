@@ -111,7 +111,7 @@ ghost predicate LearnerValidReceivedAcceptsKeys(c: Constants, v: Variables)
     c.ValidLeaderIdx(vb.b)
 }
 
-ghost predicate LearnerReceivedAcceptMeansLeaderCanPropose(c: Constants, v: Variables) 
+ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
   requires LearnerValidReceivedAcceptsKeys(c, v)
 {
@@ -119,7 +119,8 @@ ghost predicate LearnerReceivedAcceptMeansLeaderCanPropose(c: Constants, v: Vari
     && c.ValidLearnerIdx(lnr)
     && vb in v.learners[lnr].receivedAccepts
   ::
-    v.LeaderCanPropose(c, vb.b)
+    && v.LeaderCanPropose(c, vb.b)
+    && v.leaders[vb.b].value == vb.v
 }
 
 // Learner's learned value must be backed by a quorum of accepts
@@ -176,7 +177,7 @@ ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables)
     && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
 }
 
-ghost predicate AcceptorAcceptedMeansLeaderCanPropose(c: Constants, v: Variables) 
+ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
 {
@@ -184,7 +185,8 @@ ghost predicate AcceptorAcceptedMeansLeaderCanPropose(c: Constants, v: Variables
     && c.ValidAcceptorIdx(acc)
     && v.acceptors[acc].acceptedVB == Some(vb)
   ::
-    v.LeaderCanPropose(c, vb.b)
+    && v.LeaderCanPropose(c, vb.b)
+    && v.leaders[vb.b].value == vb.v
 }
 
 // For all leaders, its highestHeardBallot is upper bounded by its own ballot
@@ -275,11 +277,11 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerValidReceivedAccepts(c, v)
   && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
-  && LearnerReceivedAcceptMeansLeaderCanPropose(c, v)
+  && LearnerReceivedAcceptImpliesProposed(c, v)
   // && LearnerReceivedAcceptImpliesAcceptorAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
-  && AcceptorAcceptedMeansLeaderCanPropose(c, v)
+  && AcceptorAcceptedImpliesProposed(c, v)
   && LeaderHighestHeardUpperBound(c, v)
   && LeaderHearedImpliesProposed(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
@@ -319,15 +321,13 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
 
 
-  assert LearnerReceivedAcceptMeansLeaderCanPropose(c, v');
-  assert AcceptorAcceptedMeansLeaderCanPropose(c, v');
+  assert LearnerReceivedAcceptImpliesProposed(c, v');
+  assert AcceptorAcceptedImpliesProposed(c, v');
   assert LeaderHearedImpliesProposed(c, v');
 
   InvNextOneValuePerBallot(c, v, v');
 
-
-  // TODO
-  assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
 
@@ -345,10 +345,10 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires OneValuePerBallot(c, v)
-  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptMeansLeaderCanPropose
-  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedMeansLeaderCanPropose
-  requires LearnerReceivedAcceptMeansLeaderCanPropose(c, v)
-  requires AcceptorAcceptedMeansLeaderCanPropose(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')
   ensures OneValuePerBallot(c, v')
 {}
@@ -374,6 +374,34 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
         assert v.learners[lnr].HasLearnedValue(val);
       }
     }
+  }
+}
+
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+{
+  var sysStep :| NextStep(c, v, v', sysStep);
+  if sysStep.P1aStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  } else if sysStep.P1bStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+    assume false;   // TODO
+    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  } else if sysStep.P2aStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  } else if sysStep.P2bStep? {
+    assume false;   // TODO
+    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  } else if sysStep.LearnerInternalStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  } else {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
   }
 }
 
