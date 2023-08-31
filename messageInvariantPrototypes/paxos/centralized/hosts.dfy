@@ -22,12 +22,17 @@ module LeaderHost {
     highestHeardBallot: Option<LeaderId>) 
   {
     
+    // My highestHeardBallot < b
+    ghost predicate HeardAtMost(b: LeaderId) {
+      highestHeardBallot.None? || highestHeardBallot.value < b
+    }
+
     ghost predicate CanPropose(c: Constants) {
       && |receivedPromises| >= c.f+1
       // Enabling condition that my hightest heard 
       // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
       // It is equivalent to being preempted
-      && (highestHeardBallot.None? || highestHeardBallot.value <= c.id)
+      && HeardAtMost(c.id)
     }
   } // end datatype Variables (Leader)
 
@@ -150,6 +155,11 @@ module AcceptorHost {
     ghost predicate HasAcceptedAtLeast(b: LeaderId) {
       && acceptedVB.Some?
       && b <= acceptedVB.value.b
+    }
+
+    ghost predicate HasAcceptedAtMost(b: LeaderId) {
+      && acceptedVB.Some?
+      && acceptedVB.value.b < b
     }
   } // end datatype Variables (acceptor)
 

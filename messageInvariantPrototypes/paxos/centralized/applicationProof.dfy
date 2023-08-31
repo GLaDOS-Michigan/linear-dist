@@ -55,7 +55,7 @@ ghost predicate OneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables
   forall a, l, vb1, vb2 |
     && c.ValidAcceptorIdx(a)
     && c.ValidLearnerIdx(l)
-    && v.acceptors[a].acceptedVB == Some(vb1)
+    && v.acceptors[a].HasAccepted(vb1)
     && vb2 in v.learners[l].receivedAccepts
     && vb1.b == vb2.b
   ::
@@ -83,7 +83,7 @@ ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
     && v.LeaderCanPropose(c, ldr)
-    && v.acceptors[acc].acceptedVB == Some(VB(acceptedVal, ldr))
+    && v.acceptors[acc].HasAccepted(VB(acceptedVal, ldr))
   ::
     acceptedVal == v.leaders[ldr].value
 }
@@ -230,6 +230,23 @@ ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Vari
     v.acceptors[acc].HasPromisedAtLeast(ldr)
 }
 
+// If an acceptor A accepted ballot b, and a leader L has highestHeardBallot < b, then 
+// L cannot have received a promise from A
+ghost predicate LeaderNotHeardImpliesNotPromised(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr:LeaderId, acc:AcceptorId, b:LeaderId |
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && b < ldr
+    && v.acceptors[acc].HasAcceptedAtLeast(b)
+    // Tony: Did not have this line below, which this invariant false
+    && v.acceptors[acc].HasAcceptedAtMost(ldr)
+    && v.leaders[ldr].HeardAtMost(b)
+  ::
+    && acc !in v.leaders[ldr].receivedPromises
+}
+
 ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
@@ -286,6 +303,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LeaderHighestHeardUpperBound(c, v)
   && LeaderHearedImpliesProposed(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  && LeaderNotHeardImpliesNotPromised(c, v)
   && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
   && ChosenValImpliesLeaderOnlyHearsVal(c, v)
@@ -319,6 +337,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
+  InvNextOneValuePerBallot(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
 
 
@@ -326,8 +345,9 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   assert AcceptorAcceptedImpliesProposed(c, v');
   assert LeaderHearedImpliesProposed(c, v');
 
-  InvNextOneValuePerBallot(c, v, v');
 
+
+  InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
@@ -377,30 +397,51 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
   }
 }
 
+lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires LeaderNotHeardImpliesNotPromised(c, v)
+  requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  requires Next(c, v, v')
+  ensures LeaderNotHeardImpliesNotPromised(c, v')
+{
+  forall ldr:LeaderId, acc:AcceptorId, b:LeaderId |
+      && c.ValidLeaderIdx(ldr)
+      && c.ValidAcceptorIdx(acc)
+      && b < ldr
+      && v'.acceptors[acc].HasAcceptedAtLeast(b)
+      && v'.acceptors[acc].HasAcceptedAtMost(ldr)
+      && v'.leaders[ldr].HeardAtMost(b)
+  ensures
+      acc !in v'.leaders[ldr].receivedPromises
+  {
+    var sysStep :| NextStep(c, v, v', sysStep);
+    if sysStep.P2aStep? {
+      if acc in v.leaders[ldr].receivedPromises {
+        if !v.acceptors[acc].HasAcceptedAtLeast(b) {
+          if acc == sysStep.acceptor {
+            assert false;
+          }
+        }
+      }
+    }
+  }
+}
+
 lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
 {
   var sysStep :| NextStep(c, v, v', sysStep);
-  if sysStep.P1aStep? {
+  if sysStep.P1aStep? || sysStep.P2aStep? || sysStep.LearnerInternalStep? {
     NewChosenOnlyInP2bStep(c, v, v', sysStep);
     assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
   } else if sysStep.P1bStep? {
     NewChosenOnlyInP2bStep(c, v, v', sysStep);
     assume false;   // TODO
     assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
-  } else if sysStep.P2aStep? {
-    NewChosenOnlyInP2bStep(c, v, v', sysStep);
-    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
   } else if sysStep.P2bStep? {
     assume false;   // TODO
-    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
-  } else if sysStep.LearnerInternalStep? {
-    NewChosenOnlyInP2bStep(c, v, v', sysStep);
-    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
-  } else {
-    NewChosenOnlyInP2bStep(c, v, v', sysStep);
     assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
   }
 }
