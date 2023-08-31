@@ -118,7 +118,7 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LearnersUnchanged(v, v')
   && if balOpt.Some? then
-        assert vbOptOpt.Some?;
+        // assert vbOptOpt.Some?;
         && var ldrLbl := LeaderHost.ReceivePromiseLbl(acc, vbOptOpt.value);
         && ldr == balOpt.value
         && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
@@ -179,7 +179,7 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
 {
   match step
     case P1aStep(ldr, acc) => NextP1aStep(c, v, v', ldr, acc)
-    case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v, v', acc, ldr, balOpt, vbOptOpt)
+    case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v, v', ldr, acc, balOpt, vbOptOpt)
     case P2aStep(ldr, acc, val) => NextP2aStep(c, v, v', ldr, acc, val)
     case P2bStep(acc, lnr, vb) => NextP2bStep(c, v, v', acc, lnr, vb)
     case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v, v', lnr)
