@@ -51,6 +51,12 @@ module DistributedSystem {
       && c.WF()
       && Host.GroupWF(c.hosts, hosts)
     }
+
+    ghost function GetServer(c: Constants) : Host.Variables
+      requires WF(c)
+    {
+      Last(hosts)
+    }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
