@@ -21,6 +21,11 @@ module LeaderHost {
     value: Value, 
     highestHeardBallot: Option<LeaderId>) 
   {
+
+    // My highestHeardBallot >= b
+    ghost predicate HeardAtLeast(b: LeaderId) {
+      highestHeardBallot.Some? && highestHeardBallot.value >= b
+    }
     
     // My highestHeardBallot < b
     ghost predicate HeardAtMost(b: LeaderId) {
@@ -147,17 +152,22 @@ module AcceptorHost {
       && acceptedVB.value == vb
     }
 
+    ghost predicate HasAcceptedValue(v: Value) {
+      && acceptedVB.Some?
+      && acceptedVB.value.v == v
+    }
+
     ghost predicate HasPromisedAtLeast(b: LeaderId) {
       && promised.Some?
       && b <= promised.value
     }
 
-    ghost predicate HasAcceptedAtLeast(b: LeaderId) {
+    ghost predicate HasAcceptedAtLeastBal(b: LeaderId) {
       && acceptedVB.Some?
       && b <= acceptedVB.value.b
     }
 
-    ghost predicate HasAcceptedAtMost(b: LeaderId) {
+    ghost predicate HasAcceptedAtMostBal(b: LeaderId) {
       && acceptedVB.Some?
       && acceptedVB.value.b < b
     }
