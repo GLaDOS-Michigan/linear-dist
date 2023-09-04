@@ -188,6 +188,16 @@ ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables)
     && v.leaders[vb.b].value == vb.v
 }
 
+ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, acc |
+    && c.ValidLeaderIdx(ldr)
+    && acc in v.leaders[ldr].receivedPromises
+  ::
+    c.ValidAcceptorIdx(acc)
+}
+
 // For all leaders, its highestHeardBallot is upper bounded by its own ballot
 ghost predicate LeaderHighestHeardUpperBound(c: Constants, v: Variables) 
   requires v.WF(c)
@@ -315,6 +325,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorValidPromisedAndAccepted(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedImpliesProposed(c, v)
+  && LeaderValidReceivedPromises(c, v)
   && LeaderHighestHeardUpperBound(c, v)
   && LeaderHearedImpliesProposed(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
@@ -364,6 +375,7 @@ lemma {:timeLimitMultiplier 2} InvInductive(c: Constants, v: Variables, v': Vari
   assert AcceptorAcceptedImpliesProposed(c, v');
   assert AcceptorPromisedLargerThanAccepted(c, v');
 
+  assert LeaderValidReceivedPromises(c, v');
   assert LeaderHighestHeardUpperBound(c, v');
   assert LeaderHearedImpliesProposed(c, v');
   assert LeaderReceivedPromisesImpliesAcceptorState(c, v');
@@ -494,40 +506,22 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, 
     if ldr == sysStep.leader {  // if the leader in question is now taking a step
       var choosingAccs := SupportingAcceptorsForChosen(c, v, vb);
       if v.leaders[ldr].HeardAtMost(vb.b) {
-        // Ldr has yet to see ballot b in this step. By quorum intersection, if must see
-        // an acceptor in choosingAccs
+        // Ldr has yet to see ballot b in this step. By quorum intersection, it must see
+        // an acceptor in choosingAccs in this step
         var acc := sysStep.acceptor;
-        if acc in choosingAccs {
-          assert v'.leaders[ldr].highestHeardBallot.Some?;
-          assert v'.leaders[ldr].highestHeardBallot.value >= vb.b;
-        } else {
+        if acc !in choosingAccs {
           // In this case, by quorum intersection, acc must already be in ldr.receivePromises
-          assert |v.leaders[ldr].receivedPromises| == c.f;
-          assert acc !in v.leaders[ldr].receivedPromises;
-          assert acc !in choosingAccs;
-          assert |choosingAccs| >= c.f+1;
-
-          // Prove that choosingAccs !! v.leaders[ldr].receivedPromises
+          // First prove that choosingAccs !! v.leaders[ldr].receivedPromises
           forall a | a in choosingAccs 
           ensures a !in v.leaders[ldr].receivedPromises
           {
-            assert vb.b < ldr;
-            assert v.acceptors[a].HasAcceptedAtLeastBal(vb.b);
             if !v.acceptors[a].HasAcceptedAtMostBal(ldr) && a in v.leaders[ldr].receivedPromises {
-              
-              assert v.leaders[ldr].HeardAtMost(vb.b);
-              assert vb.b < ldr;
-
-
-              // TODO
+              // via LeaderHighestHeardToPromisedRangeHasNoAccepts
               assert false;
             }
-            assert v.leaders[ldr].HeardAtMost(vb.b);
           }
-          assert choosingAccs !! v.leaders[ldr].receivedPromises;
-
-          // Then the result follows from quorum intersection
-          assume false;
+          var allAccs := GetAcceptorSet(c, v);
+          var e := QuorumIntersection(allAccs, choosingAccs, v.leaders[ldr].receivedPromises + {acc});
           assert false;
         }        
       }
@@ -663,29 +657,6 @@ ghost predicate AtMostOneChosenVal(c: Constants, v: Variables)
   :: vb1.v == vb2.v
 }
 
-// ghost function SupportingAcceptorsForChosen(c: Constants, v: Variables, vb: ValBal) :  (supportingAccs: set<AcceptorId>)
-//   requires v.WF(c)
-//   requires Chosen(c, v, vb)
-//   requires LearnerReceivedAcceptImpliesAccepted(c, v)
-//   requires AcceptorPromisedLargerThanAccepted(c, v)
-//   requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
-//   ensures |supportingAccs| >= c.f+1
-//   ensures forall a: AcceptorId :: a in supportingAccs <==>
-//       && c.ValidAcceptorIdx(a)
-//       && v.acceptors[a].HasAcceptedValue(vb.v)
-//       && v.acceptors[a].HasAcceptedAtLeastBal(vb.b)
-//       && v.acceptors[a].HasPromisedAtLeast(vb.b)
-// {
-//   var res := (
-//         set a:AcceptorId |
-//         0 <= a < |c.acceptorConstants| && v.acceptors[a].HasAcceptedAtLeastBal(vb.b) :: a);
-//   assert |res| >= c.f+1 by {
-//     var lnr: LearnerId :| ChosenAtLearner(c, v, vb, lnr);
-//     assert forall a | a in v.learners[lnr].receivedAccepts[vb] :: a in res;
-//     SetContainmentCardinality(v.learners[lnr].receivedAccepts[vb], res);
-//   }
-//   res
-// }
 
 //// Helper Lemmas ////
 
@@ -763,6 +734,16 @@ returns (supportingAccs: set<AcceptorId>)
   var lnr: LearnerId :| ChosenAtLearner(c, v, vb, lnr);  // skolemize!
   supportingAccs := v.learners[lnr].receivedAccepts[vb];
   return supportingAccs;
+}
+
+lemma GetAcceptorSet(c: Constants, v: Variables)
+returns (accSet: set<AcceptorId>)
+  requires v.WF(c)
+  ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
+  ensures |accSet| == 2 * c.f + 1
+{
+  accSet := set a |  0 <= a < |c.acceptorConstants|;
+  SetComprehensionSize(|c.acceptorConstants|);
 }
 
 } // end module PaxosProof
