@@ -62,6 +62,20 @@ module UtilitiesLibrary {
     }
   }
 
+  lemma SetContainmentCardinality<T>(s1: set<T>, s2: set<T>) 
+    requires s1 <= s2
+    ensures |s1| <= |s2|
+  {
+    if |s1| == 0 {
+      assert |s1| <= |s2|;
+    } else {
+      var x :| x in s1;
+      var s1' := s1 - {x};
+      SetContainmentCardinality(s1', s2);
+      assume false;
+    }
+  }
+
   lemma UnionIncreasesCardinality<T>(s1: set<T>, s2: set<T>) 
     ensures |s1 + s2| >= |s1|
     decreases s2
@@ -81,7 +95,6 @@ module UtilitiesLibrary {
     requires s1 <= s2
     ensures |s+s1| <= |s+s2|
   {
-
     assume {:axiom} false;  //TODO
   }
 
