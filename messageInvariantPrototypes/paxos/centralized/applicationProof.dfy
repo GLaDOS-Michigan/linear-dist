@@ -359,27 +359,15 @@ lemma InitImpliesInv(c: Constants, v: Variables)
   ensures Inv(c, v)
 {}
 
-lemma {:timeLimitMultiplier 2} InvInductive(c: Constants, v: Variables, v': Variables)
+lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
+  InvInductiveHelper(c, v, v');
   InvNextOneValuePerBallot(c, v, v');
-  assert LearnerValidReceivedAccepts(c, v');
-  assert LearnerValidReceivedAcceptsKeys(c, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
-  assert LearnerReceivedAcceptImpliesProposed(c, v');
   assume LearnerReceivedAcceptImpliesAccepted(c, v');  // TODO: this one should be easy
-  
-  assert AcceptorValidPromisedAndAccepted(c, v');
-  assert AcceptorAcceptedImpliesProposed(c, v');
-  assert AcceptorPromisedLargerThanAccepted(c, v');
-
-  assert LeaderValidReceivedPromises(c, v');
-  assert LeaderHighestHeardUpperBound(c, v');
-  assert LeaderHearedImpliesProposed(c, v');
-  assert LeaderReceivedPromisesImpliesAcceptorState(c, v');
-
 
   InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
@@ -388,16 +376,31 @@ lemma {:timeLimitMultiplier 2} InvInductive(c: Constants, v: Variables, v': Vari
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
 
-  assert ApplicationInv(c, v');
   assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
   AtMostOneChosenImpliesSafety(c, v');
-  assert Agreement(c, v');
 }
 
 
 /***************************************************************************************
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
+
+
+// Bundle for simple-to-ptove invariants
+lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LearnerValidReceivedAccepts(c, v')
+  ensures LearnerValidReceivedAcceptsKeys(c, v')
+  ensures LearnerReceivedAcceptImpliesProposed(c, v')
+  ensures AcceptorValidPromisedAndAccepted(c, v')
+  ensures AcceptorAcceptedImpliesProposed(c, v')
+  ensures AcceptorPromisedLargerThanAccepted(c, v')
+  ensures LeaderValidReceivedPromises(c, v')
+  ensures LeaderHighestHeardUpperBound(c, v')
+  ensures LeaderHearedImpliesProposed(c, v')
+  ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
+{}
 
 lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
@@ -472,6 +475,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
 lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
   ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
 {
   var sysStep :| NextStep(c, v, v', sysStep);
@@ -480,8 +484,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Vari
   } else if sysStep.P1bStep? {
     InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c, v, v', sysStep);
   } else if sysStep.P2bStep? {
-    assume false;   // TODO
-    assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+    InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c, v, v', sysStep);
   }
 }
 
@@ -528,6 +531,40 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, 
     }
   }
   assert ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+}
+
+// Helper lemma for P2b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires sysStep.P2bStep?
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
+  requires NextStep(c, v, v', sysStep)
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+{
+  forall vb, ldr:LeaderId | 
+    && Chosen(c, v', vb)
+    && c.ValidLeaderIdx(ldr)
+    && vb.b < ldr 
+    && v'.LeaderCanPropose(c, ldr)
+  ensures
+    v'.leaders[ldr].HeardAtLeast(vb.b)
+  {
+    var choosingAccs := SupportingAcceptorsForChosen(c, v', vb);
+    // These properties of choosingAccs carry over to pre-state v
+    assert forall a | a in choosingAccs ::
+      && c.ValidAcceptorIdx(a)
+      && v.acceptors[a].HasAcceptedAtLeastBal(vb.b);
+    // Leader is also unchanged
+    assert v'.leaders[ldr] == v.leaders[ldr];
+    assert v.LeaderCanPropose(c, ldr);
+    if !v.leaders[ldr].HeardAtLeast(vb.b) {
+      // Contradiction via quorum intersection, and LeaderHighestHeardToPromisedRangeHasNoAccepts
+      var allAccs := GetAcceptorSet(c, v);
+      var e := QuorumIntersection(allAccs, choosingAccs, v.leaders[ldr].receivedPromises);
+      assert false;
+    }
+  }
 }
 
 lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
@@ -718,14 +755,10 @@ returns (supportingAccs: set<AcceptorId>)
   requires v.WF(c)
   requires Chosen(c, v, vb)
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
-  requires AcceptorPromisedLargerThanAccepted(c, v)
-  requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   ensures |supportingAccs| >= c.f+1
   ensures forall a | a in supportingAccs :: 
     && c.ValidAcceptorIdx(a)
-    && v.acceptors[a].HasAcceptedValue(vb.v)
     && v.acceptors[a].HasAcceptedAtLeastBal(vb.b)
-    && v.acceptors[a].HasPromisedAtLeast(vb.b)
   ensures exists lnr :: 
     && c.ValidLearnerIdx(lnr)
     && vb in v.learners[lnr].receivedAccepts
