@@ -367,11 +367,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvInductiveHelper(c, v, v');
   InvNextOneValuePerBallot(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
-  assume LearnerReceivedAcceptImpliesAccepted(c, v');  // TODO: this one should be easy
-
   InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
-
   InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
@@ -393,6 +390,7 @@ lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   ensures LearnerValidReceivedAccepts(c, v')
   ensures LearnerValidReceivedAcceptsKeys(c, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
+  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
   ensures AcceptorValidPromisedAndAccepted(c, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
   ensures AcceptorPromisedLargerThanAccepted(c, v')
