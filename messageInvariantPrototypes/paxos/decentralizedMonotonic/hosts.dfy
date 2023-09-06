@@ -20,6 +20,20 @@ module LeaderHost {
     receivedPromises: set<AcceptorId>, 
     value: Value, 
     highestHeardBallot: Option<LeaderId>) 
+  {
+    // My highestHeardBallot < b
+    ghost predicate HeardAtMost(b: LeaderId) {
+      highestHeardBallot.None? || highestHeardBallot.value < b
+    }
+
+    ghost predicate CanPropose(c: Constants) {
+      && |receivedPromises| >= c.f+1
+      // Enabling condition that my hightest heard 
+      // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
+      // It is equivalent to being preempted
+      && HeardAtMost(c.id)
+    }
+  }
 
   datatype Variables = Variables(h: seq<Inner>)
   {
@@ -45,18 +59,13 @@ module LeaderHost {
     ghost predicate HeardAtMost(b: LeaderId) 
       requires WF()
     {
-      var vi := Last();
-      vi.highestHeardBallot.None? || vi.highestHeardBallot.value < b
+      Last().HeardAtMost(b)
     }
 
     ghost predicate CanPropose(c: Constants) 
       requires WF()
     {
-      && |Last().receivedPromises| >= c.f+1
-      // Enabling condition that my hightest heard 
-      // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
-      // It is equivalent to being preempted
-      && HeardAtMost(c.id)
+      Last().CanPropose(c)
     }
   } // end datatype Variables (Leader)
 
