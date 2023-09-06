@@ -85,30 +85,38 @@ module LeaderHost {
     )
   }
 
-  datatype TransitionLabel =
-    | ReceivePromiseLbl(acc: AcceptorId, vbOpt:Option<ValBal>) 
-    | ProposeLbl(val:Value) 
-    | InternalLbl()
-
   datatype Step =
-    ReceiveStep() | ProposeStep() | StutterStep()
+    PrepareStep() | ReceiveStep() | ProposeStep() | StutterStep()
 
-  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
     requires v.WF()
   {
     match step
-      case ReceiveStep => NextReceivePromiseStep(c, v, v', lbl)
-      case ProposeStep => NextProposeStep(c, v, v', lbl)
-      case StutterStep => NextStutterStep(c, v, v', lbl)
+      case PrepareStep => NextPrepareStep(c, v, v', msgOps)
+      case ReceiveStep => NextReceivePromiseStep(c, v, v', msgOps)
+      case ProposeStep => NextProposeStep(c, v, v', msgOps)
+      case StutterStep => NextStutterStep(c, v, v', msgOps)
+  }
+
+  ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
+    requires v.WF()
+  {
+    && msgOps.recv.None?
+    && msgOps.send == Some(Prepare(c.id))
+    && v' == Variables(StutterSeq(v.h))
   }
 
 
-  ghost predicate NextReceivePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+  ghost predicate NextReceivePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
     requires v.WF()
   {
-    && lbl.ReceivePromiseLbl?
-    && var acc := lbl.acc;
-    && var vbOpt := lbl.vbOpt;
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && msgOps.recv.value.Promise?
+    && var bal := msgOps.recv.value.bal;
+    && var acc := msgOps.recv.value.acc;
+    && var vbOpt := msgOps.recv.value.vbOpt;
+    && bal == c.id  // message is meant for me
     // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
     // probably simplify proof, preventing the leader from potentially equivocating
     // on its proposed value after receiving extraneous straggling promises.
@@ -126,25 +134,28 @@ module LeaderHost {
     && v' == v.(h := v.h + [vi])
   }
 
-  ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+  ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
     requires v.WF()
   {
+    && msgOps.recv.None?
     && var vi := v.Last();
-    && lbl.ProposeLbl?
-    && lbl.val == vi.value
     && v.CanPropose(c)
+    && msgOps.send == Some(Propose(c.id, vi.value))
     && v' == Variables(StutterSeq(v.h))
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.InternalLbl?
-    && v' == v
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
+    requires v.WF()
+  {
+    && msgOps.send == None
+    && msgOps.recv == None
+    && v' == Variables(StutterSeq(v.h))
   }
 
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     && v.WF()
-    && exists step :: NextStep(c, v, v', step, lbl)
+    && exists step :: NextStep(c, v, v', step, msgOps)
   }
 }  // end module LeaderHost
 
@@ -281,7 +292,7 @@ module AcceptorHost {
     && lbl.ReceivePrepareLbl?
     && vi.pendingPrepare.None?
     && v' == v.(
-      h := v.h + [vi.(pendingPrepare := Some(Prepare(lbl.bal)))]
+      h := v.h + [vi.(pendingPrepare := Some(PendingPrepare.Prepare(lbl.bal)))]
     )
   }
 
