@@ -27,11 +27,17 @@ module LeaderHost {
       0 < |h|
     }
 
+    ghost function Last() : Inner 
+      requires WF()
+    {
+      UtilitiesLibrary.Last(h)
+    }
+
     // My highestHeardBallot >= b
     ghost predicate HeardAtLeast(b: LeaderId) 
       requires WF()
     {
-      var vi := Last(h);
+      var vi := Last();
       vi.highestHeardBallot.Some? && vi.highestHeardBallot.value >= b
     }
     
@@ -39,14 +45,14 @@ module LeaderHost {
     ghost predicate HeardAtMost(b: LeaderId) 
       requires WF()
     {
-      var vi := Last(h);
+      var vi := Last();
       vi.highestHeardBallot.None? || vi.highestHeardBallot.value < b
     }
 
     ghost predicate CanPropose(c: Constants) 
       requires WF()
     {
-      && |Last(h).receivedPromises| >= c.f+1
+      && |Last().receivedPromises| >= c.f+1
       // Enabling condition that my hightest heard 
       // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
       // It is equivalent to being preempted
@@ -106,7 +112,7 @@ module LeaderHost {
     // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
     // probably simplify proof, preventing the leader from potentially equivocating
     // on its proposed value after receiving extraneous straggling promises.
-    && var vi := Last(v.h);
+    && var vi := v.Last();
     && |vi.receivedPromises| <= c.f
     && acc !in vi.receivedPromises
     && var doUpdate := 
@@ -123,7 +129,7 @@ module LeaderHost {
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
     requires v.WF()
   {
-    && var vi := Last(v.h);
+    && var vi := v.Last();
     && lbl.ProposeLbl?
     && lbl.val == vi.value
     && v.CanPropose(c)
@@ -172,10 +178,16 @@ module AcceptorHost {
       0 < |h|
     }
 
+    ghost function Last() : Inner 
+      requires WF()
+    {
+      UtilitiesLibrary.Last(h)
+    }
+
     ghost predicate HasAccepted(vb: ValBal) 
       requires WF()
     {
-      var vi := Last(h);
+      var vi := Last();
       && vi.acceptedVB.Some?
       && vi.acceptedVB.value == vb
     }
@@ -183,7 +195,7 @@ module AcceptorHost {
     ghost predicate HasAcceptedValue(v: Value) 
       requires WF()
     {
-      var vi := Last(h);
+      var vi := Last();
       && vi.acceptedVB.Some?
       && vi.acceptedVB.value.v == v
     }
@@ -191,7 +203,7 @@ module AcceptorHost {
     ghost predicate HasPromisedAtLeast(b: LeaderId) 
       requires WF()
     {
-      var vi := Last(h);
+      var vi := Last();
       && vi.promised.Some?
       && b <= vi.promised.value
     }
@@ -199,7 +211,7 @@ module AcceptorHost {
     ghost predicate HasAcceptedAtLeastBal(b: LeaderId) 
       requires WF()
     {
-      var vi := Last(h);
+      var vi := Last();
       && vi.acceptedVB.Some?
       && b <= vi.acceptedVB.value.b
     }
@@ -207,7 +219,7 @@ module AcceptorHost {
     ghost predicate HasAcceptedAtMostBal(b: LeaderId) 
       requires WF()
     {
-      var vi := Last(h);
+      var vi := Last();
       && vi.acceptedVB.Some?
       && vi.acceptedVB.value.b < b
     }
@@ -265,7 +277,7 @@ module AcceptorHost {
   ghost predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
     requires v.WF()
   {
-    && var vi := Last(v.h);
+    && var vi := v.Last();
     && lbl.ReceivePrepareLbl?
     && vi.pendingPrepare.None?
     && v' == v.(
@@ -276,7 +288,7 @@ module AcceptorHost {
   ghost predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
     requires v.WF()
   {
-    && var vi := Last(v.h);
+    && var vi := v.Last();
     && lbl.MaybePromiseLbl?
     && vi.pendingPrepare.Some?
     && var bal := vi.pendingPrepare.value.bal;
@@ -295,7 +307,7 @@ module AcceptorHost {
   ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
     requires v.WF()
   {
-    && var vi := Last(v.h);
+    && var vi := v.Last();
     && lbl.MaybeAcceptLbl?
     && vi.pendingPrepare.None?
     && var bal := lbl.bal;
@@ -313,7 +325,7 @@ module AcceptorHost {
   ghost predicate NextBroadcastAcceptedStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
     requires v.WF()
   {
-    && var vi := Last(v.h);
+    && var vi := v.Last();
     && lbl.BroadcastAcceptedLbl?
     && vi.pendingPrepare.None?
     && vi.acceptedVB.Some?
@@ -364,23 +376,29 @@ module LearnerHost {
       0 < |h|
     }
 
+    ghost function Last() : Inner 
+      requires WF()
+    {
+      UtilitiesLibrary.Last(h)
+    }
+
     ghost predicate HasLearnedSome()
       requires WF()
     {
-      Last(h).learned.Some?
+      Last().learned.Some?
     }
     
     ghost predicate HasLearnedValue(v: Value) 
       requires WF()
     {
-      Last(h).learned == Some(v)
+      Last().learned == Some(v)
     }
 
     ghost function GetLearnedValue() : (learned: Value)
       requires WF()
       requires HasLearnedSome()
     {
-      Last(h).learned.value
+      Last().learned.value
     }
   } // end datatype Variables (Learner)
 
@@ -442,7 +460,7 @@ module LearnerHost {
   ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
     requires v.WF()
   {
-    var vi := Last(v.h);
+    var vi := v.Last();
     && lbl.ReceiveAcceptLbl?
     && var vi' := Inner(UpdateReceivedAccepts(vi.receivedAccepts, lbl.vb, lbl.acc), vi.learned);
     && v' == v.(h := v.h + [vi'])
@@ -451,7 +469,7 @@ module LearnerHost {
   ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, lbl: TransitionLabel) 
     requires v.WF()
   {
-    var vi := Last(v.h);
+    var vi := v.Last();
     && lbl.InternalLbl?
     && vb in vi.receivedAccepts              // enabling
     && |vi.receivedAccepts[vb]| >= c.f + 1   // enabling
