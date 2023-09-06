@@ -436,20 +436,16 @@ module LearnerHost {
     )
   }
 
-  datatype TransitionLabel =
-    | ReceiveAcceptLbl(vb:ValBal, acc:AcceptorId)
-    | InternalLbl()
-
   datatype Step =
     ReceiveStep() | LearnStep(vb: ValBal) | StutterStep()
 
-  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
     requires v.WF()
   {
     match step
-      case ReceiveStep => NextReceiveAcceptStep(c, v, v', lbl)
-      case LearnStep(vb) => NextLearnStep(c, v, v', vb, lbl)
-      case StutterStep => NextStutterStep(c, v, v', lbl)
+      case ReceiveStep => NextReceiveAcceptStep(c, v, v', msgOps)
+      case LearnStep(vb) => NextLearnStep(c, v, v', vb, msgOps)
+      case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
   function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
@@ -466,36 +462,40 @@ module LearnerHost {
       receivedAccepts[vb := {acc}]
   }
 
-  ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+  ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
     requires v.WF()
   {
-    var vi := v.Last();
-    && lbl.ReceiveAcceptLbl?
-    && var vi' := Inner(UpdateReceivedAccepts(vi.receivedAccepts, lbl.vb, lbl.acc), vi.learned);
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && msgOps.recv.value.Accept?
+    && var vi := v.Last();
+    && var vi' := Inner(UpdateReceivedAccepts(vi.receivedAccepts, msgOps.recv.value.vb, msgOps.recv.value.acc), vi.learned);
     && v' == v.(h := v.h + [vi'])
   }
 
-  ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, lbl: TransitionLabel) 
+  ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, msgOps: MessageOps) 
     requires v.WF()
   {
-    var vi := v.Last();
-    && lbl.InternalLbl?
+    && msgOps.recv.None?
+    && msgOps.send.None?
+    && var vi := v.Last();
     && vb in vi.receivedAccepts              // enabling
     && |vi.receivedAccepts[vb]| >= c.f + 1   // enabling
     && var vi' := vi.(learned := Some(vb.v));  // learn new value
     && v' == v.(h := v.h + [vi'])
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
     requires v.WF()
   {
-    && lbl.InternalLbl?
+    && msgOps.recv.None?
+    && msgOps.send.None?
     && v' == Variables(StutterSeq(v.h))
   }
 
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     && v.WF()
-    && exists step :: NextStep(c, v, v', step, lbl)
+    && exists step :: NextStep(c, v, v', step, msgOps)
   }
 }  // end module LearnerHost
