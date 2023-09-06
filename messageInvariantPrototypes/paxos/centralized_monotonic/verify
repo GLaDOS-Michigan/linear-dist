@@ -1,8 +1,8 @@
 #!/bin/sh
 
-dafny="/Users/nudzhang/installations/dafny-4.2.0/dafny /timeLimit:20 /compile:0  /noNLarith /autoTriggers:1 /vcsCores:8"
+dafny="/Users/nudzhang/installations/dafny-4.2.0/dafny /timeLimit:20 /compile:0  /noNLarith /autoTriggers:1 /vcsCores:12"
 
-files="../../lib/UtilitiesLibrary.dfy types.dfy hosts.dfy system.dfy spec.dfy"
+files="../../lib/UtilitiesLibrary.dfy types.dfy hosts.dfy system.dfy spec.dfy applicationProof.dfy"
 
 echo "Verifying $files"
 

@@ -364,7 +364,15 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  assume false;
+  InvInductiveHelper(c, v, v');
+  InvNextOneValuePerBallot(c, v, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
+  InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
+  InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
+  InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
+  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
+  InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
+  
   assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
   AtMostOneChosenImpliesSafety(c, v');
 }
@@ -427,6 +435,207 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
     }
   }
 }
+
+lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires LeaderNotHeardImpliesNotPromised(c, v)
+  requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  requires Next(c, v, v')
+  ensures LeaderNotHeardImpliesNotPromised(c, v')
+{}
+
+lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
+{}
+
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+{
+  var sysStep :| NextStep(c, v, v', sysStep);
+  if sysStep.P1aStep? || sysStep.P2aStep? || sysStep.LearnerInternalStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  } else if sysStep.P1bStep? {
+    InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c, v, v', sysStep);
+  } else if sysStep.P2bStep? {
+    InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c, v, v', sysStep);
+  }
+}
+
+// Helper lemma for P1b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
+  requires Inv(c, v)
+  requires sysStep.P1bStep?
+  requires Next(c, v, v')
+  requires NextStep(c, v, v', sysStep)
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+{
+  NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  forall vb, ldr:LeaderId | 
+    && Chosen(c, v', vb)
+    && c.ValidLeaderIdx(ldr)
+    && vb.b < ldr 
+    && v'.LeaderCanPropose(c, ldr)
+  ensures
+    v'.leaders[ldr].HeardAtLeast(vb.b)
+  {
+    assert Chosen(c, v, vb);
+    if ldr == sysStep.leader {  // if the leader in question is now taking a step
+      var choosingAccs := SupportingAcceptorsForChosen(c, v, vb);
+      if v.leaders[ldr].HeardAtMost(vb.b) {
+        // Ldr has yet to see ballot b in this step. By quorum intersection, it must see
+        // an acceptor in choosingAccs in this step
+        var acc := sysStep.acceptor;
+        if acc !in choosingAccs {
+          // In this case, by quorum intersection, acc must already be in ldr.receivePromises
+          // First prove that choosingAccs !! v.leaders[ldr].receivedPromises
+          forall a | a in choosingAccs 
+          ensures a !in v.leaders[ldr].Last().receivedPromises
+          {
+            if !v.acceptors[a].HasAcceptedAtMostBal(ldr) && a in v.leaders[ldr].Last().receivedPromises {
+              // via LeaderHighestHeardToPromisedRangeHasNoAccepts
+              assert false;
+            }
+          }
+          var allAccs := GetAcceptorSet(c, v);
+          var e := QuorumIntersection(allAccs, choosingAccs, v.leaders[ldr].Last().receivedPromises + {acc});
+          assert false;
+        }        
+      }
+    }
+  }
+}
+
+// Helper lemma for P2b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
+lemma {:timeLimitMultiplier 2} InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires sysStep.P2bStep?
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
+  requires NextStep(c, v, v', sysStep)
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+{
+  forall vb, ldr:LeaderId | 
+    && Chosen(c, v', vb)
+    && c.ValidLeaderIdx(ldr)
+    && vb.b < ldr 
+    && v'.LeaderCanPropose(c, ldr)
+  ensures
+    v'.leaders[ldr].HeardAtLeast(vb.b)
+  {
+    var choosingAccs := SupportingAcceptorsForChosen(c, v', vb);
+    // These properties of choosingAccs carry over to pre-state v
+    assert forall a | a in choosingAccs ::
+      && c.ValidAcceptorIdx(a)
+      && v.acceptors[a].HasAcceptedAtLeastBal(vb.b);
+    // Leader is also unchanged
+    assert v'.leaders[ldr] == v.leaders[ldr];
+    assert v.LeaderCanPropose(c, ldr);
+    if !v.leaders[ldr].HeardAtLeast(vb.b) {
+      // Contradiction via quorum intersection, and LeaderHighestHeardToPromisedRangeHasNoAccepts
+      var allAccs := GetAcceptorSet(c, v);
+      var e := QuorumIntersection(allAccs, choosingAccs, v.leaders[ldr].Last().receivedPromises);
+      assert false;
+    }
+  }
+}
+
+lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')  // prereq for AcceptorAcceptedImpliesProposed
+  
+  // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
+  requires AcceptorAcceptedImpliesProposed(c, v')
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+
+  // post-condition
+  ensures ChosenValImpliesAcceptorOnlyAcceptsVal(c, v')
+{
+  var sysStep :| NextStep(c, v, v', sysStep);
+  if sysStep.P1aStep? || sysStep.P1bStep? || sysStep.P2aStep? || sysStep.LearnerInternalStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  } else if sysStep.P2bStep? {
+    if !ChosenValImpliesAcceptorOnlyAcceptsVal(c, v') {
+      var vb, acc:AcceptorId :|
+        && Chosen(c, v', vb)
+        && c.ValidAcceptorIdx(acc)
+        && v'.acceptors[acc].Last().acceptedVB.Some?
+        && vb.b <= v'.acceptors[acc].Last().acceptedVB.value.b 
+        // This is the contradiction
+        && v'.acceptors[acc].Last().acceptedVB.value.v != vb.v;
+      
+      // Then there is a leader that proposed the accepted value, by AcceptorAcceptedImpliesProposed
+      var ldr := v'.acceptors[acc].Last().acceptedVB.value.b;
+      LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldr, vb);
+    }
+  }
+}
+
+lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+  ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
+{
+  var sysStep :| NextStep(c, v, v', sysStep);
+  if sysStep.P1aStep? || sysStep.P1bStep? || sysStep.P2aStep? || sysStep.LearnerInternalStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  } else {
+    // P2bStep
+    if !ChosenValImpliesLeaderOnlyHearsVal(c, v') {
+      var vb, ldrBal:LeaderId :|
+          && Chosen(c, v', vb)
+          && c.ValidLeaderIdx(ldrBal)
+          && v'.leaders[ldrBal].Last().highestHeardBallot.Some?
+          && v'.leaders[ldrBal].Last().highestHeardBallot.value >= vb.b
+          // This is the contradiction
+          && v'.leaders[ldrBal].Last().value != vb.v;
+      if vb.b < ldrBal {
+        LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldrBal, vb);
+      }
+      // Otherwise, when vb.b < ldrBal, violates OneValuePerBallot(c, v')
+    }
+  }
+}
+
+lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
+  requires v.WF(c)
+  requires Chosen(c, v, chosen)
+  requires c.ValidLeaderIdx(ldr)
+  requires v.leaders[ldr].Last().highestHeardBallot.Some?
+  requires v.leaders[ldr].Last().highestHeardBallot.value >= chosen.b
+  requires v.leaders[ldr].Last().value != chosen.v
+  requires chosen.b < ldr
+  requires OneValuePerBallot(c, v)
+  requires LeaderHighestHeardUpperBound(c, v)
+  requires LeaderHearedImpliesProposed(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  ensures false
+{
+  /* 
+    Suppose leader L hears a value v' != vb.v. Then by LeaderHearedImpliesProposed, another leader L' 
+    such that vb.v <= L' < L must have proposed v', 
+    Then do recursion all the way down.
+  */
+  var ldr' := v.leaders[ldr].Last().highestHeardBallot.value;
+  assert v.leaders[ldr'].Last().value == v.leaders[ldr].Last().value;
+  assert chosen.b <= ldr' < ldr;
+  LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
+}
+
 
 /***************************************************************************************
 *                            Helper Definitions and Lemmas                             *
