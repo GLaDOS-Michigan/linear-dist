@@ -486,11 +486,11 @@ module LearnerHost {
     requires v.WF()
   {
     && msgOps.recv.None?
-    && msgOps.send.None?
     && var vi := v.Last();
     && vb in vi.receivedAccepts              // enabling
     && |vi.receivedAccepts[vb]| >= c.f + 1   // enabling
     && var vi' := vi.(learned := Some(vb.v));  // learn new value
+    && msgOps.send == Some(Learn(c.id, vb.b, vb.v))
     && v' == v.(h := v.h + [vi'])
   }
 
