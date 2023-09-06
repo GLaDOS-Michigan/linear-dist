@@ -441,27 +441,7 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
   requires Next(c, v, v')
   ensures LeaderNotHeardImpliesNotPromised(c, v')
 {
-  forall ldr:LeaderId, acc:AcceptorId, b:LeaderId |
-      && c.ValidLeaderIdx(ldr)
-      && c.ValidAcceptorIdx(acc)
-      && b < ldr
-      && v'.acceptors[acc].HasAcceptedAtLeastBal(b)
-      && v'.acceptors[acc].HasAcceptedAtMostBal(ldr)
-      && v'.leaders[ldr].HeardAtMost(b)
-  ensures
-      acc !in v'.leaders[ldr].receivedPromises
-  {
-    var sysStep :| NextStep(c, v, v', sysStep);
-    if sysStep.P2aStep? {
-      if acc in v.leaders[ldr].receivedPromises {
-        if !v.acceptors[acc].HasAcceptedAtLeastBal(b) {
-          if acc == sysStep.acceptor {
-            assert false;
-          }
-        }
-      }
-    }
-  }
+  assert LeaderNotHeardImpliesNotPromised(c, v');  // trigger
 }
 
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
