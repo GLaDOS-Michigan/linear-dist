@@ -383,7 +383,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 ***************************************************************************************/
 
 
-// Bundle for simple-to-ptove invariants
+// Bundle for simple-to-prove invariants
 lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
@@ -423,7 +423,7 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
   ensures
     exists b: LeaderId ::
       && var vb := VB(val, b);
-      && ChosenAtLearner(c, v, vb, lnr)
+      && ChosenAtLearner(c, v', vb, lnr)
   {
     var sysStep :| NextStep(c, v, v', sysStep);
     if sysStep.P2bStep? {
