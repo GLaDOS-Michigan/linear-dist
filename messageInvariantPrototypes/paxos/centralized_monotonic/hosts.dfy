@@ -31,22 +31,21 @@ module LeaderHost {
     ghost predicate HeardAtLeast(b: LeaderId) 
       requires WF()
     {
-      var v := Last(h);
-      v.highestHeardBallot.Some? && v.highestHeardBallot.value >= b
+      var vi := Last(h);
+      vi.highestHeardBallot.Some? && vi.highestHeardBallot.value >= b
     }
     
     // My highestHeardBallot < b
     ghost predicate HeardAtMost(b: LeaderId) 
       requires WF()
     {
-      var v := Last(h);
-      v.highestHeardBallot.None? || v.highestHeardBallot.value < b
+      var vi := Last(h);
+      vi.highestHeardBallot.None? || vi.highestHeardBallot.value < b
     }
 
     ghost predicate CanPropose(c: Constants) 
       requires WF()
     {
-      var v := Last(h);
       && |Last(h).receivedPromises| >= c.f+1
       // Enabling condition that my hightest heard 
       // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
@@ -160,35 +159,57 @@ module AcceptorHost {
 
   datatype PendingPrepare = Prepare(bal:LeaderId)
 
-  datatype Variables = Variables(
+  datatype Inner = Inner(
     pendingPrepare: Option<PendingPrepare>,
     promised: Option<LeaderId>,
-    acceptedVB: Option<ValBal>) 
+    acceptedVB: Option<ValBal>
+  )
+
+  datatype Variables = Variables(h: seq<Inner>)
   {
 
-    ghost predicate HasAccepted(vb: ValBal) {
-      && acceptedVB.Some?
-      && acceptedVB.value == vb
+    ghost predicate WF() {
+      0 < |h|
     }
 
-    ghost predicate HasAcceptedValue(v: Value) {
-      && acceptedVB.Some?
-      && acceptedVB.value.v == v
+    ghost predicate HasAccepted(vb: ValBal) 
+      requires WF()
+    {
+      var vi := Last(h);
+      && vi.acceptedVB.Some?
+      && vi.acceptedVB.value == vb
     }
 
-    ghost predicate HasPromisedAtLeast(b: LeaderId) {
-      && promised.Some?
-      && b <= promised.value
+    ghost predicate HasAcceptedValue(v: Value) 
+      requires WF()
+    {
+      var vi := Last(h);
+      && vi.acceptedVB.Some?
+      && vi.acceptedVB.value.v == v
     }
 
-    ghost predicate HasAcceptedAtLeastBal(b: LeaderId) {
-      && acceptedVB.Some?
-      && b <= acceptedVB.value.b
+    ghost predicate HasPromisedAtLeast(b: LeaderId) 
+      requires WF()
+    {
+      var vi := Last(h);
+      && vi.promised.Some?
+      && b <= vi.promised.value
     }
 
-    ghost predicate HasAcceptedAtMostBal(b: LeaderId) {
-      && acceptedVB.Some?
-      && acceptedVB.value.b < b
+    ghost predicate HasAcceptedAtLeastBal(b: LeaderId) 
+      requires WF()
+    {
+      var vi := Last(h);
+      && vi.acceptedVB.Some?
+      && b <= vi.acceptedVB.value.b
+    }
+
+    ghost predicate HasAcceptedAtMostBal(b: LeaderId) 
+      requires WF()
+    {
+      var vi := Last(h);
+      && vi.acceptedVB.Some?
+      && vi.acceptedVB.value.b < b
     }
   } // end datatype Variables (acceptor)
 
@@ -201,6 +222,7 @@ module AcceptorHost {
   ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWFConstants(grp_c)
     && |grp_v| == |grp_c| == 2*f+1
+    && forall i | 0 <= i < |grp_v| :: grp_v[i].WF()
   }
 
   ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 
@@ -210,9 +232,9 @@ module AcceptorHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && v.promised == None
-    && v.acceptedVB == None
-    && v.pendingPrepare == None
+    v == Variables(
+      [Inner(None, None, None)]
+    )
   }
 
   datatype TransitionLabel =
@@ -230,6 +252,7 @@ module AcceptorHost {
     | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+    requires v.WF()
   {
     match step
       case ReceivePrepareStep => NextReceivePrepareStep(c, v, v', lbl)
@@ -239,60 +262,76 @@ module AcceptorHost {
       case StutterStep => NextStutterStep(c, v, v', lbl)
   }
 
-  ghost predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+    requires v.WF()
+  {
+    && var vi := Last(v.h);
     && lbl.ReceivePrepareLbl?
-    && v.pendingPrepare.None?
-    && v' == v.(pendingPrepare := Some(Prepare(lbl.bal)))
+    && vi.pendingPrepare.None?
+    && v' == v.(
+      h := v.h + [vi.(pendingPrepare := Some(Prepare(lbl.bal)))]
+    )
   }
 
   ghost predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+    requires v.WF()
   {
+    && var vi := Last(v.h);
     && lbl.MaybePromiseLbl?
-    && v.pendingPrepare.Some?
-    && var bal := v.pendingPrepare.value.bal;
-    && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+    && vi.pendingPrepare.Some?
+    && var bal := vi.pendingPrepare.value.bal;
+    && var doPromise := vi.promised.None? || (vi.promised.Some? && vi.promised.value < bal);
     && if doPromise then
-          && v' == v.(
-            promised := Some(bal),
-            pendingPrepare := None)
-          && lbl == MaybePromiseLbl(Some(bal), Some(v.acceptedVB))
+          var vi' := vi.(promised := Some(bal),
+            pendingPrepare := None);
+          && v' == v.(h := v.h + [vi'])
+          && lbl == MaybePromiseLbl(Some(bal), Some(vi.acceptedVB))
         else
-          && v' == v.(pendingPrepare := None)
+          var vi' := vi.(pendingPrepare := None);
+          && v' == v.(h := v.h + [vi'])
           && lbl == MaybePromiseLbl(None, None)
   }
 
-  ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+    requires v.WF()
+  {
+    && var vi := Last(v.h);
     && lbl.MaybeAcceptLbl?
-    && v.pendingPrepare.None?
+    && vi.pendingPrepare.None?
     && var bal := lbl.bal;
     && var val := lbl.val;
-    && var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
+    && var doAccept := vi.promised.None? || (vi.promised.Some? && vi.promised.value <= bal);
     &&  if doAccept then
-          && v' == v.(
-                promised := Some(bal), 
-                acceptedVB := Some(VB(val, bal))
-              )
+          var vi' := vi.(
+                  promised := Some(bal), 
+                  acceptedVB := Some(VB(val, bal)));
+          && v' == v.(h := v.h + [vi'])
         else
-          && v' == v
+          && v' == Variables(StutterSeq(v.h))
   }
 
   ghost predicate NextBroadcastAcceptedStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+    requires v.WF()
   {
+    && var vi := Last(v.h);
     && lbl.BroadcastAcceptedLbl?
-    && v.pendingPrepare.None?
-    && v.acceptedVB.Some?
-    && lbl.vb == v.acceptedVB.value
-    && v' == v
+    && vi.pendingPrepare.None?
+    && vi.acceptedVB.Some?
+    && lbl.vb == vi.acceptedVB.value
+    && v' == Variables(StutterSeq(v.h))
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+    requires v.WF()
+  {
     && lbl.InternalLbl?
-    && v' == v
+    && v' == Variables(StutterSeq(v.h))
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
-    exists step :: NextStep(c, v, v', step, lbl)
+    && v.WF()
+    && exists step :: NextStep(c, v, v', step, lbl)
   }
 }  // end module AcceptorHost
 
@@ -312,14 +351,36 @@ module LearnerHost {
     && c.f == f
   }
 
-  datatype Variables = Variables(
+  datatype Inner = Inner(
     // maps ValBal to acceptors that accepted such pair
     receivedAccepts: map<ValBal, set<AcceptorId>>,
     learned: Option<Value>
-  ) {
+  )
+
+  datatype Variables = Variables(h: seq<Inner>) 
+  {
+
+    ghost predicate WF() {
+      0 < |h|
+    }
+
+    ghost predicate HasLearnedSome()
+      requires WF()
+    {
+      Last(h).learned.Some?
+    }
     
-    ghost predicate HasLearnedValue(v: Value) {
-      learned == Some(v)
+    ghost predicate HasLearnedValue(v: Value) 
+      requires WF()
+    {
+      Last(h).learned == Some(v)
+    }
+
+    ghost function GetLearnedValue() : (learned: Value)
+      requires WF()
+      requires HasLearnedSome()
+    {
+      Last(h).learned.value
     }
   } // end datatype Variables (Learner)
 
@@ -333,6 +394,7 @@ module LearnerHost {
     && 0 < f
     && GroupWFConstants(grp_c, f)
     && |grp_v| == |grp_c|
+    && forall i | 0 <= i < |grp_v| :: grp_v[i].WF()
   }
 
   ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 
@@ -342,8 +404,9 @@ module LearnerHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && v.receivedAccepts == map[]
-    && v.learned == None
+    v == Variables(
+      [Inner(map[], None)]
+    )
   }
 
   datatype TransitionLabel =
@@ -354,6 +417,7 @@ module LearnerHost {
     ReceiveStep() | LearnStep(vb: ValBal) | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+    requires v.WF()
   {
     match step
       case ReceiveStep => NextReceiveAcceptStep(c, v, v', lbl)
@@ -375,25 +439,36 @@ module LearnerHost {
       receivedAccepts[vb := {acc}]
   }
 
-  ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+    requires v.WF()
+  {
+    var vi := Last(v.h);
     && lbl.ReceiveAcceptLbl?
-    && v' == Variables(UpdateReceivedAccepts(v.receivedAccepts, lbl.vb, lbl.acc), v.learned)
+    && var vi' := Inner(UpdateReceivedAccepts(vi.receivedAccepts, lbl.vb, lbl.acc), vi.learned);
+    && v' == v.(h := v.h + [vi'])
   }
 
-  ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, lbl: TransitionLabel) {
+  ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, lbl: TransitionLabel) 
+    requires v.WF()
+  {
+    var vi := Last(v.h);
     && lbl.InternalLbl?
-    && vb in v.receivedAccepts              // enabling
-    && |v.receivedAccepts[vb]| >= c.f + 1   // enabling
-    && v' == v.(learned := Some(vb.v))      // learn new value
+    && vb in vi.receivedAccepts              // enabling
+    && |vi.receivedAccepts[vb]| >= c.f + 1   // enabling
+    && var vi' := vi.(learned := Some(vb.v));  // learn new value
+    && v' == v.(h := v.h + [vi'])
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+    requires v.WF()
+  {
     && lbl.InternalLbl?
-    && v' == v
+    && v' == Variables(StutterSeq(v.h))
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
   {
-    exists step :: NextStep(c, v, v', step, lbl)
+    && v.WF()
+    && exists step :: NextStep(c, v, v', step, lbl)
   }
 }  // end module LearnerHost
