@@ -94,7 +94,7 @@ datatype Step =
 ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: LeaderId, acc: AcceptorId) 
   requires v.WF(c) && v'.WF(c)
 {
-  var ldrLbl := LeaderHost.InternalLbl();
+  var ldrLbl := LeaderHost.PrepareLbl();
   var accLbl := AcceptorHost.ReceivePrepareLbl(ldr);
   && c.ValidLeaderIdx(ldr)
   && c.ValidAcceptorIdx(acc)

@@ -398,7 +398,13 @@ lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   ensures LeaderHighestHeardUpperBound(c, v')
   ensures LeaderHearedImpliesProposed(c, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
-{}
+{
+  assert LearnerValidReceivedAccepts(c, v');
+  assert LearnerValidReceivedAcceptsKeys(c, v');
+  assert LearnerReceivedAcceptImpliesProposed(c, v');
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
+  assert AcceptorValidPromisedAndAccepted(c, v');
+}
 
 lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)

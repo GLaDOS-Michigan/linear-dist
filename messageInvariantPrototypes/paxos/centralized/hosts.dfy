@@ -66,25 +66,27 @@ module LeaderHost {
   }
 
   datatype TransitionLabel =
+    | PrepareLbl()
     | ReceivePromiseLbl(acc: AcceptorId, vbOpt:Option<ValBal>) 
     | ProposeLbl(val:Value) 
     | InternalLbl()
 
   datatype Step =
-    ReceiveStep() | ProposeStep() | StutterStep()
+    PrepareStep() | ReceiveStep() | ProposeStep() | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
+      case PrepareStep => NextPrepareStep(c, v, v', lbl)
       case ReceiveStep => NextReceivePromiseStep(c, v, v', lbl)
       case ProposeStep => NextProposeStep(c, v, v', lbl)
       case StutterStep => NextStutterStep(c, v, v', lbl)
   }
 
-  // ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-  //   && lbl.InternalLbl?
-  //   && v' == v
-  // }
+  ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.PrepareLbl?
+    && v' == v
+  }
 
   ghost predicate NextReceivePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.ReceivePromiseLbl?

@@ -86,22 +86,30 @@ module LeaderHost {
   }
 
   datatype TransitionLabel =
+    | PrepareLbl()
     | ReceivePromiseLbl(acc: AcceptorId, vbOpt:Option<ValBal>) 
     | ProposeLbl(val:Value) 
     | InternalLbl()
 
   datatype Step =
-    ReceiveStep() | ProposeStep() | StutterStep()
+    PrepareStep() | ReceiveStep() | ProposeStep() | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
     requires v.WF()
   {
     match step
+      case PrepareStep => NextPrepareStep(c, v, v', lbl)
       case ReceiveStep => NextReceivePromiseStep(c, v, v', lbl)
       case ProposeStep => NextProposeStep(c, v, v', lbl)
       case StutterStep => NextStutterStep(c, v, v', lbl)
   }
 
+  ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+    requires v.WF()
+  {
+    && lbl.PrepareLbl?
+    && v' == Variables(StutterSeq(v.h))
+  }
 
   ghost predicate NextReceivePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
     requires v.WF()
@@ -136,9 +144,11 @@ module LeaderHost {
     && v' == Variables(StutterSeq(v.h))
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) 
+    requires v.WF()
+  {
     && lbl.InternalLbl?
-    && v' == v
+    && v' == Variables(StutterSeq(v.h))
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
