@@ -137,7 +137,47 @@ ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables)
     && v.leaders[vb.b].Last().value == vb.v
 }
 
-// Monotonicity Properties
+// Each entry in a learner's receivedAccepts implies that an acceptor accepted it
+ghost predicate LearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, vb:ValBal, acc:AcceptorId |
+    && c.ValidLearnerIdx(lnr)
+    && c.ValidAcceptorIdx(acc)
+    && vb in v.learners[lnr].Last().receivedAccepts
+    && acc in v.learners[lnr].Last().receivedAccepts[vb]
+  ::
+    v.acceptors[acc].HasAcceptedAtLeastBal(vb.b) 
+}
+
+// Acceptor's fields all host valid leader ballots
+ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables) 
+  requires v.WF(c)
+{
+  forall acc: AcceptorId | c.ValidAcceptorIdx(acc)
+  ::
+    && (v.acceptors[acc].Last().pendingPrepare.Some? 
+        ==> c.ValidLeaderIdx(v.acceptors[acc].Last().pendingPrepare.value.bal))
+    && (v.acceptors[acc].Last().promised.Some? 
+        ==> c.ValidLeaderIdx(v.acceptors[acc].Last().promised.value))
+    && (v.acceptors[acc].Last().acceptedVB.Some? 
+        ==> c.ValidLeaderIdx(v.acceptors[acc].Last().acceptedVB.value.b))
+}
+
+// If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
+ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall acc | 
+    && c.ValidAcceptorIdx(acc) 
+    && v.acceptors[acc].Last().acceptedVB.Some?
+  :: 
+    && v.acceptors[acc].Last().promised.Some?
+    && v.acceptors[acc].Last().acceptedVB.value.b <= v.acceptors[acc].Last().promised.value
+}
+
+//// Monotonicity Properties
+
 ghost predicate LeaderMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
@@ -150,11 +190,24 @@ ghost predicate LeaderMonotonic(c: Constants, v: Variables)
     && v.leaders[ldr].Last().value == v.leaders[ldr].h[i].value
 }
 
+ghost predicate AcceptorMonotonic(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall acc, i | 
+    && c.ValidAcceptorIdx(acc)
+    && 0 <= i < |v.acceptors[acc].h|
+    && v.acceptors[acc].h[i].acceptedVB.Some?
+  ::
+    && v.acceptors[acc].Last().acceptedVB.Some?
+    && v.acceptors[acc].h[i].acceptedVB.value.b <= v.acceptors[acc].Last().acceptedVB.value.b
+}
 
+// Monotonicity Bundle
 ghost predicate MonotonicityInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
   && LeaderMonotonic(c, v)
+  && AcceptorMonotonic(c, v)
 }
 
 // Application bundle
@@ -168,9 +221,9 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
   && LearnerReceivedAcceptImpliesProposed(c, v)
-  // && LearnerReceivedAcceptImpliesAccepted(c, v)
-  // && AcceptorValidPromisedAndAccepted(c, v)
-  // && AcceptorPromisedLargerThanAccepted(c, v)
+  && LearnerReceivedAcceptImpliesAccepted(c, v)
+  && AcceptorValidPromisedAndAccepted(c, v)
+  && AcceptorPromisedLargerThanAccepted(c, v)
   // && AcceptorAcceptedImpliesProposed(c, v)
   // && LeaderValidReceivedPromises(c, v)
   // && LeaderHighestHeardUpperBound(c, v)
@@ -213,17 +266,19 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
-  assert MonotonicityInv(c, v');
 
   assert LearnerValidReceivedAccepts(c, v');
   assert LearnerValidReceivedAcceptsKeys(c, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   assert LearnedImpliesQuorumOfAccepts(c, v');
   assert LearnerReceivedAcceptImpliesProposed(c, v');
-  
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
+  assert AcceptorValidPromisedAndAccepted(c, v');
+  assert AcceptorPromisedLargerThanAccepted(c, v');
 
-  assert ApplicationInv(c, v');
   
+  assert MonotonicityInv(c, v');
+  assert ApplicationInv(c, v');
   
   assume false;
   assume AtMostOneChosenVal(c, v');  // this should be implied by invariants
