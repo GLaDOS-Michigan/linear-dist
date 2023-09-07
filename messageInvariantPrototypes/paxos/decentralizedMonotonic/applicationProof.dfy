@@ -1,10 +1,11 @@
-include "spec.dfy"
+include "messageInvariants.dfy"
 
 module PaxosProof {
   
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
+import opened PaxosMessageInvariants
 import opened Obligations
 
 
@@ -88,17 +89,104 @@ ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
     acceptedVal == v.leaders[ldr].Last().value
 }
 
+// Learner's receivedAccepts contain valid acceptor ids
+ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, vb:ValBal, e:AcceptorId |
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.learners[lnr].Last().receivedAccepts
+    && e in v.learners[lnr].Last().receivedAccepts[vb]
+  ::
+    c.ValidAcceptorIdx(e)
+}
+
+// Learner's receivedAccepts contain valid leader ballots
+ghost predicate LearnerValidReceivedAcceptsKeys(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, vb:ValBal |
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.learners[lnr].Last().receivedAccepts
+  ::
+    c.ValidLeaderIdx(vb.b)
+}
+
+// Learner's learned value must be backed by a quorum of accepts
+ghost predicate LearnedImpliesQuorumOfAccepts(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, val:Value |
+    && c.ValidLearnerIdx(lnr)
+    && v.learners[lnr].HasLearnedValue(val)
+  ::
+    exists b: LeaderId ::
+      && var vb := VB(val, b);
+      && ChosenAtLearner(c, v, vb, lnr)
+}
+
+ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables) 
+  requires v.WF(c)
+  requires LearnerValidReceivedAcceptsKeys(c, v)
+{
+  forall lnr:LearnerId, vb:ValBal |
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.learners[lnr].Last().receivedAccepts
+  ::
+    && v.LeaderCanPropose(c, vb.b)
+    && v.leaders[vb.b].Last().value == vb.v
+}
+
+// Monotonicity Properties
+ghost predicate LeaderMonotonic(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, i | 
+    && c.ValidLeaderIdx(ldr)
+    && 0 <= i < |v.leaders[ldr].h|
+    && v.leaders[ldr].h[i].CanPropose(c.leaderConstants[ldr])
+  ::
+    && v.LeaderCanPropose(c, ldr)
+    && v.leaders[ldr].Last().value == v.leaders[ldr].h[i].value
+}
+
+
+ghost predicate MonotonicityInv(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  && LeaderMonotonic(c, v)
+}
 
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
+  requires MessageInv(c, v)
 {
-  && OneValuePerBallot(c, v)
+  && MonotonicityInv(c, v)
+  // && OneValuePerBallot(c, v)
+  && LearnerValidReceivedAccepts(c, v)
+  && LearnerValidReceivedAcceptsKeys(c, v)
+  && LearnedImpliesQuorumOfAccepts(c, v)
+  && LearnerReceivedAcceptImpliesProposed(c, v)
+  // && LearnerReceivedAcceptImpliesAccepted(c, v)
+  // && AcceptorValidPromisedAndAccepted(c, v)
+  // && AcceptorPromisedLargerThanAccepted(c, v)
+  // && AcceptorAcceptedImpliesProposed(c, v)
+  // && LeaderValidReceivedPromises(c, v)
+  // && LeaderHighestHeardUpperBound(c, v)
+  // && LeaderHearedImpliesProposed(c, v)
+  // && LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  // && LeaderNotHeardImpliesNotPromised(c, v)
+  // && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
+  // && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  // && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  // && ChosenValImpliesLeaderOnlyHearsVal(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
+  && MessageInv(c, v)
   && ApplicationInv(c, v)
   && Agreement(c, v)
 }
@@ -124,16 +212,21 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  // InvNextOneValuePerBallot(c, v, v');
-  // InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
-  // InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
-  // InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
-  // InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
-  // InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
-  // InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
+  MessageInvInductive(c, v, v');
+  assert MonotonicityInv(c, v');
+
+  assert LearnerValidReceivedAccepts(c, v');
+  assert LearnerValidReceivedAcceptsKeys(c, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
+  assert LearnedImpliesQuorumOfAccepts(c, v');
+  assert LearnerReceivedAcceptImpliesProposed(c, v');
+  
+
+  assert ApplicationInv(c, v');
+  
   
   assume false;
-  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  assume AtMostOneChosenVal(c, v');  // this should be implied by invariants
   // AtMostOneChosenImpliesSafety(c, v');
 }
 
@@ -143,6 +236,33 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 ***************************************************************************************/
 
 
+lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires LearnerValidReceivedAccepts(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
+  requires Next(c, v, v')
+  ensures LearnedImpliesQuorumOfAccepts(c, v')
+{
+  forall lnr:LearnerId, val:Value |
+    c.ValidLearnerIdx(lnr) && v'.learners[lnr].HasLearnedValue(val)
+  ensures
+    exists b: LeaderId ::
+      && var vb := VB(val, b);
+      && ChosenAtLearner(c, v', vb, lnr)
+  {
+    var sysStep :| NextStep(c, v, v', sysStep);
+    var actor, msgOps := sysStep.actor, sysStep.msgOps;
+    if sysStep.LearnerStep? && actor == lnr {
+      var step :| LearnerHost.NextStep(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], step, msgOps);
+      if !step.LearnStep? {
+        assert v.learners[lnr].HasLearnedValue(val);  // trigger
+      }
+    } else {
+      assert v.learners[lnr].HasLearnedValue(val);    // trigger
+    }
+  }
+}
 
 
 /***************************************************************************************
@@ -181,7 +301,7 @@ ghost predicate AtMostOneChosenVal(c: Constants, v: Variables)
 
 //// Helper Lemmas ////
 
-// // A value being learned implies it was chosen at some ballot, and skolemize this ballot
+// A value being learned implies it was chosen at some ballot, and skolemize this ballot
 // lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Value) returns (vb: ValBal)
 //   requires v.WF(c)
 //   requires c.ValidLearnerIdx(lnr)
@@ -262,5 +382,8 @@ ghost predicate AtMostOneChosenVal(c: Constants, v: Variables)
 //   accSet := set a |  0 <= a < |c.acceptorConstants|;
 //   SetComprehensionSize(|c.acceptorConstants|);
 // }
+
+
+// Monotonic properties
 
 } // end module PaxosProof
