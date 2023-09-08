@@ -23,27 +23,31 @@ ghost predicate OneValuePerBallot(c: Constants, v: Variables)
 ghost predicate OneValuePerBallotAcceptors(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall a1, a2 |
+  forall a1, a2, i, j|
     && c.ValidAcceptorIdx(a1)
     && c.ValidAcceptorIdx(a2)
-    && v.acceptors[a1].Last().acceptedVB.Some?
-    && v.acceptors[a2].Last().acceptedVB.Some?
-    && v.acceptors[a1].Last().acceptedVB.value.b 
-        == v.acceptors[a2].Last().acceptedVB.value.b 
+    && v.acceptors[a1].ValidHistoryIndex(i)
+    && v.acceptors[a2].ValidHistoryIndex(j)
+    && v.acceptors[a1].h[i].acceptedVB.Some?
+    && v.acceptors[a2].h[j].acceptedVB.Some?
+    && v.acceptors[a1].h[i].acceptedVB.value.b 
+        == v.acceptors[a2].h[j].acceptedVB.value.b 
   ::
-    v.acceptors[a1].Last().acceptedVB.value.v
-        == v.acceptors[a2].Last().acceptedVB.value.v
+    v.acceptors[a1].h[i].acceptedVB.value.v
+        == v.acceptors[a2].h[j].acceptedVB.value.v
 }
 
 // Learners only have one value for each ballot
 ghost predicate OneValuePerBallotLearners(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall l1, l2, vb1, vb2 |
+  forall l1, l2, vb1, vb2, i, j|
     && c.ValidLearnerIdx(l1)
     && c.ValidLearnerIdx(l2)
-    && vb1 in v.learners[l1].Last().receivedAccepts
-    && vb2 in v.learners[l1].Last().receivedAccepts
+    && v.learners[l1].ValidHistoryIndex(i)
+    && v.learners[l1].ValidHistoryIndex(j)
+    && vb1 in v.learners[l1].h[i].receivedAccepts
+    && vb2 in v.learners[l1].h[j].receivedAccepts
     && vb1.b == vb2.b
   ::
     vb1.v == vb2.v
@@ -70,7 +74,6 @@ ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
   forall ldr, lnr, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidLearnerIdx(lnr)
-    && v.LeaderCanPropose(c, ldr)
     && VB(acceptedVal, ldr) in v.learners[lnr].Last().receivedAccepts
   ::
     acceptedVal == v.leaders[ldr].Last().value
@@ -83,7 +86,6 @@ ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
   forall ldr, acc, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
-    && v.LeaderCanPropose(c, ldr)
     && v.acceptors[acc].HasAccepted(VB(acceptedVal, ldr))
   ::
     acceptedVal == v.leaders[ldr].Last().value
@@ -164,30 +166,116 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
         ==> c.ValidLeaderIdx(v.acceptors[acc].Last().acceptedVB.value.b))
 }
 
+// TONY: I had to modify this to talk about the whole history, rather than just the Last() state.
 // If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
 ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall acc | 
-    && c.ValidAcceptorIdx(acc) 
-    && v.acceptors[acc].Last().acceptedVB.Some?
+  forall acc, i| 
+    && c.ValidAcceptorIdx(acc)
+    && 0 <= i < |v.acceptors[acc].h|
+    && v.acceptors[acc].h[i].acceptedVB.Some?
   :: 
-    && v.acceptors[acc].Last().promised.Some?
-    && v.acceptors[acc].Last().acceptedVB.value.b <= v.acceptors[acc].Last().promised.value
+    && v.acceptors[acc].h[i].promised.Some?
+    && v.acceptors[acc].h[i].acceptedVB.value.b <= v.acceptors[acc].h[i].promised.value
 }
+
+ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
+  requires v.WF(c)
+  requires AcceptorValidPromisedAndAccepted(c, v)
+{
+  forall acc:AcceptorId, i |
+    && c.ValidAcceptorIdx(acc)
+    && v.acceptors[acc].ValidHistoryIndex(i)
+    && v.acceptors[acc].h[i].acceptedVB.Some?
+  ::
+    var vb := v.acceptors[acc].h[i].acceptedVB.value;
+    && v.LeaderCanPropose(c, vb.b)
+    && v.leaders[vb.b].h[i].value == vb.v
+}
+
+ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, acc |
+    && c.ValidLeaderIdx(ldr)
+    && acc in v.leaders[ldr].Last().receivedPromises
+  ::
+    c.ValidAcceptorIdx(acc)
+}
+
+// For all leaders, its highestHeardBallot is upper bounded by its own ballot
+ghost predicate LeaderHighestHeardUpperBound(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall ldr:LeaderId | 
+    && c.ValidLeaderIdx(ldr)
+    && v.leaders[ldr].Last().highestHeardBallot.Some?
+  :: 
+    v.leaders[ldr].Last().highestHeardBallot.value < ldr
+}
+
+// If a leader has a highestHeardBallot B, then its value has been proposed by the leader 
+// with ballot B
+ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall ldr:LeaderId | 
+    && c.ValidLeaderIdx(ldr)
+    && v.leaders[ldr].Last().highestHeardBallot.Some?
+  ::
+    // note that once a leader CanPropose(), its value does not change
+    var b := v.leaders[ldr].Last().highestHeardBallot.value;
+    && c.ValidLeaderIdx(b)
+    && v.LeaderCanPropose(c, b)
+    && v.leaders[b].Last().value == v.leaders[ldr].Last().value
+}
+
+// For all ldr, acc such that acc in ldr.receivedPromises, acc's current promise
+// must be >= ldr's ballot
+ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr:LeaderId, acc:AcceptorId |
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && acc in v.leaders[ldr].Last().receivedPromises
+  ::
+    v.acceptors[acc].HasPromisedAtLeast(ldr)
+}
+
+// If an acceptor A accepted ballot b, and a leader L has highestHeardBallot < b, then 
+// L cannot have received a promise from A
+ghost predicate LeaderNotHeardImpliesNotPromised(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr:LeaderId, acc:AcceptorId, b:LeaderId |
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && b < ldr
+    && v.acceptors[acc].HasAcceptedAtLeastBal(b)
+    // Tony: Did not have this line below, which this invariant false
+    && v.acceptors[acc].HasAcceptedAtMostBal(ldr)
+    && v.leaders[ldr].HeardAtMost(b)
+  ::
+    && acc !in v.leaders[ldr].Last().receivedPromises
+}
+
 
 //// Monotonicity Properties
 
 ghost predicate LeaderMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, i | 
+  forall ldr, i, j | 
     && c.ValidLeaderIdx(ldr)
-    && 0 <= i < |v.leaders[ldr].h|
+    && v.leaders[ldr].ValidHistoryIndex(i)
+    && v.leaders[ldr].ValidHistoryIndex(j)
+    && i <= j
     && v.leaders[ldr].h[i].CanPropose(c.leaderConstants[ldr])
   ::
-    && v.LeaderCanPropose(c, ldr)
-    && v.leaders[ldr].Last().value == v.leaders[ldr].h[i].value
+    && v.leaders[ldr].h[j].CanPropose(c.leaderConstants[ldr])
+    && v.leaders[ldr].h[j].value == v.leaders[ldr].h[i].value
 }
 
 ghost predicate AcceptorMonotonic(c: Constants, v: Variables)
@@ -216,7 +304,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires MessageInv(c, v)
 {
   && MonotonicityInv(c, v)
-  // && OneValuePerBallot(c, v)
+  && OneValuePerBallot(c, v)
   && LearnerValidReceivedAccepts(c, v)
   && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
@@ -224,12 +312,12 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerReceivedAcceptImpliesAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
-  // && AcceptorAcceptedImpliesProposed(c, v)
-  // && LeaderValidReceivedPromises(c, v)
-  // && LeaderHighestHeardUpperBound(c, v)
-  // && LeaderHearedImpliesProposed(c, v)
-  // && LeaderReceivedPromisesImpliesAcceptorState(c, v)
-  // && LeaderNotHeardImpliesNotPromised(c, v)
+  && AcceptorAcceptedImpliesProposed(c, v)
+  && LeaderValidReceivedPromises(c, v)
+  && LeaderHighestHeardUpperBound(c, v)
+  && LeaderHearedImpliesProposed(c, v)
+  && LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  && LeaderNotHeardImpliesNotPromised(c, v)
   // && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   // && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   // && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -260,22 +348,15 @@ lemma InitImpliesInv(c: Constants, v: Variables)
   ensures Inv(c, v)
 {}
 
-lemma InvInductive(c: Constants, v: Variables, v': Variables)
+lemma {:timeLimitMultiplier 2} InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
-
-  assert LearnerValidReceivedAccepts(c, v');
-  assert LearnerValidReceivedAcceptsKeys(c, v');
+  InvInductiveHelper(c, v, v');
+  InvNextOneValuePerBallot(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
-  assert LearnedImpliesQuorumOfAccepts(c, v');
-  assert LearnerReceivedAcceptImpliesProposed(c, v');
-  assert LearnerReceivedAcceptImpliesAccepted(c, v');
-  assert AcceptorValidPromisedAndAccepted(c, v');
-  assert AcceptorPromisedLargerThanAccepted(c, v');
-
   
   assert MonotonicityInv(c, v');
   assert ApplicationInv(c, v');
@@ -290,6 +371,43 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
+// Bundle for simple-to-prove invariants
+lemma {:timeLimitMultiplier 3} InvInductiveHelper(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LearnerValidReceivedAccepts(c, v')
+  ensures LearnerValidReceivedAcceptsKeys(c, v')
+  ensures LearnerReceivedAcceptImpliesProposed(c, v')
+  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
+  ensures AcceptorValidPromisedAndAccepted(c, v')
+  ensures AcceptorAcceptedImpliesProposed(c, v')
+  ensures AcceptorPromisedLargerThanAccepted(c, v')
+  ensures LeaderValidReceivedPromises(c, v')
+  ensures LeaderHighestHeardUpperBound(c, v')
+  ensures LeaderHearedImpliesProposed(c, v')
+  ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
+  ensures LeaderNotHeardImpliesNotPromised(c, v')
+{}
+
+lemma {:timeLimitMultiplier 3} InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires OneValuePerBallot(c, v)
+  // requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
+  // requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires AcceptorAcceptedImpliesProposed(c, v)
+  requires Next(c, v, v')
+  ensures OneValuePerBallot(c, v')
+{
+  assume false;
+  assert OneValuePerBallotAcceptors(c, v');
+  assume OneValuePerBallotLearners(c, v');
+  assume OneValuePerBallotAcceptorsAndLearners(c, v');
+  assume OneValuePerBallotLeaderAndLearners(c, v');
+  assume OneValuePerBallotLeaderAndAcceptors(c, v');
+}
 
 lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)

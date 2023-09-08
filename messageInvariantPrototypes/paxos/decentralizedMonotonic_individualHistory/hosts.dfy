@@ -41,6 +41,10 @@ module LeaderHost {
       0 < |h|
     }
 
+    ghost predicate ValidHistoryIndex(i: int) {
+      0 <= i < |h|
+    }
+
     ghost function Last() : Inner 
       requires WF()
     {
@@ -196,6 +200,10 @@ module AcceptorHost {
 
     ghost predicate WF() {
       0 < |h|
+    }
+    
+    ghost predicate ValidHistoryIndex(i: int) {
+      0 <= i < |h|
     }
 
     ghost function Last() : Inner 
@@ -392,6 +400,10 @@ module LearnerHost {
 
     ghost predicate WF() {
       0 < |h|
+    }
+
+    ghost predicate ValidHistoryIndex(i: int) {
+      0 <= i < |h|
     }
 
     ghost function Last() : Inner 
