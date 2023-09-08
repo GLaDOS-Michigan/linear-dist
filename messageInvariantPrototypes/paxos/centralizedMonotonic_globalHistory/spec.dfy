@@ -10,9 +10,9 @@ module Obligations {
     forall l1, l2 |
       && c.ValidLearnerIdx(l1)
       && c.ValidLearnerIdx(l2)
-      && v.learners[l1].HasLearnedSome()
-      && v.learners[l2].HasLearnedSome()
+      && v.Last().learners[l1].learned.Some?
+      && v.Last().learners[l2].learned.Some?
     ::
-      v.learners[l1].GetLearnedValue() == v.learners[l2].GetLearnedValue()
+      v.Last().learners[l1].learned == v.Last().learners[l2].learned
   }
 }
