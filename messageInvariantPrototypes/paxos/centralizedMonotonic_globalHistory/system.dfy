@@ -135,6 +135,7 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
   var accLbl := AcceptorHost.MaybePromiseLbl(balOpt, vbOptOpt);
   && c.ValidLeaderIdx(ldr)
   && c.ValidAcceptorIdx(acc)
+  && IsSeqExtension(v.history, v'.history)  // TONY: I previously  forgot this line, which led to buggy spec
   && AcceptorHost.Next(c.acceptorConstants[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc], accLbl)
   && AcceptorsUnchangedExcept(c, v.Last(), v'.Last(), acc)
   && LearnersUnchanged(v.Last(), v'.Last())
@@ -158,6 +159,7 @@ ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables,
   var accLbl := AcceptorHost.MaybeAcceptLbl(ldr, val);
   && c.ValidLeaderIdx(ldr)
   && c.ValidAcceptorIdx(acc)
+  && IsSeqExtension(v.history, v'.history)
   && LeaderHost.Next(c.leaderConstants[ldr], v.Last().leaders[ldr], v'.Last().leaders[ldr], ldrLbl)
   && AcceptorHost.Next(c.acceptorConstants[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc], accLbl)
   && LeadersUnchangedExcept(c, v.Last(), v'.Last(), ldr)
@@ -175,6 +177,7 @@ ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables,
   var lnrLbl := LearnerHost.ReceiveAcceptLbl(acceptedVb, acc);
   && c.ValidAcceptorIdx(acc)
   && c.ValidLearnerIdx(lnr)
+  && IsSeqExtension(v.history, v'.history)
   // acceptor simply stutters
   && AcceptorHost.Next(c.acceptorConstants[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc], accLbl)
   && AcceptorsUnchangedExcept(c, v.Last(), v'.Last(), acc)
@@ -189,6 +192,7 @@ ghost predicate NextLearnerInternalStep(c: Constants, v: Variables, v': Variable
 {
   var lnrLbl := LearnerHost.InternalLbl();
   && c.ValidLearnerIdx(lnr)
+  && IsSeqExtension(v.history, v'.history)
   && LearnerHost.Next(c.learnerConstants[lnr], v.Last().learners[lnr], v'.Last().learners[lnr], lnrLbl)
   && LearnersUnchangedExcept(c, v.Last(), v'.Last(), lnr)
   && LeadersUnchanged(v.Last(), v'.Last())

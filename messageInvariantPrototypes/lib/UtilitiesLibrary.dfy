@@ -165,6 +165,7 @@ module UtilitiesLibrary {
 
   ghost predicate IsSeqExtension<T>(s: seq<T>, s': seq<T>) {
     && |s'| == |s| + 1
+    && |s| == |s'| - 1
     && forall i | 0 <= i < |s| :: s[i] == s'[i]
   }
 

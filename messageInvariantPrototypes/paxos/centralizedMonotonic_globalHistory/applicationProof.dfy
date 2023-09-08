@@ -8,11 +8,125 @@ import opened System
 import opened Obligations
 
 
+ghost predicate OneValuePerBallot(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  && OneValuePerBallotAcceptors(c, v)
+  && OneValuePerBallotLearners(c, v)
+  && OneValuePerBallotAcceptorsAndLearners(c, v)
+  && OneValuePerBallotLeaderAndLearners(c, v)
+  && OneValuePerBallotLeaderAndAcceptors(c, v)
+}
+
+// Acceptors only have one value for each ballot
+ghost predicate OneValuePerBallotAcceptors(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall a1, a2, i|
+    && v.ValidHistoryIdx(i)
+    && c.ValidAcceptorIdx(a1)
+    && c.ValidAcceptorIdx(a2)
+    && v.history[i].acceptors[a1].acceptedVB.Some?
+    && v.history[i].acceptors[a2].acceptedVB.Some?
+    && v.history[i].acceptors[a1].acceptedVB.value.b 
+        == v.history[i].acceptors[a2].acceptedVB.value.b 
+  ::
+    v.history[i].acceptors[a1].acceptedVB.value.v
+        == v.history[i].acceptors[a2].acceptedVB.value.v
+}
+
+// Learners only have one value for each ballot
+ghost predicate OneValuePerBallotLearners(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall l1, l2, vb1, vb2, i|
+    && v.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(l1)
+    && c.ValidLearnerIdx(l2)
+    && vb1 in v.history[i].learners[l1].receivedAccepts
+    && vb2 in v.history[i].learners[l1].receivedAccepts
+    && vb1.b == vb2.b
+  ::
+    vb1.v == vb2.v
+}
+
+// Learners and Acceptors only have one value for each ballot
+ghost predicate OneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall a, l, vb1, vb2, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidAcceptorIdx(a)
+    && c.ValidLearnerIdx(l)
+    && v.history[i].acceptors[a].HasAccepted(vb1)
+    && vb2 in v.history[i].learners[l].receivedAccepts
+    && vb1.b == vb2.b
+  ::
+    vb1.v == vb2.v
+}
+
+// Leaders and Learners only have one value for each ballot
+ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, lnr, acceptedVal, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidLearnerIdx(lnr)
+    && VB(acceptedVal, ldr) in v.history[i].learners[lnr].receivedAccepts
+  ::
+    acceptedVal == v.history[i].leaders[ldr].value
+}
+
+// Leaders and Acceptors only have one value for each ballot
+ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, acc, acceptedVal, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && v.history[i].acceptors[acc].HasAccepted(VB(acceptedVal, ldr))
+  ::
+    acceptedVal == v.history[i].leaders[ldr].value
+}
+
+// Learner's receivedAccepts contain valid acceptor ids
+ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, vb:ValBal, e:AcceptorId, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.history[i].learners[lnr].receivedAccepts
+    && e in v.history[i].learners[lnr].receivedAccepts[vb]
+  ::
+    c.ValidAcceptorIdx(e)
+}
+
+
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  true
+  // && OneValuePerBallot(c, v)
+  && LearnerValidReceivedAccepts(c, v)
+  // && LearnerValidReceivedAcceptsKeys(c, v)
+  // && LearnedImpliesQuorumOfAccepts(c, v)
+  // && LearnerReceivedAcceptImpliesProposed(c, v)
+  // && LearnerReceivedAcceptImpliesAccepted(c, v)
+  // && AcceptorValidPromisedAndAccepted(c, v)
+  // && AcceptorPromisedLargerThanAccepted(c, v)
+  // && AcceptorAcceptedImpliesProposed(c, v)
+  // && LeaderValidReceivedPromises(c, v)
+  // && LeaderHighestHeardUpperBound(c, v)
+  // && LeaderHearedImpliesProposed(c, v)
+  // && LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  // && LeaderNotHeardImpliesNotPromised(c, v)
+  // && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
+  // && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  // && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  // && ChosenValImpliesLeaderOnlyHearsVal(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)
@@ -45,6 +159,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 {
   InvInductiveHelper(c, v, v');
 
+  assert ApplicationInv(c, v');
+
   assume AtMostOneChosenVal(c, v');  // this should be implied by invariants
   assume false;
   // AtMostOneChosenImpliesSafety(c, v');
@@ -60,7 +176,52 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-{}
+  ensures LearnerValidReceivedAccepts(c, v')
+{
+  InvNextLearnerValidReceivedAccepts(c, v, v');
+  assert LearnerValidReceivedAccepts(c, v');
+}
+
+lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires LearnerValidReceivedAccepts(c, v)
+  requires Next(c, v, v')
+  ensures LearnerValidReceivedAccepts(c, v')
+{
+  forall lnr:LearnerId, vb:ValBal, e:AcceptorId, i |
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && vb in v'.history[i].learners[lnr].receivedAccepts
+    && e in v'.history[i].learners[lnr].receivedAccepts[vb]
+  ensures
+    c.ValidAcceptorIdx(e)
+  {
+    var sysStep :| NextStep(c, v, v', sysStep);
+    if sysStep.P1aStep? {
+      assert c.ValidAcceptorIdx(e);
+    } else if sysStep.P1bStep? {
+      if i == |v'.history| - 1 {
+        assert c.ValidAcceptorIdx(e);
+      } else {
+        assert 0 <= i < |v'.history| - 1;
+        assert |v.history| == |v'.history| - 1;
+        assert v'.history[i] == v.history[i];
+        assert c.ValidAcceptorIdx(e);
+      }
+    } else if sysStep.P2aStep? {
+      // assume false;
+      assert c.ValidAcceptorIdx(e);
+    } else if sysStep.P2bStep? {
+      // assume false;
+      assert c.ValidAcceptorIdx(e);
+    } else if sysStep.LearnerInternalStep? {
+      // assume false;
+      assert c.ValidAcceptorIdx(e);
+    } else {
+      assert c.ValidAcceptorIdx(e);
+    }
+  }
+}
 
 
 
