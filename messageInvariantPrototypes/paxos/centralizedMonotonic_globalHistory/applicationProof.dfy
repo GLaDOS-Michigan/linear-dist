@@ -104,6 +104,52 @@ ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
     c.ValidAcceptorIdx(e)
 }
 
+// Learner's receivedAccepts contain valid leader ballots
+ghost predicate LearnerValidReceivedAcceptsKeys(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, vb:ValBal, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.history[i].learners[lnr].receivedAccepts
+  ::
+    c.ValidLeaderIdx(vb.b)
+}
+
+// Learner's learned value must be backed by a quorum of accepts
+ghost predicate LearnedImpliesQuorumOfAccepts(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, val:Value, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && v.history[i].learners[lnr].HasLearnedValue(val)
+  ::
+    exists b: LeaderId ::
+      && var vb := VB(val, b);
+      && ChosenAtLearner(c, v.history[i], vb, lnr)
+}
+
+
+
+
+
+// Acceptor's fields all host valid leader ballots
+ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables) 
+  requires v.WF(c)
+{
+  forall acc: AcceptorId, i | 
+    && v.ValidHistoryIdx(i)
+    && c.ValidAcceptorIdx(acc)
+  ::
+    && var vi := v.history[i];
+    && (vi.acceptors[acc].pendingPrepare.Some? 
+        ==> c.ValidLeaderIdx(vi.acceptors[acc].pendingPrepare.value.bal))
+    && (vi.acceptors[acc].promised.Some? 
+        ==> c.ValidLeaderIdx(vi.acceptors[acc].promised.value))
+    && (vi.acceptors[acc].acceptedVB.Some? 
+        ==> c.ValidLeaderIdx(vi.acceptors[acc].acceptedVB.value.b))
+}
 
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
@@ -111,11 +157,11 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
 {
   // && OneValuePerBallot(c, v)
   && LearnerValidReceivedAccepts(c, v)
-  // && LearnerValidReceivedAcceptsKeys(c, v)
-  // && LearnedImpliesQuorumOfAccepts(c, v)
+  && LearnerValidReceivedAcceptsKeys(c, v)
+  && LearnedImpliesQuorumOfAccepts(c, v)
   // && LearnerReceivedAcceptImpliesProposed(c, v)
   // && LearnerReceivedAcceptImpliesAccepted(c, v)
-  // && AcceptorValidPromisedAndAccepted(c, v)
+  && AcceptorValidPromisedAndAccepted(c, v)
   // && AcceptorPromisedLargerThanAccepted(c, v)
   // && AcceptorAcceptedImpliesProposed(c, v)
   // && LeaderValidReceivedPromises(c, v)
@@ -158,6 +204,10 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   InvInductiveHelper(c, v, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
+  assert LearnedImpliesQuorumOfAccepts(c, v');
+
+
 
   assert ApplicationInv(c, v');
 
@@ -172,57 +222,48 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 ***************************************************************************************/
 
 
-// Bundle for simple-to-prove invariants
+// Bundle for simple-to-prove invariants that needs no dafny proof
 lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
+  ensures LearnerValidReceivedAcceptsKeys(c, v')
+
+
+  ensures AcceptorValidPromisedAndAccepted(c, v')
 {
-  InvNextLearnerValidReceivedAccepts(c, v, v');
   assert LearnerValidReceivedAccepts(c, v');
+  assert LearnerValidReceivedAcceptsKeys(c, v');
+
+
+  
+  assert AcceptorValidPromisedAndAccepted(c, v');
 }
 
-lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
+lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables) 
   requires v.WF(c) && v'.WF(c)
   requires LearnerValidReceivedAccepts(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
   requires Next(c, v, v')
-  ensures LearnerValidReceivedAccepts(c, v')
+  ensures LearnedImpliesQuorumOfAccepts(c, v')
 {
-  forall lnr:LearnerId, vb:ValBal, e:AcceptorId, i |
+  forall lnr:LearnerId, val:Value, i |
     && v'.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
-    && vb in v'.history[i].learners[lnr].receivedAccepts
-    && e in v'.history[i].learners[lnr].receivedAccepts[vb]
+    && v'.history[i].learners[lnr].HasLearnedValue(val)
   ensures
-    c.ValidAcceptorIdx(e)
+    exists b: LeaderId ::
+      && var vb := VB(val, b);
+      && ChosenAtLearner(c, v'.history[i], vb, lnr)
   {
     var sysStep :| NextStep(c, v, v', sysStep);
-    if sysStep.P1aStep? {
-      assert c.ValidAcceptorIdx(e);
-    } else if sysStep.P1bStep? {
+    if sysStep.P2bStep? {
       if i == |v'.history| - 1 {
-        assert c.ValidAcceptorIdx(e);
-      } else {
-        assert 0 <= i < |v'.history| - 1;
-        assert |v.history| == |v'.history| - 1;
-        assert v'.history[i] == v.history[i];
-        assert c.ValidAcceptorIdx(e);
+        assert v'.history[i-1].learners[lnr].HasLearnedValue(val);  // trigger
       }
-    } else if sysStep.P2aStep? {
-      // assume false;
-      assert c.ValidAcceptorIdx(e);
-    } else if sysStep.P2bStep? {
-      // assume false;
-      assert c.ValidAcceptorIdx(e);
-    } else if sysStep.LearnerInternalStep? {
-      // assume false;
-      assert c.ValidAcceptorIdx(e);
-    } else {
-      assert c.ValidAcceptorIdx(e);
     }
   }
 }
-
 
 
 /***************************************************************************************
@@ -238,16 +279,17 @@ ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
 ghost predicate Chosen(c: Constants, v: Variables, vb: ValBal) 
   requires v.WF(c)
 {
-  exists lnr:LearnerId :: ChosenAtLearner(c, v, vb, lnr)
+  exists lnr:LearnerId:: 
+    && ChosenAtLearner(c, v.Last(), vb, lnr)
 }
 
 // Learner lnr witnessed a vb being chosen
-ghost predicate ChosenAtLearner(c: Constants, v: Variables, vb: ValBal, lnr:LearnerId) 
-  requires v.WF(c)
+ghost predicate ChosenAtLearner(c: Constants, h: Hosts, vb: ValBal, lnr:LearnerId) 
+  requires h.WF(c)
 {
   && c.ValidLearnerIdx(lnr)
-  && vb in v.Last().learners[lnr].receivedAccepts
-  && IsAcceptorQuorum(c, v.Last().learners[lnr].receivedAccepts[vb])
+  && vb in h.learners[lnr].receivedAccepts
+  && IsAcceptorQuorum(c, h.learners[lnr].receivedAccepts[vb])
 }
 
 // At most one value can become Chosen
