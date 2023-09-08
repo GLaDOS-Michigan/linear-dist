@@ -69,7 +69,6 @@ ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
   forall ldr, lnr, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidLearnerIdx(lnr)
-    && v.LeaderCanPropose(c, ldr)
     && VB(acceptedVal, ldr) in v.learners[lnr].receivedAccepts
   ::
     acceptedVal == v.leaders[ldr].value
@@ -82,7 +81,6 @@ ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
   forall ldr, acc, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
-    && v.LeaderCanPropose(c, ldr)
     && v.acceptors[acc].HasAccepted(VB(acceptedVal, ldr))
   ::
     acceptedVal == v.leaders[ldr].value

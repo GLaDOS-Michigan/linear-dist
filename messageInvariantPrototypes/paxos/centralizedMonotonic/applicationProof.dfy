@@ -69,7 +69,6 @@ ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
   forall ldr, lnr, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidLearnerIdx(lnr)
-    && v.LeaderCanPropose(c, ldr)
     && VB(acceptedVal, ldr) in v.learners[lnr].Last().receivedAccepts
   ::
     acceptedVal == v.leaders[ldr].Last().value
@@ -82,7 +81,6 @@ ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
   forall ldr, acc, acceptedVal |
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
-    && v.LeaderCanPropose(c, ldr)
     && v.acceptors[acc].HasAccepted(VB(acceptedVal, ldr))
   ::
     acceptedVal == v.leaders[ldr].Last().value
@@ -383,7 +381,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 ***************************************************************************************/
 
 // Bundle for simple-to-prove invariants
-lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
+lemma {:timeLimitMultiplier 2} InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
@@ -450,7 +448,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
   ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
 {}
 
-lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables, v': Variables) 
+lemma {:timeLimitMultiplier 2} InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   requires LearnerReceivedAcceptImpliesAccepted(c, v')
@@ -511,7 +509,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, 
 }
 
 // Helper lemma for P2b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
-lemma {:timeLimitMultiplier 2} InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
+lemma {:timeLimitMultiplier 3} InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
   requires Inv(c, v)
   requires Next(c, v, v')
   requires sysStep.P2bStep?
