@@ -130,8 +130,34 @@ ghost predicate LearnedImpliesQuorumOfAccepts(c: Constants, v: Variables)
       && ChosenAtLearner(c, v.history[i], vb, lnr)
 }
 
+ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables) 
+  requires v.WF(c)
+  requires LearnerValidReceivedAcceptsKeys(c, v)
+{
+  forall lnr:LearnerId, vb:ValBal, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.history[i].learners[lnr].receivedAccepts
+  ::
+    && v.history[i].LeaderCanPropose(c, vb.b)
+    && v.history[i].leaders[vb.b].value == vb.v
+}
 
 
+
+// Each entry in a learner's receivedAccepts implies that an acceptor accepted it
+ghost predicate LearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall lnr:LearnerId, vb:ValBal, acc:AcceptorId, i |
+    && v.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && c.ValidAcceptorIdx(acc)
+    && vb in v.history[i].learners[lnr].receivedAccepts
+    && acc in v.history[i].learners[lnr].receivedAccepts[vb]
+  ::
+    v.history[i].acceptors[acc].HasAcceptedAtLeastBal(vb.b) 
+}
 
 
 // Acceptor's fields all host valid leader ballots
@@ -151,6 +177,45 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
         ==> c.ValidLeaderIdx(vi.acceptors[acc].acceptedVB.value.b))
 }
 
+// If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
+ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall acc, i | 
+    && v.ValidHistoryIdx(i)
+    && c.ValidAcceptorIdx(acc) 
+    && v.history[i].acceptors[acc].acceptedVB.Some?
+  :: 
+    && var vi := v.history[i];
+    && vi.acceptors[acc].promised.Some?
+    && vi.acceptors[acc].acceptedVB.value.b <= vi.acceptors[acc].promised.value
+}
+
+ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
+  requires v.WF(c)
+  requires AcceptorValidPromisedAndAccepted(c, v)
+{
+  forall acc:AcceptorId, i | 
+    && v.ValidHistoryIdx(i)
+    && c.ValidAcceptorIdx(acc)
+    && v.history[i].acceptors[acc].acceptedVB.Some?
+  ::
+    var vb := v.history[i].acceptors[acc].acceptedVB.value;
+    && v.history[i].LeaderCanPropose(c, vb.b)
+    && v.history[i].leaders[vb.b].value == vb.v
+}
+
+ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, acc, i | 
+    && v.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && acc in v.history[i].leaders[ldr].receivedPromises
+  ::
+    c.ValidAcceptorIdx(acc)
+}
+
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
@@ -159,12 +224,12 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerValidReceivedAccepts(c, v)
   && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
-  // && LearnerReceivedAcceptImpliesProposed(c, v)
-  // && LearnerReceivedAcceptImpliesAccepted(c, v)
+  && LearnerReceivedAcceptImpliesProposed(c, v)
+  && LearnerReceivedAcceptImpliesAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
-  // && AcceptorPromisedLargerThanAccepted(c, v)
-  // && AcceptorAcceptedImpliesProposed(c, v)
-  // && LeaderValidReceivedPromises(c, v)
+  && AcceptorPromisedLargerThanAccepted(c, v)
+  && AcceptorAcceptedImpliesProposed(c, v)
+  && LeaderValidReceivedPromises(c, v)
   // && LeaderHighestHeardUpperBound(c, v)
   // && LeaderHearedImpliesProposed(c, v)
   // && LeaderReceivedPromisesImpliesAcceptorState(c, v)
@@ -206,7 +271,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvInductiveHelper(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   assert LearnedImpliesQuorumOfAccepts(c, v');
-
+  InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
 
 
   assert ApplicationInv(c, v');
@@ -228,16 +293,19 @@ lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
   ensures LearnerValidReceivedAcceptsKeys(c, v')
-
-
+  ensures LearnerReceivedAcceptImpliesProposed(c, v')
+  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
   ensures AcceptorValidPromisedAndAccepted(c, v')
+  ensures AcceptorAcceptedImpliesProposed(c, v')
+  ensures LeaderValidReceivedPromises(c, v')
 {
   assert LearnerValidReceivedAccepts(c, v');
   assert LearnerValidReceivedAcceptsKeys(c, v');
-
-
-  
+  assert LearnerReceivedAcceptImpliesProposed(c, v');
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
   assert AcceptorValidPromisedAndAccepted(c, v');
+  assert AcceptorAcceptedImpliesProposed(c, v');
+  assert LeaderValidReceivedPromises(c, v');
 }
 
 lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables) 
@@ -263,6 +331,15 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
       }
     }
   }
+}
+
+lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': Variables) 
+  requires v.WF(c) && v'.WF(c)
+  requires AcceptorPromisedLargerThanAccepted(c, v)
+  requires Next(c, v, v')
+  ensures AcceptorPromisedLargerThanAccepted(c, v')
+{
+  // This needs its own lemma to avoid timeout
 }
 
 
