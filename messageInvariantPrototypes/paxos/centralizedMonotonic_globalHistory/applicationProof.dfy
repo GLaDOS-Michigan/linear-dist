@@ -296,6 +296,48 @@ ghost predicate LeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: V
     acc !in v.history[i].learners[lnr].receivedAccepts[vb]
 }
 
+ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, acc:AcceptorId, i | 
+    && v.ValidHistoryIdx(i)
+    && Chosen(c, v, vb)
+    && c.ValidAcceptorIdx(acc)
+    && v.history[i].acceptors[acc].acceptedVB.Some?
+    && v.history[i].acceptors[acc].acceptedVB.value.b >= vb.b
+  ::
+     v.history[i].acceptors[acc].acceptedVB.value.v == vb.v
+}
+
+// If vb is chosen, then for all leaders > vb.b and ready to propose, they must have highest 
+// heard >= b
+ghost predicate ChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall vb, ldrBal:LeaderId, i | 
+    && v.ValidHistoryIdx(i)
+    && Chosen(c, v, vb)
+    && c.ValidLeaderIdx(ldrBal)
+    && vb.b < ldrBal
+    && v.history[i].LeaderCanPropose(c, ldrBal)
+  ::
+    v.history[i].leaders[ldrBal].HeardAtLeast(vb.b)
+}
+
+// If vb is chosen, then for all leaders has a highest heard >= vb.b, the value must be vb.v
+ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall vb, ldrBal:LeaderId, i | 
+    && v.ValidHistoryIdx(i)
+    && Chosen(c, v, vb)
+    && c.ValidLeaderIdx(ldrBal)
+    && v.history[i].leaders[ldrBal].highestHeardBallot.Some?
+    && v.history[i].leaders[ldrBal].highestHeardBallot.value >= vb.b
+  ::
+    v.history[i].leaders[ldrBal].value == vb.v
+}
+
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
@@ -315,9 +357,9 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
   && LeaderNotHeardImpliesNotPromised(c, v)
   && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
-  // && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
-  // && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
-  // && ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  && ChosenValImpliesLeaderOnlyHearsVal(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)
@@ -343,7 +385,7 @@ lemma InitImpliesInv(c: Constants, v: Variables)
   ensures Inv(c, v)
 {}
 
-lemma InvInductive(c: Constants, v: Variables, v': Variables)
+lemma {:timeLimitMultiplier 4} InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures Inv(c, v')
@@ -358,11 +400,15 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
 
-  assert ApplicationInv(c, v');
+  
+  assume ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
+  assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
 
-  assume AtMostOneChosenVal(c, v');  // this should be implied by invariants
-  assume false;
-  // AtMostOneChosenImpliesSafety(c, v');
+
+  assert ApplicationInv(c, v');
+  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  AtMostOneChosenImpliesSafety(c, v');
 }
 
 
@@ -407,7 +453,10 @@ ghost predicate HelperBundle2(c: Constants, v: Variables)
 // Bundle for simple-to-prove invariants that needs no dafny proof, as bundle1 is overloaded
 lemma InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
-  requires ApplicationInv(c, v)
+  requires AcceptorValidPromisedAndAccepted(c, v)
+  requires AcceptorAcceptedImpliesProposed(c, v)
+  requires HelperBundle2(c, v)
+  requires AcceptorPromisedLargerThanAccepted(c, v)
   requires Next(c, v, v')
   ensures HelperBundle2(c, v')
 {
@@ -548,41 +597,41 @@ ghost predicate AtMostOneChosenVal(c: Constants, v: Variables)
 
 //// Helper Lemmas ////
 
-// // A value being learned implies it was chosen at some ballot, and skolemize this ballot
-// lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Value) returns (vb: ValBal)
-//   requires v.WF(c)
-//   requires c.ValidLearnerIdx(lnr)
-//   requires v.learners[lnr].HasLearnedValue(val)
-//   requires LearnedImpliesQuorumOfAccepts(c, v)
-//   ensures vb.v == val
-//   ensures Chosen(c, v, vb)
-// {
-//   // Witness, given by LearnedImpliesQuorumOfAccepts
-//   var bal :| ChosenAtLearner(c, v, VB(val, bal), lnr);
-//   return VB(val, bal);
-// }
+// A value being learned implies it was chosen at some ballot, and skolemize this ballot
+lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Value) returns (vb: ValBal)
+  requires v.WF(c)
+  requires c.ValidLearnerIdx(lnr)
+  requires v.Last().learners[lnr].HasLearnedValue(val)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
+  ensures vb.v == val
+  ensures Chosen(c, v, vb)
+{
+  // Witness, given by LearnedImpliesQuorumOfAccepts
+  var bal :| ChosenAtLearner(c, v.Last(), VB(val, bal), lnr);
+  return VB(val, bal);
+}
 
 // If only one value can be chosen, then Agreement must be satisfied
-// lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
-//   requires v.WF(c)
-//   requires AtMostOneChosenVal(c, v)
-//   requires LearnedImpliesQuorumOfAccepts(c, v)
-//   ensures Agreement(c, v)
-// {
-//   // Proof by contradiction
-//   if !Agreement(c, v) {
-//     var l1, l2 :| 
-//         && c.ValidLearnerIdx(l1)
-//         && c.ValidLearnerIdx(l2)
-//         && v.learners[l1].learned.Some?
-//         && v.learners[l2].learned.Some?
-//         && v.learners[l1].learned != v.learners[l2].learned
-//     ;
-//     var vb1 := LearnedImpliesChosen(c, v, l1, v.learners[l1].learned.value);
-//     var vb2 := LearnedImpliesChosen(c, v, l2, v.learners[l2].learned.value);
-//     assert false;
-//   }
-// }
+lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires AtMostOneChosenVal(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
+  ensures Agreement(c, v)
+{
+  // Proof by contradiction
+  if !Agreement(c, v) {
+    var l1, l2 :| 
+        && c.ValidLearnerIdx(l1)
+        && c.ValidLearnerIdx(l2)
+        && v.Last().learners[l1].learned.Some?
+        && v.Last().learners[l2].learned.Some?
+        && v.Last().learners[l1].learned != v.Last().learners[l2].learned
+    ;
+    var vb1 := LearnedImpliesChosen(c, v, l1, v.Last().learners[l1].learned.value);
+    var vb2 := LearnedImpliesChosen(c, v, l2, v.Last().learners[l2].learned.value);
+    assert false;
+  }
+}
 
 // // Lemma: The only system step in which a new vb can be chosen is a P2bStep 
 // lemma NewChosenOnlyInP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step) 
