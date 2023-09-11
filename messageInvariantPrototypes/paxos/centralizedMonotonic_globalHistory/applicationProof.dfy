@@ -405,7 +405,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
   assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
-  assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
+  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
 
 
   assert ApplicationInv(c, v');
@@ -604,7 +604,6 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
     var sysStep :| NextStep(c, v, v', sysStep);
     if sysStep.P2bStep? {
       if i == |v'.history| - 1 {
-        assert v'.history[i] == v'.Last();
         if v'.history[i].acceptors[acc].acceptedVB.value.v != vb.v {
           var ldr := v'.Last().acceptors[acc].acceptedVB.value.b;
           reveal_Chosen();
@@ -622,7 +621,8 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
   }
 }
 
-lemma InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c: Constants, v: Variables, v': Variables, sysStep: Step, i:int, acc: AcceptorId, vb: ValBal)
+lemma InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c: Constants, v: Variables, v': Variables, 
+sysStep: Step, i:int, acc: AcceptorId, vb: ValBal)
   requires v.WF(c) && v'.WF(c)
   requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
   requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
@@ -649,7 +649,66 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c: Constants, v: Varia
   reveal_ChosenAtIdx();
 }
 
+lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+  ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
+{
+  forall vb, ldrBal:LeaderId, i | 
+    && v'.ValidHistoryIdx(i)
+    && ChosenAtIdx(c, v', i, vb)
+    && c.ValidLeaderIdx(ldrBal)
+    && v'.history[i].leaders[ldrBal].highestHeardBallot.Some?
+    && v'.history[i].leaders[ldrBal].highestHeardBallot.value >= vb.b
+  ensures
+    v'.history[i].leaders[ldrBal].value == vb.v
+  {
+    var sysStep :| NextStep(c, v, v', sysStep);
+    if sysStep.P2bStep? {
+      if i == |v'.history| - 1 {
+        if v'.history[i].leaders[ldrBal].value != vb.v {
+          if vb.b < ldrBal {
+            reveal_Chosen();
+            reveal_ChosenAtIdx();
+            LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldrBal, vb);
+          }
+        }
+      } else {
+        assert ChosenAtIdx(c, v, i, vb) by {
+          reveal_ChosenAtIdx();
+        }
+      }
+    } else {
+      InvNextChosenValImpliesLeaderOnlyHearsValHelper(c, v, v', sysStep, i, ldrBal, vb);
+    }
+  }
+}
 
+lemma InvNextChosenValImpliesLeaderOnlyHearsValHelper(c: Constants, v: Variables, v': Variables,
+sysStep: Step, i:int, ldrBal: LeaderId, vb: ValBal)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires NextStep(c, v, v', sysStep)
+  requires !sysStep.P2bStep?
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+  requires  && v'.ValidHistoryIdx(i)
+            && ChosenAtIdx(c, v', i, vb)
+            && c.ValidLeaderIdx(ldrBal)
+            && v'.history[i].leaders[ldrBal].highestHeardBallot.Some?
+            && v'.history[i].leaders[ldrBal].highestHeardBallot.value >= vb.b
+  ensures v'.history[i].leaders[ldrBal].value == vb.v
+{
+  reveal_Chosen();
+  reveal_ChosenAtIdx();
+  NewChosenOnlyInP2bStep(c, v, v', sysStep);
+}
 
 // Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
 lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
