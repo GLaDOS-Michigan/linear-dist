@@ -408,9 +408,12 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
 
 
-  assume false;
   assert ApplicationInv(c, v');
-  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  assert AtMostOneChosenVal(c, v') by {
+    // this should be implied by invariants
+    reveal_Chosen();
+    reveal_ChosenAtIdx();
+  }
   AtMostOneChosenImpliesSafety(c, v');
 }
 
@@ -572,7 +575,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
   reveal_ChosenAtIdx();
 }
 
-lemma {:timeLimitMultiplier 2} InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
+lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
   requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
   requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
@@ -598,36 +601,52 @@ lemma {:timeLimitMultiplier 2} InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: 
   ensures
      v'.history[i].acceptors[acc].acceptedVB.value.v == vb.v
   {
-    if i == |v'.history| - 1 {
-      var sysStep :| NextStep(c, v, v', sysStep);
-      if sysStep.P1aStep? {
-        NewChosenOnlyInP2bStep(c, v, v', sysStep);
-        assert v'.history[i].acceptors[acc].acceptedVB.value.v == vb.v by {
+    var sysStep :| NextStep(c, v, v', sysStep);
+    if sysStep.P2bStep? {
+      if i == |v'.history| - 1 {
+        assert v'.history[i] == v'.Last();
+        if v'.history[i].acceptors[acc].acceptedVB.value.v != vb.v {
+          var ldr := v'.Last().acceptors[acc].acceptedVB.value.b;
+          reveal_Chosen();
+          reveal_ChosenAtIdx();
+          LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldr, vb);
+        }
+      } else {
+        assert ChosenAtIdx(c, v, i, vb) by {
           reveal_ChosenAtIdx();
         }
-      } else if sysStep.P1bStep? {
-        // VariableNextProperties(c, v, v', sysStep);
-        // NewChosenOnlyInP2bStep(c, v, v', sysStep);
-        // assert v'.history[i].acceptors[acc].acceptedVB.value.v == vb.v by {
-        //   reveal_ChosenAtIdx();
-        // }
-        assume false;
-      } else if sysStep.P2aStep? {
-        assume false;
-      } else if sysStep.P2bStep? {
-        assume false;
-      } else if sysStep.LearnerInternalStep? {
-        assume false;
-      } else {
-        assume false;
       }
-      assume false;
     } else {
-      assert v'.history[i].acceptors[acc].acceptedVB.value.v == vb.v by {
-        reveal_ChosenAtIdx();
-      }
+      InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c, v, v', sysStep, i, acc, vb);
     }
   }
+}
+
+lemma InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c: Constants, v: Variables, v': Variables, sysStep: Step, i:int, acc: AcceptorId, vb: ValBal)
+  requires v.WF(c) && v'.WF(c)
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  requires Next(c, v, v')
+  requires NextStep(c, v, v', sysStep)
+  requires !sysStep.P2bStep?
+  requires AcceptorValidPromisedAndAccepted(c, v')  // prereq for AcceptorAcceptedImpliesProposed
+  
+  // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
+  requires AcceptorAcceptedImpliesProposed(c, v')
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+
+  requires && v'.ValidHistoryIdx(i)
+            && ChosenAtIdx(c, v', i, vb)
+            && c.ValidAcceptorIdx(acc)
+            && v'.history[i].acceptors[acc].acceptedVB.Some?
+            && v'.history[i].acceptors[acc].acceptedVB.value.b >= vb.b
+  ensures v'.history[i].acceptors[acc].acceptedVB.value.v == vb.v
+{
+  NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  reveal_ChosenAtIdx();
 }
 
 
