@@ -208,7 +208,9 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
     case P2aStep(ldr, acc, val) => NextP2aStep(c, v, v', ldr, acc, val)
     case P2bStep(acc, lnr, vb) => NextP2bStep(c, v, v', acc, lnr, vb)
     case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v, v', lnr)
-    case StutterStep => v' == v
+    case StutterStep => 
+            && IsSeqExtension(v.history, v'.history)  
+            && v'.Last() == v.Last()
 }
 
 ghost predicate Next(c: Constants, v: Variables, v': Variables)
