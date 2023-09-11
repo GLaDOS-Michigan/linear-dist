@@ -710,6 +710,49 @@ sysStep: Step, i:int, ldrBal: LeaderId, vb: ValBal)
   NewChosenOnlyInP2bStep(c, v, v', sysStep);
 }
 
+
+// Helper lemma for P2b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires sysStep.P2bStep?
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
+  requires NextStep(c, v, v', sysStep)
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+{
+  forall vb, ldr:LeaderId, i | 
+    && v'.ValidHistoryIdx(i) 
+    && ChosenAtIdx(c, v', i, vb)
+    && c.ValidLeaderIdx(ldr)
+    && vb.b < ldr 
+    && v'.history[i].LeaderCanPropose(c, ldr)
+  ensures
+    v'.history[i].leaders[ldr].HeardAtLeast(vb.b)
+  {
+    if i == |v'.history|-1 {
+      var choosingAccs := SupportingAcceptorsForChosen(c, v', i, vb);
+      // These properties of choosingAccs carry over to pre-state v
+      assert forall a | a in choosingAccs ::
+        && c.ValidAcceptorIdx(a)
+        && v.Last().acceptors[a].HasAcceptedAtLeastBal(vb.b);
+      // Leader is also unchanged
+      assert v'.Last().leaders[ldr] == v.Last().leaders[ldr];
+      assert v.Last().LeaderCanPropose(c, ldr);
+      if !v.Last().leaders[ldr].HeardAtLeast(vb.b) {
+        // Contradiction via quorum intersection, and LeaderHighestHeardToPromisedRangeHasNoAccepts
+        var allAccs := GetAcceptorSet(c, v);
+        var e := QuorumIntersection(allAccs, choosingAccs, v.Last().leaders[ldr].receivedPromises);
+        assert LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v);  // trigger
+        assert false;
+      }
+    } else {
+      reveal_Chosen();
+      reveal_ChosenAtIdx();
+      assert v'.history[i].leaders[ldr].HeardAtLeast(vb.b);
+    }
+  }
+}
+
 // Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
 lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
   requires v.WF(c)
@@ -843,6 +886,28 @@ lemma NewChosenOnlyInP2bStep(c: Constants, v: Variables, v': Variables, sysStep:
   }
 }
 
+// Suppose vb is chosen. Return the quorum of acceptors supporting the chosen vb
+lemma SupportingAcceptorsForChosen(c: Constants, v: Variables, i: int, vb: ValBal)
+returns (supportingAccs: set<AcceptorId>)
+  requires v.WF(c)
+  requires v.ValidHistoryIdx(i)
+  requires ChosenAtIdx(c, v, i, vb)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v)
+  ensures |supportingAccs| >= c.f+1
+  ensures forall a | a in supportingAccs :: 
+    && c.ValidAcceptorIdx(a)
+    && v.history[i].acceptors[a].HasAcceptedAtLeastBal(vb.b)
+  ensures exists lnr :: 
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.history[i].learners[lnr].receivedAccepts
+    && supportingAccs <= v.history[i].learners[lnr].receivedAccepts[vb]
+{
+  reveal_ChosenAtIdx();
+  var lnr: LearnerId :| ChosenAtLearner(c, v.history[i], vb, lnr);  // skolemize!
+  supportingAccs := v.history[i].learners[lnr].receivedAccepts[vb];
+  return supportingAccs;
+}
+
 lemma VariableNextProperties(c: Constants, v: Variables, v': Variables, sysStep: Step)
   requires v.WF(c)
   requires Next(c, v, v')
@@ -875,14 +940,15 @@ lemma VariableNextProperties(c: Constants, v: Variables, v': Variables, sysStep:
 //   return supportingAccs;
 // }
 
-// lemma GetAcceptorSet(c: Constants, v: Variables)
-// returns (accSet: set<AcceptorId>)
-//   requires v.WF(c)
-//   ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
-//   ensures |accSet| == 2 * c.f + 1
-// {
-//   accSet := set a |  0 <= a < |c.acceptorConstants|;
-//   SetComprehensionSize(|c.acceptorConstants|);
-// }
+lemma GetAcceptorSet(c: Constants, v: Variables)
+returns (accSet: set<AcceptorId>)
+  requires v.WF(c)
+  ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
+  ensures |accSet| == 2 * c.f + 1
+{
+  assert v.history[0].WF(c);  // trigger for |c.acceptorConstants| == 2 * c.f+1
+  accSet := set a |  0 <= a < |c.acceptorConstants|;
+  SetComprehensionSize(|c.acceptorConstants|);
+}
 
 } // end module PaxosProof
