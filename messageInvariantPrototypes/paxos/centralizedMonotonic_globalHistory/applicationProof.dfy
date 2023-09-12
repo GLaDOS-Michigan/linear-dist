@@ -390,32 +390,24 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  assume false;
-  // InvNextOneValuePerBallot(c, v, v');
-  // InvInductiveHelper1(c, v, v');
-  // InvInductiveHelper2(c, v, v');
-  // InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
-  // assert LearnedImpliesQuorumOfAccepts(c, v');
-  // InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
-  // InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
-  // InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
-  // InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
-  // InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
-
- 
-
-  // assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
-  // InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
-  // InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
-
-
-  // assert ApplicationInv(c, v');
-  // assert AtMostOneChosenVal(c, v') by {
-  //   // this should be implied by invariants
-  //   reveal_Chosen();
-  //   reveal_ChosenAtIdx();
-  // }
-  // AtMostOneChosenImpliesSafety(c, v');
+  InvNextOneValuePerBallot(c, v, v');
+  InvInductiveHelper1(c, v, v');
+  InvInductiveHelper2(c, v, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
+  InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
+  InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
+  InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
+  InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
+  InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
+  InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
+  InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
+  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
+  assert AtMostOneChosenVal(c, v') by {
+    // this should be implied by invariants
+    reveal_Chosen();
+    reveal_ChosenAtHistory();
+  }
+  AtMostOneChosenImpliesSafety(c, v');
 }
 
 
@@ -704,80 +696,48 @@ sysStep: Step, i:int, ldrBal: LeaderId, vb: ValBal)
   NewChosenOnlyInP2bStep(c, v, v', sysStep);
 }
 
-// // Helper lemma for P1b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
-// lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
-//   requires Inv(c, v)
-//   requires sysStep.P1bStep?
-//   requires Next(c, v, v')
-//   requires NextStep(c, v.Last(), v'.Last(), sysStep)
-//   ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
-// {
-//   NewChosenOnlyInP2bStep(c, v, v', sysStep);
-//   forall vb, ldr:LeaderId, i | 
-//     && v'.ValidHistoryIdx(i)
-//     && ChosenAtIdx(c, v', i, vb)
-//     && c.ValidLeaderIdx(ldr)
-//     && vb.b < ldr 
-//     && v'.history[i].LeaderCanPropose(c, ldr)
-//   ensures
-//     v'.history[i].leaders[ldr].HeardAtLeast(vb.b)
-//   {
-//     VariableNextProperties(c, v, v', sysStep);
-//     reveal_Chosen();
-//     reveal_ChosenAtIdx();
-//     if i == |v'.history|-1 {
-//       if ldr == sysStep.leader {  // if the leader in question is now taking a step
-//         InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStepHelper(c, v, v', sysStep, vb, ldr);
-//       }
-//     }
-//   }
-// }
-
-lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStepHelper(
-  c: Constants, v: Variables, v': Variables, sysStep: Step, vb: ValBal, ldr: LeaderId)
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires NextStep(c, v.Last(), v'.Last(), sysStep)
-  requires sysStep.P1bStep?
-  requires ldr == sysStep.leader
-
-  requires&& ChosenAtHistory(c, v'.Last(), vb)
-          && c.ValidLeaderIdx(ldr)
-          && vb.b < ldr 
-          && v'.Last().LeaderCanPropose(c, ldr)
-
-  ensures v'.Last().leaders[ldr].HeardAtLeast(vb.b)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
 {
-  reveal_Chosen();
-  reveal_ChosenAtHistory();
+  var sysStep :| NextStep(c, v.Last(), v'.Last(), sysStep);
+  if sysStep.P1aStep? || sysStep.P2aStep? || sysStep.LearnerInternalStep? {
+    NewChosenOnlyInP2bStep(c, v, v', sysStep);
+  } else if sysStep.P1bStep? {
+    InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c, v, v', sysStep);
+  } else if sysStep.P2bStep? {
+    InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c, v, v', sysStep);
+  }
+}
+
+// Helper lemma for P1b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
+  requires Inv(c, v)
+  requires sysStep.P1bStep?
+  requires Next(c, v, v')
+  requires NextStep(c, v.Last(), v'.Last(), sysStep)
+  ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+{
   NewChosenOnlyInP2bStep(c, v, v', sysStep);
-  var choosingAccs := SupportingAcceptorsForChosen(c, v, |v.history|-1, vb);
-  // Ldr has yet to see ballot b in this step. By quorum intersection, it must see
-  // an acceptor in choosingAccs in this step
-  var acc := sysStep.acceptor;
-  if acc !in choosingAccs {
+  forall vb, ldr:LeaderId, i | 
+    && v'.ValidHistoryIdx(i)
+    && ChosenAtHistory(c, v'.history[i], vb)
+    && c.ValidLeaderIdx(ldr)
+    && vb.b < ldr 
+    && v'.history[i].LeaderCanPropose(c, ldr)
+  ensures
+    v'.history[i].leaders[ldr].HeardAtLeast(vb.b)
+  {
     VariableNextProperties(c, v, v', sysStep);
-    assume false;
-    // In this case, by quorum intersection, acc must already be in ldr.receivePromises
-    // First prove that choosingAccs !! v.leaders[ldr].receivedPromises
-    forall a | a in choosingAccs 
-    ensures a !in v.Last().leaders[ldr].receivedPromises
-    {
-      if !v.Last().acceptors[a].HasAcceptedAtMostBal(ldr) && a in v.Last().leaders[ldr].receivedPromises {
-        // via LeaderHighestHeardToPromisedRangeHasNoAccepts
-        assert false;
+    reveal_Chosen();
+    reveal_ChosenAtHistory();
+    if i == |v'.history|-1 {
+      if ldr == sysStep.leader {  // if the leader in question is now taking a step
+        assume false;  // TODO
       }
     }
-    assume false;
-    var allAccs := GetAcceptorSet(c, v);
-    assume |v.Last().leaders[ldr].receivedPromises| == c.f;
-    assume acc !in v.Last().leaders[ldr].receivedPromises;
-
-    var e := QuorumIntersection(allAccs, choosingAccs, v.Last().leaders[ldr].receivedPromises + {acc});
-    assume false;
-    assert false;
-  } else {
-    VariableNextProperties(c, v, v', sysStep);
   }
 }
 
