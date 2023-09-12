@@ -735,7 +735,29 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, 
     reveal_ChosenAtHistory();
     if i == |v'.history|-1 {
       if ldr == sysStep.leader {  // if the leader in question is now taking a step
-        assume false;  // TODO
+        assert ChosenAtHistory(c, v.Last(), vb);
+        var choosingAccs := SupportingAcceptorsForChosen(c, v, |v.history|-1, vb);
+        var h, h' := v.Last(), v'.Last();
+        if h.leaders[ldr].HeardAtMost(vb.b) {
+          // Ldr has yet to see ballot b in this step. By quorum intersection, it must see
+          // an acceptor in choosingAccs in this step
+          var acc := sysStep.acceptor;
+          if acc !in choosingAccs {
+            // In this case, by quorum intersection, acc must already be in ldr.receivePromises
+            // First prove that choosingAccs !! v.leaders[ldr].receivedPromises
+            forall a | a in choosingAccs 
+            ensures a !in h.leaders[ldr].receivedPromises
+            {
+              if !h.acceptors[a].HasAcceptedAtMostBal(ldr) && a in h.leaders[ldr].receivedPromises {
+                // via LeaderHighestHeardToPromisedRangeHasNoAccepts
+                assert false;
+              }
+            }
+            var allAccs := GetAcceptorSet(c, v);
+            var e := QuorumIntersection(allAccs, choosingAccs, h.leaders[ldr].receivedPromises + {acc});
+            assert false;
+          }
+        }
       }
     }
   }
