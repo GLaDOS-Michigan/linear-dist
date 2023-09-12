@@ -194,24 +194,24 @@ ghost predicate NextLearnerInternalStep(c: Constants, h: Hosts, h': Hosts, lnr: 
   && AcceptorsUnchanged(h, h')
 }
 
-ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
-  requires v.WF(c) && v'.WF(c)
+ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, step: Step)
+  requires h.WF(c) && h'.WF(c)
 {
-  && IsSeqExtension(v.history, v'.history)
-  && match step
-    case P1aStep(ldr, acc) => NextP1aStep(c, v.Last(), v'.Last(), ldr, acc)
-    case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v.Last(), v'.Last(), ldr, acc, balOpt, vbOptOpt)
-    case P2aStep(ldr, acc, val) => NextP2aStep(c, v.Last(), v'.Last(), ldr, acc, val)
-    case P2bStep(acc, lnr, vb) => NextP2bStep(c, v.Last(), v'.Last(), acc, lnr, vb)
-    case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v.Last(), v'.Last(), lnr)
-    case StutterStep => v'.Last() == v.Last()
+  match step
+    case P1aStep(ldr, acc) => NextP1aStep(c, h, h', ldr, acc)
+    case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, h, h', ldr, acc, balOpt, vbOptOpt)
+    case P2aStep(ldr, acc, val) => NextP2aStep(c, h, h', ldr, acc, val)
+    case P2bStep(acc, lnr, vb) => NextP2bStep(c, h, h', acc, lnr, vb)
+    case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, h, h', lnr)
+    case StutterStep => h == h'
 }
 
 ghost predicate Next(c: Constants, v: Variables, v': Variables)
 {
   && v.WF(c)
   && v'.WF(c)
-  && exists step :: NextStep(c, v, v', step)
+  && IsSeqExtension(v.history, v'.history)
+  && exists step :: NextStep(c, v.Last(), v'.Last(), step)
 }
 
 
