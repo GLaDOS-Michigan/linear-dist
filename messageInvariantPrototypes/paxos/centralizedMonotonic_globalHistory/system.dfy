@@ -111,106 +111,100 @@ datatype Step =
 
 
 // Leader sends Prepare message to Acceptor. Acceptor buffers it in its pendingPrepare field 
-ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: LeaderId, acc: AcceptorId) 
-  requires v.WF(c) && v'.WF(c)
+ghost predicate NextP1aStep(c: Constants, h: Hosts, h': Hosts, ldr: LeaderId, acc: AcceptorId) 
+  requires h.WF(c) && h'.WF(c)
 {
   var ldrLbl := LeaderHost.PrepareLbl();
   var accLbl := AcceptorHost.ReceivePrepareLbl(ldr);
   && c.ValidLeaderIdx(ldr)
   && c.ValidAcceptorIdx(acc)
-  && IsSeqExtension(v.history, v'.history)
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc], accLbl)
-  && AcceptorsUnchangedExcept(c, v.Last(), v'.Last(), acc)
-  && LeaderHost.Next(c.leaderConstants[ldr], v.Last().leaders[ldr], v'.Last().leaders[ldr], ldrLbl)
-  && LeadersUnchangedExcept(c, v.Last(), v'.Last(), ldr)
-  && LearnersUnchanged(v.Last(), v'.Last())
+  && AcceptorHost.Next(c.acceptorConstants[acc], h.acceptors[acc], h'.acceptors[acc], accLbl)
+  && AcceptorsUnchangedExcept(c, h, h', acc)
+  && LeaderHost.Next(c.leaderConstants[ldr], h.leaders[ldr], h'.leaders[ldr], ldrLbl)
+  && LeadersUnchangedExcept(c, h, h', ldr)
+  && LearnersUnchanged(h, h')
 }
 
 // Acceptor processes its pendingPrepare, and maybe sends a Promise to the leader
-ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables, 
+ghost predicate NextP1bStep(c: Constants, h: Hosts, h': Hosts, 
     ldr: LeaderId, acc: AcceptorId,
     balOpt: Option<LeaderId>, vbOptOpt: Option<Option<ValBal>>) 
-  requires v.WF(c) && v'.WF(c)
+  requires h.WF(c) && h'.WF(c)
 {
   var accLbl := AcceptorHost.MaybePromiseLbl(balOpt, vbOptOpt);
   && c.ValidLeaderIdx(ldr)
   && c.ValidAcceptorIdx(acc)
-  && IsSeqExtension(v.history, v'.history)  // TONY: I previously  forgot this line, which led to buggy spec
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc], accLbl)
-  && AcceptorsUnchangedExcept(c, v.Last(), v'.Last(), acc)
-  && LearnersUnchanged(v.Last(), v'.Last())
+  && AcceptorHost.Next(c.acceptorConstants[acc], h.acceptors[acc], h'.acceptors[acc], accLbl)
+  && AcceptorsUnchangedExcept(c, h, h', acc)
+  && LearnersUnchanged(h, h')
   && if balOpt.Some? then
         // assert vbOptOpt.Some?;
         && var ldrLbl := LeaderHost.ReceivePromiseLbl(acc, vbOptOpt.value);
         && ldr == balOpt.value
-        && LeaderHost.Next(c.leaderConstants[ldr], v.Last().leaders[ldr], v'.Last().leaders[ldr], ldrLbl)
-        && LeadersUnchangedExcept(c, v.Last(), v'.Last(), ldr)
+        && LeaderHost.Next(c.leaderConstants[ldr], h.leaders[ldr], h'.leaders[ldr], ldrLbl)
+        && LeadersUnchangedExcept(c, h, h', ldr)
       else 
-        LeadersUnchanged(v.Last(), v'.Last())
+        LeadersUnchanged(h, h')
 }
 
 // Leader sends Proposal to an acceptor. The acceptor processes the proposal
-ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables, 
+ghost predicate NextP2aStep(c: Constants, h: Hosts, h': Hosts, 
     ldr: LeaderId, acc: AcceptorId,
     val: Value) 
-  requires v.WF(c) && v'.WF(c)
+  requires h.WF(c) && h'.WF(c)
 {
   var ldrLbl := LeaderHost.ProposeLbl(val);
   var accLbl := AcceptorHost.MaybeAcceptLbl(ldr, val);
   && c.ValidLeaderIdx(ldr)
   && c.ValidAcceptorIdx(acc)
-  && IsSeqExtension(v.history, v'.history)
-  && LeaderHost.Next(c.leaderConstants[ldr], v.Last().leaders[ldr], v'.Last().leaders[ldr], ldrLbl)
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc], accLbl)
-  && LeadersUnchangedExcept(c, v.Last(), v'.Last(), ldr)
-  && AcceptorsUnchangedExcept(c, v.Last(), v'.Last(), acc)
-  && LearnersUnchanged(v.Last(), v'.Last())
+  && LeaderHost.Next(c.leaderConstants[ldr], h.leaders[ldr], h'.leaders[ldr], ldrLbl)
+  && AcceptorHost.Next(c.acceptorConstants[acc], h.acceptors[acc], h'.acceptors[acc], accLbl)
+  && LeadersUnchangedExcept(c, h, h', ldr)
+  && AcceptorsUnchangedExcept(c, h, h', acc)
+  && LearnersUnchanged(h, h')
 }
 
 // Acceptor sends acceptedVB to some Learner
-ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables, 
+ghost predicate NextP2bStep(c: Constants, h: Hosts, h': Hosts, 
     acc: AcceptorId, lnr: LearnerId,
     acceptedVb: ValBal)
-  requires v.WF(c) && v'.WF(c)
+  requires h.WF(c) && h'.WF(c)
 {
   var accLbl := AcceptorHost.BroadcastAcceptedLbl(acceptedVb);
   var lnrLbl := LearnerHost.ReceiveAcceptLbl(acceptedVb, acc);
   && c.ValidAcceptorIdx(acc)
   && c.ValidLearnerIdx(lnr)
-  && IsSeqExtension(v.history, v'.history)
   // acceptor simply stutters
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc], accLbl)
-  && AcceptorsUnchangedExcept(c, v.Last(), v'.Last(), acc)
-  && LeadersUnchanged(v.Last(), v'.Last())
+  && AcceptorHost.Next(c.acceptorConstants[acc], h.acceptors[acc], h'.acceptors[acc], accLbl)
+  && AcceptorsUnchangedExcept(c, h, h', acc)
+  && LeadersUnchanged(h, h')
   // learner receives accepted vb from acceptor
-  && LearnerHost.Next(c.learnerConstants[lnr], v.Last().learners[lnr], v'.Last().learners[lnr], lnrLbl)
-  && LearnersUnchangedExcept(c, v.Last(), v'.Last(), lnr)
+  && LearnerHost.Next(c.learnerConstants[lnr], h.learners[lnr], h'.learners[lnr], lnrLbl)
+  && LearnersUnchangedExcept(c, h, h', lnr)
 }
 
-ghost predicate NextLearnerInternalStep(c: Constants, v: Variables, v': Variables, lnr: LearnerId)
-  requires v.WF(c) && v'.WF(c)
+ghost predicate NextLearnerInternalStep(c: Constants, h: Hosts, h': Hosts, lnr: LearnerId)
+  requires h.WF(c) && h'.WF(c)
 {
   var lnrLbl := LearnerHost.InternalLbl();
   && c.ValidLearnerIdx(lnr)
-  && IsSeqExtension(v.history, v'.history)
-  && LearnerHost.Next(c.learnerConstants[lnr], v.Last().learners[lnr], v'.Last().learners[lnr], lnrLbl)
-  && LearnersUnchangedExcept(c, v.Last(), v'.Last(), lnr)
-  && LeadersUnchanged(v.Last(), v'.Last())
-  && AcceptorsUnchanged(v.Last(), v'.Last())
+  && LearnerHost.Next(c.learnerConstants[lnr], h.learners[lnr], h'.learners[lnr], lnrLbl)
+  && LearnersUnchangedExcept(c,h, h', lnr)
+  && LeadersUnchanged(h, h')
+  && AcceptorsUnchanged(h, h')
 }
 
 ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
 {
-  match step
-    case P1aStep(ldr, acc) => NextP1aStep(c, v, v', ldr, acc)
-    case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v, v', ldr, acc, balOpt, vbOptOpt)
-    case P2aStep(ldr, acc, val) => NextP2aStep(c, v, v', ldr, acc, val)
-    case P2bStep(acc, lnr, vb) => NextP2bStep(c, v, v', acc, lnr, vb)
-    case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v, v', lnr)
-    case StutterStep => 
-            && IsSeqExtension(v.history, v'.history)  
-            && v'.Last() == v.Last()
+  && IsSeqExtension(v.history, v'.history)
+  && match step
+    case P1aStep(ldr, acc) => NextP1aStep(c, v.Last(), v'.Last(), ldr, acc)
+    case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v.Last(), v'.Last(), ldr, acc, balOpt, vbOptOpt)
+    case P2aStep(ldr, acc, val) => NextP2aStep(c, v.Last(), v'.Last(), ldr, acc, val)
+    case P2bStep(acc, lnr, vb) => NextP2bStep(c, v.Last(), v'.Last(), acc, lnr, vb)
+    case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v.Last(), v'.Last(), lnr)
+    case StutterStep => v'.Last() == v.Last()
 }
 
 ghost predicate Next(c: Constants, v: Variables, v': Variables)
