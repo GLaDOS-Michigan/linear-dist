@@ -4,20 +4,16 @@ module Obligations {
   import opened Types
   import opened DistributedSystem
 
-  // All Learn messages must be of the same value
-  ghost predicate Agreement(c: Constants, v: Variables) 
-    requires c.WF()
+  // All learners must learn the same value
+  ghost predicate Agreement(c: Constants, v: Variables)
     requires v.WF(c)
   {
-  forall m1, m2 | 
-    && m1 in v.network.sentMsgs 
-    && m2 in v.network.sentMsgs 
-    && m1.Learn?
-    && m2.Learn?
-  :: 
-    m1.val == m2.val
+    forall l1, l2 |
+      && c.ValidLearnerIdx(l1)
+      && c.ValidLearnerIdx(l2)
+      && v.Last().learners[l1].learned.Some?
+      && v.Last().learners[l2].learned.Some?
+    ::
+      v.Last().learners[l1].learned == v.Last().learners[l2].learned
   }
-
-  // Note that I am skipping Validity proof: All learned values are ones that were
-  // proposed by a leader
 }
