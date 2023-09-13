@@ -343,11 +343,10 @@ ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  && true
   // && OneValuePerBallot(c, v)
-  // && LearnerValidReceivedAccepts(c, v)
-  // && LearnerValidReceivedAcceptsKeys(c, v)
-  // && LearnedImpliesQuorumOfAccepts(c, v)
+  && LearnerValidReceivedAccepts(c, v)
+  && LearnerValidReceivedAcceptsKeys(c, v)
+  && LearnedImpliesQuorumOfAccepts(c, v)
   // && LearnerReceivedAcceptImpliesProposed(c, v)
   // && LearnerReceivedAcceptImpliesAccepted(c, v)
   // && AcceptorValidPromisedAndAccepted(c, v)
@@ -367,6 +366,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
 ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
+  && MessageInv(c, v)
   && ApplicationInv(c, v)
   && Agreement(c, v)
 }
@@ -392,10 +392,10 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  // InvNextOneValuePerBallot(c, v, v');
-  // InvInductiveHelper1(c, v, v');
-  // InvInductiveHelper2(c, v, v');
-  // InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
+  MessageInvInductive(c, v, v');
+  InvNextLearnerValidReceivedAccepts(c, v, v');
+  InvNextLearnerValidReceivedAcceptsKeys(c, v, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   // InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
   // InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   // InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
@@ -404,6 +404,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   // InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   // InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
   // InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
+
+  assert ApplicationInv(c, v');
   assume false;
   assert AtMostOneChosenVal(c, v') by {
     // this should be implied by invariants
@@ -417,54 +419,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 /***************************************************************************************
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
-
-// // Bundle for simple-to-prove invariants that needs no dafny proof
-// ghost predicate HelperBundle1(c: Constants, v: Variables)
-//   requires v.WF(c)
-// {
-//   && LearnerValidReceivedAccepts(c, v)
-//   && LearnerValidReceivedAcceptsKeys(c, v)
-//   && LearnerReceivedAcceptImpliesProposed(c, v)
-//   && AcceptorValidPromisedAndAccepted(c, v)
-//   && AcceptorAcceptedImpliesProposed(c, v)
-// }
-
-// lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
-//   requires v.WF(c) && v'.WF(c)
-//   requires HelperBundle1(c, v)
-//   requires Next(c, v, v')
-//   ensures HelperBundle1(c, v')
-// {
-//   assert LearnerValidReceivedAccepts(c, v');
-//   assert LearnerValidReceivedAcceptsKeys(c, v');
-//   assert LearnerReceivedAcceptImpliesProposed(c, v');
-//   assert AcceptorValidPromisedAndAccepted(c, v');
-//   assert AcceptorAcceptedImpliesProposed(c, v');
-// }
-
-// // Bundle for simple-to-prove invariants that needs no dafny proof
-// ghost predicate HelperBundle2(c: Constants, v: Variables)
-//   requires v.WF(c)
-// {
-//   && LeaderValidReceivedPromises(c, v)
-//   && LeaderHighestHeardUpperBound(c, v)
-//   && LeaderHearedImpliesProposed(c, v)
-// }
-
-// // Bundle for simple-to-prove invariants that needs no dafny proof, as bundle1 is overloaded
-// lemma InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
-//   requires v.WF(c) && v'.WF(c)
-//   requires AcceptorValidPromisedAndAccepted(c, v)
-//   requires AcceptorAcceptedImpliesProposed(c, v)
-//   requires AcceptorPromisedLargerThanAccepted(c, v)
-//   requires HelperBundle2(c, v)
-//   requires Next(c, v, v')
-//   ensures HelperBundle2(c, v')
-// {
-//   assert LeaderValidReceivedPromises(c, v');
-//   assert LeaderHighestHeardUpperBound(c, v');
-//   assert LeaderHearedImpliesProposed(c, v');
-// }
 
 // lemma {:timeLimitMultiplier 2} InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
 //   requires v.WF(c) && v'.WF(c)
@@ -483,30 +437,59 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 //   assert OneValuePerBallotLeaderAndAcceptors(c, v');
 // }
 
-// lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables) 
-//   requires v.WF(c) && v'.WF(c)
-//   requires LearnerValidReceivedAccepts(c, v)
-//   requires LearnedImpliesQuorumOfAccepts(c, v)
-//   requires Next(c, v, v')
-//   ensures LearnedImpliesQuorumOfAccepts(c, v')
-// {
-//   forall lnr:LearnerId, val:Value, i |
-//     && v'.ValidHistoryIdx(i)
-//     && c.ValidLearnerIdx(lnr)
-//     && v'.history[i].learners[lnr].HasLearnedValue(val)
-//   ensures
-//     exists b: LeaderId ::
-//       && var vb := VB(val, b);
-//       && ChosenAtLearner(c, v'.history[i], vb, lnr)
-//   {
-//     var sysStep :| NextStep(c, v.Last(), v'.Last(), sysStep);
-//     if sysStep.P2bStep? {
-//       if i == |v'.history| - 1 {
-//         assert v'.history[i-1].learners[lnr].HasLearnedValue(val);  // trigger
-//       }
-//     }
-//   }
-// }
+lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires LearnerValidReceivedAccepts(c, v)
+  requires Next(c, v, v')
+  ensures LearnerValidReceivedAccepts(c, v')
+{}
+
+lemma InvNextLearnerValidReceivedAcceptsKeys(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)
+  requires Next(c, v, v')
+  ensures LearnerValidReceivedAcceptsKeys(c, v')
+{}
+
+lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables) 
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)  // From MessageInv
+  requires LearnerValidReceivedAccepts(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
+  requires Next(c, v, v')
+  ensures LearnedImpliesQuorumOfAccepts(c, v')
+{
+  forall lnr:LearnerId, val:Value, i |
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && v'.history[i].learners[lnr].HasLearnedValue(val)
+  ensures
+    exists b: LeaderId ::
+      && var vb := VB(val, b);
+      && ChosenAtLearner(c, v'.history[i], vb, lnr)
+  {
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      // VariableNextProperties(c, v, v', dsStep);
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      if  && dsStep.LearnerStep?
+          && actor == lnr 
+      {
+        var lc, l, l' := c.learnerConstants[actor], v.Last().learners[actor], v'.Last().learners[actor];
+        var step :| LearnerHost.NextStep(lc, l, l', step, msgOps);
+        if !step.LearnStep? {
+          // trigger and witness
+          assert v.history[i-1].learners[lnr].HasLearnedValue(val);
+          var b: LeaderId :|
+              && var vb := VB(val, b);
+              && ChosenAtLearner(c, v.history[i-1], vb, lnr);
+        }
+      }
+    }
+  }
+}
 
 // lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
 //   requires Inv(c, v)

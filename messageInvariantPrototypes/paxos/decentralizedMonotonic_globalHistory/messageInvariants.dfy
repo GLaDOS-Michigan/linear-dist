@@ -370,7 +370,6 @@ lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variabl
         if && dsStep.LearnerStep?
            && actor == idx
         {
-          assert LearnerHost.Next(c.learnerConstants[actor], v.Last().learners[actor], v'.Last().learners[actor], msgOps);
           var lc, l, l' := c.learnerConstants[actor], v.Last().learners[actor], v'.Last().learners[actor];
           var step :| LearnerHost.NextStep(lc, l, l', step, msgOps);
           if  && vb in l.receivedAccepts
