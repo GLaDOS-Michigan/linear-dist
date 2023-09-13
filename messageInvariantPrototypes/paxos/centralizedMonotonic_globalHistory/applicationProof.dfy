@@ -964,7 +964,7 @@ lemma VariableNextProperties(c: Constants, v: Variables, v': Variables, sysStep:
   requires NextStep(c, v.Last(), v'.Last(), sysStep)
   ensures 1 < |v'.history|
   ensures v.Last() == v.history[|v'.history|-2] == v'.history[|v'.history|-2]
-  ensures NextStep(c, v.Last(), v'.Last(), sysStep)
+  ensures NextStep(c, v.history[|v'.history|-2], v'.Last(), sysStep)
 {
   assert 0 < |v.history|;
   assert 1 < |v'.history|;
