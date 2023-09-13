@@ -109,6 +109,12 @@ module DistributedSystem {
     {
       UtilitiesLibrary.Last(history)
     }
+
+    ghost function History(i: int) : Hosts
+      requires ValidHistoryIdx(i)
+    {
+      history[i]
+    }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
