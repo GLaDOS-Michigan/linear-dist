@@ -414,14 +414,12 @@ ghost predicate IsAcceptMessage(v: Variables, m: Message) {
   && m in v.network.sentMsgs
 }
 
-lemma VariableNextProperties(c: Constants, v: Variables, v': Variables, dsStep: Step)
+lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires Next(c, v, v')
-  requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
   ensures 1 < |v'.history|
   ensures |v.history| == |v'.history| - 1
   ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)
-  ensures NextStep(c, v.History(|v'.history|-2), v'.Last(), v.network, v'.network, dsStep)
   ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)
 {
   assert 0 < |v.history|;

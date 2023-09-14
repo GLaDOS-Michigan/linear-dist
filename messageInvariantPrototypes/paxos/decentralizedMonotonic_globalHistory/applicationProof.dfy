@@ -355,7 +355,7 @@ ghost predicate LeaderMonotonic(c: Constants, v: Variables)
     && v.History(j).leaders[ldr].value == v.History(i).leaders[ldr].value
 }
 
-ghost predicate AcceptorMonotonic(c: Constants, v: Variables)
+ghost predicate AcceptorAcceptedMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall i, j, acc | 
@@ -369,12 +369,27 @@ ghost predicate AcceptorMonotonic(c: Constants, v: Variables)
     && v.History(i).acceptors[acc].acceptedVB.value.b <= v.History(j).acceptors[acc].acceptedVB.value.b
 }
 
+ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall i, j, acc | 
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && c.ValidAcceptorIdx(acc)
+    && i <= j
+    && v.History(i).acceptors[acc].promised.Some?
+  ::
+    && v.History(j).acceptors[acc].promised.Some?
+    && v.History(i).acceptors[acc].promised.value <= v.History(j).acceptors[acc].promised.value
+}
+
 // Monotonicity Bundle
 ghost predicate MonotonicityInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
   && LeaderMonotonic(c, v)
-  && AcceptorMonotonic(c, v)
+  && AcceptorAcceptedMonotonic(c, v)
+  && AcceptorPromisedMonotonic(c, v)
 }
 
 // Application bundle
@@ -432,7 +447,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
-  assert MonotonicityInv(c, v');
+  MonotonicityInvInductive(c, v, v');
 
   InvNextLearnerValidReceivedAccepts(c, v, v');
   InvNextLearnerValidReceivedAcceptsKeys(c, v, v');
@@ -481,13 +496,25 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 //   assert OneValuePerBallotLeaderAndAcceptors(c, v');
 // }
 
+lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MonotonicityInv(c, v)
+  requires AcceptorPromisedLargerThanAccepted(c, v)
+  requires Next(c, v, v')
+  ensures MonotonicityInv(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
+
 lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
   requires LearnerValidReceivedAccepts(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
-{}
+{
+  VariableNextProperties(c, v, v');
+}
 
 lemma InvNextLearnerValidReceivedAcceptsKeys(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
@@ -495,7 +522,9 @@ lemma InvNextLearnerValidReceivedAcceptsKeys(c: Constants, v: Variables, v': Var
   requires LearnerValidReceivedAcceptsKeys(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAcceptsKeys(c, v')
-{}
+{
+  VariableNextProperties(c, v, v');
+}
 
 lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables) 
   requires v.WF(c)
@@ -505,6 +534,7 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
   requires Next(c, v, v')
   ensures LearnedImpliesQuorumOfAccepts(c, v')
 {
+  VariableNextProperties(c, v, v');
   forall lnr:LearnerId, val:Value, i |
     && v'.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
@@ -531,7 +561,7 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
               && ChosenAtLearner(c, v.History(i-1), vb, lnr);
         }
       }
-    }
+    } 
   }
 }
  
@@ -544,8 +574,11 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires LearnerReceivedAcceptImpliesProposed(c, v)
   requires Next(c, v, v')
+  requires LearnerValidReceivedAcceptsKeys(c, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
-{}
+{
+  VariableNextProperties(c, v, v');
+}
 
 lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
@@ -553,7 +586,9 @@ lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Va
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires Next(c, v, v')
   ensures AcceptorValidPromisedAndAccepted(c, v')
-{}
+{
+  VariableNextProperties(c, v, v');
+}
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
@@ -575,7 +610,7 @@ lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v'
   {
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      VariableNextProperties(c, v, v', dsStep);
+      VariableNextProperties(c, v, v');
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       if  && dsStep.LearnerStep?
           && actor == lnr 
@@ -615,12 +650,17 @@ lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': 
 }
 
 lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Variables) 
-  requires v.WF(c) && v'.WF(c)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires ValidProposeMesssage(c, v)
+  requires LeaderMonotonic(c, v)
+  requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
 {
-  assume false;
+  VariableNextProperties(c, v, v');
 }
 
 // lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
