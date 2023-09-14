@@ -104,14 +104,17 @@ module DistributedSystem {
       && (forall i | ValidHistoryIdx(i) :: history[i].WF(c))
     }
 
-    ghost function Last() : Hosts 
+    ghost function Last() : (h: Hosts)
       requires 0 < |history|
+      ensures h == history[|history|-1]
+      ensures h == History(|history|-1)
     {
       UtilitiesLibrary.Last(history)
     }
 
-    ghost function History(i: int) : Hosts
+    ghost function History(i: int) : (h: Hosts)
       requires ValidHistoryIdx(i)
+      ensures h == history[i]
     {
       history[i]
     }

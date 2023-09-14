@@ -419,9 +419,10 @@ lemma VariableNextProperties(c: Constants, v: Variables, v': Variables, dsStep: 
   requires Next(c, v, v')
   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
   ensures 1 < |v'.history|
-  ensures v.Last() == v.history[|v'.history|-2] == v'.history[|v'.history|-2]
-  ensures forall i | 0 <= i < |v'.history| - 1 :: v.history[i] == v'.history[i]
-  ensures NextStep(c, v.history[|v'.history|-2], v'.Last(), v.network, v'.network, dsStep)
+  ensures |v.history| == |v'.history| - 1
+  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)
+  ensures NextStep(c, v.History(|v'.history|-2), v'.Last(), v.network, v'.network, dsStep)
+  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)
 {
   assert 0 < |v.history|;
   assert 1 < |v'.history|;
@@ -433,7 +434,7 @@ returns (accSet: set<AcceptorId>)
   ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
   ensures |accSet| == 2 * c.f + 1
 {
-  assert v.history[0].WF(c);  // trigger for |c.acceptorConstants| == 2 * c.f+1
+  assert v.History(0).WF(c);  // trigger for |c.acceptorConstants| == 2 * c.f+1
   accSet := set a |  0 <= a < |c.acceptorConstants|;
   SetComprehensionSize(|c.acceptorConstants|);
 }
