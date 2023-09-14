@@ -30,6 +30,7 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   // && LeaderValidReceivedPromises(c, v)
   && ValidProposeMesssage(c, v)
   // From Acceptor transitions
+  && AcceptorValidPendingPrepare(c, v)
   && AcceptorValidAccepted(c, v)
   && ValidPromiseMessage(c, v)
   && ValidAcceptMessage(c, v)
@@ -51,6 +52,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 {
   // InvNextLeaderValidReceivedPromises(c, v, v');
   InvNextValidProposeMesssage(c, v, v');
+  InvNextAcceptorValidPendingPrepare(c, v, v');
   InvNextAcceptorValidAccepted(c, v, v');
   InvNextValidPromiseMessage(c, v, v');
   InvNextValidAcceptMessage(c, v, v');
@@ -61,9 +63,6 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 *                                     Leader Host                                      *
 ***************************************************************************************/
 
-// TONY: Whether or not I need the following LeaderValidReceivedPromises invariant
-// affects whether I need to store received messages.
-
 // certified self-inductive
 // Leader updates receivedPromises based on Promise messages
 // Property of Receive
@@ -72,7 +71,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 // {
 //   forall idx, i, p | 
 //     && c.ValidLeaderIdx(idx)
-//     && 0 <= i < |v.leaders[idx].receivedPromises|
+//     && v.ValidHistoryIdx(i)
 //     && p in v.leaders[idx].receivedPromises[i]
 //   :: 
 //     IsPromiseMessage(v, p)
@@ -97,6 +96,19 @@ ghost predicate ValidProposeMesssage(c: Constants, v: Variables)
 /***************************************************************************************
 *                                     Acceptor Host                                    *
 ***************************************************************************************/
+
+
+// Acceptor's pendingPrepare comes from the network
+ghost predicate AcceptorValidPendingPrepare(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall acc, i |
+    && c.ValidAcceptorIdx(acc) 
+    && v.ValidHistoryIdx(i)
+    && v.History(i).acceptors[acc].pendingPrepare.Some?
+  :: 
+    Prepare(v.History(i).acceptors[acc].pendingPrepare.value.bal) in v.network.sentMsgs
+} 
 
 // certified self-inductive
 // Acceptor updates its acceptedVB based on a Propose message carrying that ballot and value
@@ -203,39 +215,16 @@ lemma InvNextValidProposeMesssage(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures ValidProposeMesssage(c, v')
 {
-  forall prop | IsProposeMessage(v', prop)
-  ensures
-    (exists i ::
-      && v'.ValidHistoryIdx(i)
-      && var ldr := v'.History(i).leaders[prop.bal];
-      && ldr.CanPropose(c.leaderConstants[prop.bal])
-      && prop.val == ldr.value
-    )
-  {
-    var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-    var actor, msgOps := dsStep.actor, dsStep.msgOps;
-    var i: int;
-    if && dsStep.LeaderStep? 
-       && actor == prop.bal
-       && msgOps.send == Some(prop) {
-        // witness
-        i := |v.history| - 1;
-    } else {
-      assert IsProposeMessage(v, prop);
-      // witness
-      i :|       
-          && v.ValidHistoryIdx(i)
-          && var ldr := v.History(i).leaders[prop.bal];
-          && ldr.CanPropose(c.leaderConstants[prop.bal])
-          && prop.val == ldr.value;
-    }
-    // trigger
-      assert  
-        && v'.ValidHistoryIdx(i)
-        && var ldr := v'.History(i).leaders[prop.bal];
-        && ldr.CanPropose(c.leaderConstants[prop.bal])
-        && prop.val == ldr.value;
-  }
+  VariableNextProperties(c, v, v');
+}
+
+lemma InvNextAcceptorValidPendingPrepare(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires AcceptorValidPendingPrepare(c, v)
+  requires Next(c, v, v')
+  ensures AcceptorValidPendingPrepare(c, v')
+{
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextAcceptorValidAccepted(c: Constants, v: Variables, v': Variables)
@@ -244,40 +233,7 @@ lemma InvNextAcceptorValidAccepted(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures AcceptorValidAccepted(c, v')
 {
-  forall acc, i |
-    && c.ValidAcceptorIdx(acc) 
-    && v'.ValidHistoryIdx(i)
-    && v'.History(i).acceptors[acc].acceptedVB.Some?
-  ensures
-    && var vb := v'.History(i).acceptors[acc].acceptedVB.value;
-    && Propose(vb.b, vb.v) in v'.network.sentMsgs
-  {
-    var vb := v'.History(i).acceptors[acc].acceptedVB.value;
-    if Propose(vb.b, vb.v) in v.network.sentMsgs {
-      assert Propose(vb.b, vb.v) in v'.network.sentMsgs;
-    } else {
-      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if i == |v'.history| - 1 {
-        var actor, msgOps := dsStep.actor, dsStep.msgOps;
-        if && dsStep.AcceptorStep?
-          && actor == acc
-        {
-          assert AcceptorHost.Next(c.acceptorConstants[actor], v.Last().acceptors[actor], v'.Last().acceptors[actor], msgOps);
-          var ac, a, a' := c.acceptorConstants[actor], v.Last().acceptors[actor], v'.Last().acceptors[actor];
-          var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-          if step.MaybeAcceptStep? {
-            assert Propose(vb.b, vb.v) in v'.network.sentMsgs;
-          } else {
-            assert v.History(i-1).acceptors[acc].acceptedVB.Some?;  // trigger
-          }
-        } else {
-          assert v.History(i-1).acceptors[acc].acceptedVB.Some?;  // trigger
-        }
-      } else {
-        assert v.History(i).acceptors[acc].acceptedVB.Some?;  // trigger
-      }
-    }
-  }
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextValidPromiseMessage(c: Constants, v: Variables, v': Variables)
@@ -320,31 +276,7 @@ lemma InvNextValidAcceptMessage(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures ValidAcceptMessage(c, v')
 {
-  forall accept | IsAcceptMessage(v', accept)
-  ensures exists i :: 
-    && v'.ValidHistoryIdx(i)
-    && v'.History(i).acceptors[accept.acc].acceptedVB == Some(accept.vb)
-  {
-    var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-    var actor, msgOps := dsStep.actor, dsStep.msgOps;
-    if && dsStep.AcceptorStep? 
-       && accept.acc == actor 
-       && msgOps.send == Some(accept)
-    {
-      var ac, a, a' := c.acceptorConstants[actor], v.Last().acceptors[actor], v'.Last().acceptors[actor];
-      var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
-      if step.BroadcastAcceptedStep?  {
-        var i := |v'.history|-1;
-        assert  && v'.ValidHistoryIdx(i)  // trigger 
-                && v'.History(i).acceptors[accept.acc].acceptedVB == Some(accept.vb);
-      }
-    } else {
-      var i :|  && v.ValidHistoryIdx(i)   // witness 
-                && v.History(i).acceptors[accept.acc].acceptedVB == Some(accept.vb);
-      assert  && v'.ValidHistoryIdx(i)    // trigger 
-              && v'.History(i).acceptors[accept.acc].acceptedVB == Some(accept.vb);
-    }
-  }
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
@@ -353,41 +285,7 @@ lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variabl
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
 {
-  forall idx, vb, acc, i | 
-    && c.ValidLearnerIdx(idx)
-    && v'.ValidHistoryIdx(i)
-    && vb in v'.History(i).learners[idx].receivedAccepts
-    && acc in v'.History(i).learners[idx].receivedAccepts[vb]
-  ensures
-    && Accept(vb, acc) in v'.network.sentMsgs
-  {
-    if Accept(vb, acc) in v.network.sentMsgs {
-      assert Accept(vb, acc) in v'.network.sentMsgs;
-    } else {
-      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if i == |v'.history| - 1 {
-        var actor, msgOps := dsStep.actor, dsStep.msgOps;
-        if && dsStep.LearnerStep?
-           && actor == idx
-        {
-          var lc, l, l' := c.learnerConstants[actor], v.Last().learners[actor], v'.Last().learners[actor];
-          var step :| LearnerHost.NextStep(lc, l, l', step, msgOps);
-          if  && vb in l.receivedAccepts
-              && acc in l.receivedAccepts[vb]
-          {
-            assert  && vb in v.History(i-1).learners[idx].receivedAccepts   // trigger
-                    && acc in v.History(i-1).learners[idx].receivedAccepts[vb];
-          }
-        } else {
-          assert  && vb in v.History(i-1).learners[idx].receivedAccepts     // trigger
-                  && acc in v.History(i-1).learners[idx].receivedAccepts[vb];
-        }
-      } else {
-        assert  && vb in v.History(i).learners[idx].receivedAccepts         // trigger
-                && acc in v.History(i).learners[idx].receivedAccepts[vb];
-      }
-    }
-  }
+  VariableNextProperties(c, v, v');
 }
 
 /***************************************************************************************
