@@ -27,7 +27,8 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && v.WF(c)
   && ValidMessageSrc(c, v)
   // From Leader transitions
-  // && LeaderValidReceivedPromises(c, v)
+  && LeaderValidReceivedPromises(c, v)
+  && LeaderValidHighestHeard(c, v)
   && ValidProposeMesssage(c, v)
   // From Acceptor transitions
   && AcceptorValidPendingPrepare(c, v)
@@ -50,7 +51,9 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
 {
-  // InvNextLeaderValidReceivedPromises(c, v, v');
+  InvNextValidMessageSrc(c, v, v');
+  InvNextLeaderValidReceivedPromises(c, v, v');
+  InvNextLeaderValidHighestHeard(c, v, v');
   InvNextValidProposeMesssage(c, v, v');
   InvNextAcceptorValidPendingPrepare(c, v, v');
   InvNextAcceptorValidAccepted(c, v, v');
@@ -66,16 +69,35 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 // certified self-inductive
 // Leader updates receivedPromises based on Promise messages
 // Property of Receive
-// ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
-//   requires v.WF(c)
-// {
-//   forall idx, i, p | 
-//     && c.ValidLeaderIdx(idx)
-//     && v.ValidHistoryIdx(i)
-//     && p in v.leaders[idx].receivedPromises[i]
-//   :: 
-//     IsPromiseMessage(v, p)
-// }
+ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, i, acc | 
+    && c.ValidLeaderIdx(ldr)
+    && v.ValidHistoryIdx(i)
+    && acc in v.History(i).leaders[ldr].receivedPromises
+  :: 
+    (exists prom :: 
+      && IsPromiseMessage(v, prom)
+      && prom.bal == ldr
+      && prom.acc == acc
+    )
+}
+
+ghost predicate LeaderValidHighestHeard(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall ldr, i | 
+    && c.ValidLeaderIdx(ldr)
+    && v.ValidHistoryIdx(i)
+    && v.History(i).leaders[ldr].highestHeardBallot.Some?
+  :: 
+    (exists prom :: 
+      && IsPromiseMessage(v, prom)
+      && prom.bal == ldr
+      && prom.vbOpt == Some(VB(v.History(i).leaders[ldr].value, v.History(i).leaders[ldr].highestHeardBallot.value))
+    )
+}
 
 // certified self-inductive
 // Property of Send
@@ -189,23 +211,32 @@ ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
 *                               Proofs (how unfortunate)                               *
 ***************************************************************************************/
 
+lemma InvNextValidMessageSrc(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires Next(c, v, v')
+  ensures ValidMessageSrc(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
 
-// lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
-//   requires v.WF(c)
-//   requires LeaderValidReceivedPromises(c, v)
-//   requires Next(c, v, v')
-//   ensures LeaderValidReceivedPromises(c, v')
-// {
-//   forall idx, i, p | 
-//     && c.ValidLeaderIdx(idx)
-//     && 0 <= i < |v'.leaders[idx].receivedPromises|
-//     && p in v'.leaders[idx].receivedPromises[i]
-//   ensures
-//     IsPromiseMessage(v', p)
-//   {
-//     assert IsPromiseMessage(v, p);  // trigger
-//   }
-// }
+lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LeaderValidReceivedPromises(c, v)
+  requires Next(c, v, v')
+  ensures LeaderValidReceivedPromises(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
+
+lemma InvNextLeaderValidHighestHeard(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LeaderValidHighestHeard(c, v)
+  requires Next(c, v, v')
+  ensures LeaderValidHighestHeard(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
 
 
 lemma InvNextValidProposeMesssage(c: Constants, v: Variables, v': Variables)
