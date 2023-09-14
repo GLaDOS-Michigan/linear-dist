@@ -405,11 +405,11 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorValidPromisedAndAccepted(c, v)
   && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedImpliesProposed(c, v)
-  // && LeaderValidReceivedPromises(c, v)
-  // && LeaderHighestHeardUpperBound(c, v)
-  // && LeaderHearedImpliesProposed(c, v)
-  // && LeaderReceivedPromisesImpliesAcceptorState(c, v)
-  // && LeaderNotHeardImpliesNotPromised(c, v)
+  && LeaderValidReceivedPromises(c, v)
+  && LeaderHighestHeardUpperBound(c, v)
+  && LeaderHearedImpliesProposed(c, v)
+  && LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  && LeaderNotHeardImpliesNotPromised(c, v)
   // && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   // && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   // && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -457,8 +457,11 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextAcceptorValidPromisedAndAccepted(c, v, v');
   InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextAcceptorAcceptedImpliesProposed(c, v, v');
-  // InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
-  // InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
+  InvNextLeaderValidReceivedPromises(c, v, v');
+  InvNextLeaderHighestHeardUpperBound(c, v, v');
+  InvNextLeaderHearedImpliesProposed(c, v, v');
+  InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
+  InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   // InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
   // InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   // InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
@@ -640,13 +643,12 @@ lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v'
 }
 
 lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': Variables) 
-  requires v.WF(c) && v'.WF(c)
+  requires v.WF(c)
   requires AcceptorPromisedLargerThanAccepted(c, v)
   requires Next(c, v, v')
   ensures AcceptorPromisedLargerThanAccepted(c, v')
 {
-  // This needs its own lemma to avoid timeout
-  assume false;
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Variables) 
@@ -663,24 +665,147 @@ lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Var
   VariableNextProperties(c, v, v');
 }
 
-// lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
-//   requires v.WF(c) && v'.WF(c)
-//   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
-//   requires Next(c, v, v')
-//   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
-// {
-//   // This needs its own lemma to avoid timeout
-// }
+lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires LeaderValidReceivedPromises(c, v)
+  requires Next(c, v, v')
+  ensures LeaderValidReceivedPromises(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
 
-// lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
-//   requires v.WF(c) && v'.WF(c)
-//   requires LeaderNotHeardImpliesNotPromised(c, v)
-//   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
-//   requires Next(c, v, v')
-//   ensures LeaderNotHeardImpliesNotPromised(c, v')
-// {
-//   // This needs its own lemma to avoid timeout
-// }
+lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires AcceptorPromisedLargerThanAccepted(c, v)
+  requires LeaderHighestHeardUpperBound(c, v) 
+  requires Next(c, v, v')
+  ensures LeaderHighestHeardUpperBound(c, v')
+{
+  forall ldr:LeaderId, i | 
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && v'.History(i).leaders[ldr].highestHeardBallot.Some?
+  ensures
+    v'.History(i).leaders[ldr].highestHeardBallot.value < ldr
+  {
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      if dsStep.LeaderStep? {
+        var actor, msgOps := dsStep.actor, dsStep.msgOps;
+        var lc, l, l' := c.leaderConstants[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
+        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+        if step.ReceiveStep? {
+          assert IsPromiseMessage(v, msgOps.recv.value);  // trigger
+        } 
+      }
+    }
+  }
+}
+
+lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires LeaderHearedImpliesProposed(c, v) 
+  requires Next(c, v, v')
+  ensures LeaderHearedImpliesProposed(c, v')
+{  
+  forall ldr:LeaderId, i | 
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && v'.History(i).leaders[ldr].highestHeardBallot.Some?
+  ensures
+    // note that once a leader CanPropose(), its value does not change
+    && var vi' := v'.History(i);
+    var b := vi'.leaders[ldr].highestHeardBallot.value;
+    && c.ValidLeaderIdx(b)
+    && vi'.LeaderCanPropose(c, b)
+    && vi'.leaders[b].value == vi'.leaders[ldr].value
+  { 
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      if dsStep.LeaderStep? {
+        var actor, msgOps := dsStep.actor, dsStep.msgOps;
+        var lc, l, l' := c.leaderConstants[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
+        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+        if step.ReceiveStep? {
+          assert IsPromiseMessage(v, msgOps.recv.value);  // trigger
+        } 
+      }
+    }
+  }
+}
+
+lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  requires Next(c, v, v')
+  ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
+{
+  forall ldr:LeaderId, acc:AcceptorId, i | 
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && acc in v'.History(i).leaders[ldr].receivedPromises
+  ensures
+    v'.History(i).acceptors[acc].HasPromisedAtLeast(ldr)
+  {
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      if dsStep.LeaderStep? {
+        var actor, msgOps := dsStep.actor, dsStep.msgOps;
+        var lc, l, l' := c.leaderConstants[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
+        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+        if step.ReceiveStep? {
+          assert IsPromiseMessage(v, msgOps.recv.value);  // trigger
+        } 
+      }
+    }
+  }
+}
+
+lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires LeaderNotHeardImpliesNotPromised(c, v)
+  requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  requires Next(c, v, v')
+  ensures LeaderNotHeardImpliesNotPromised(c, v')
+{
+  forall ldr:LeaderId, acc:AcceptorId, b:LeaderId, i | 
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && b < ldr
+    && v'.History(i).acceptors[acc].HasAcceptedAtLeastBal(b)
+    && v'.History(i).acceptors[acc].HasAcceptedAtMostBal(ldr)
+    && v'.History(i).leaders[ldr].HeardAtMost(b)
+  ensures
+    && acc !in v'.History(i).leaders[ldr].receivedPromises
+  {
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      if acc in v'.History(i).leaders[ldr].receivedPromises {
+
+
+        // might need something about ValidPromiseMessages
+
+        assume false;
+        assert false;
+      }
+    }
+  }
+}
 
 // lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
 //   requires Inv(c, v)
