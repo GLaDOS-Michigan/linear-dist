@@ -400,6 +400,7 @@ ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
 ghost predicate {:opaque} VariableNextPreserved(c: Constants, v: Variables)
   requires v.WF(c)
 {
+  && InitHosts(c, v.History(0))
   && forall i | 
     && 1 <= i < |v.history|
   ::
@@ -847,7 +848,7 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   }
 }
 
-lemma {:timeLimitMultiplier 3} InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
+lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
   // requires ValidProposeMesssage(c, v)
@@ -907,9 +908,9 @@ lemma {:timeLimitMultiplier 3} InvNextLeaderNotHeardImpliesNotPromised(c: Consta
 
             // 0 < j because no promise messages in initial state
             assert 0 < j by {
-              assume false;
               // we don't actually have access to message set in the genesis block, 
               // but PromiseMessageMatchesHistory cannot work for 0.
+              reveal_VariableNextPreserved();
             }
 
             assert v.History(j).acceptors[msg.acc].promised.value == ldr;
@@ -918,7 +919,6 @@ lemma {:timeLimitMultiplier 3} InvNextLeaderNotHeardImpliesNotPromised(c: Consta
               assert false;
             } else {
               // Acceptor cannot accept between b and ldr
-              // assume false;
               assert v.History(j).acceptors[acc].HasPromisedAtLeast(ldr);
               assert v.History(j).acceptors[acc].HasAcceptedAtMostBal(b);
               Help(c, v, acc, j, i-1, ldr, b);

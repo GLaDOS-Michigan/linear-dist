@@ -133,11 +133,16 @@ module DistributedSystem {
   {
     && v.WF(c)
     && |v.history| == 1
-    && LeaderHost.GroupInit(c.leaderConstants, v.history[0].leaders, c.f)
-    && AcceptorHost.GroupInit(c.acceptorConstants, v.history[0].acceptors, c.f)
-    && LearnerHost.GroupInit(c.learnerConstants, v.history[0].learners, c.f)
-
+    && InitHosts(c, v.History(0))
     && Network.Init(v.network)
+  }
+
+  ghost predicate InitHosts(c: Constants, h: Hosts) 
+    requires h.WF(c)
+  {
+    && LeaderHost.GroupInit(c.leaderConstants, h.leaders, c.f)
+    && AcceptorHost.GroupInit(c.acceptorConstants, h.acceptors, c.f)
+    && LearnerHost.GroupInit(c.learnerConstants, h.learners, c.f)
   }
   
   datatype Step = 
