@@ -851,17 +851,9 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
 lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
-  // requires ValidProposeMesssage(c, v)
-  // requires AcceptorValidPendingPrepare(c, v)
-  // requires AcceptorValidAccepted(c, v)
   requires ValidPromiseMessage(c, v)
-  // requires ValidAcceptMessage(c, v)
-
-  // requires LeaderHighestHeardMonotonic(c, v)
-  // requires AcceptorAcceptedMonotonic(c, v)
   requires AcceptorPromisedMonotonic(c, v)
   requires VariableNextPreserved(c, v)
-
   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires LeaderNotHeardImpliesNotPromised(c, v)
   requires Next(c, v, v')
@@ -890,50 +882,27 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
         if && step.ReceiveStep?
            && acc in l'.receivedPromises 
         {
-          if acc in l.receivedPromises {
-            assert v.History(i-1).acceptors[acc].HasAcceptedAtLeastBal(b);
-            assert v.History(i-1).acceptors[acc].HasAcceptedAtMostBal(ldr);
-            assert v.History(i-1).leaders[ldr].HeardAtMost(b);
-            assert acc !in v.History(i-1).leaders[ldr].receivedPromises;
-            assert v.History(i-1) == v.Last();
-            assert l == v.History(i-1).leaders[ldr];
-            assert false;
-          } else {
-            var msg := msgOps.recv.value;
-            assert msg.Promise?;
-            assert IsPromiseMessage(v, msg);
-            assert msg.bal == ldr;
-            var j: nat  :| PromiseMessageMatchesHistory(c, v, msg, j);  
-            assert msg.acc == acc;
+          assert acc !in l.receivedPromises;
+          var msg := msgOps.recv.value;
+          assert msg.Promise?;  // trigger
+          assert IsPromiseMessage(v, msg);  // trigger
+          var j: nat  :| PromiseMessageMatchesHistory(c, v, msg, j);    // witness
 
-            // 0 < j because no promise messages in initial state
-            assert 0 < j by {
-              // we don't actually have access to message set in the genesis block, 
-              // but PromiseMessageMatchesHistory cannot work for 0.
-              reveal_VariableNextPreserved();
-            }
-
-            assert v.History(j).acceptors[msg.acc].promised.value == ldr;
-            if v.History(j).acceptors[acc].HasAcceptedAtLeastBal(b) {
-              // Then leader must hear it via message
-              assert false;
-            } else {
-              // Acceptor cannot accept between b and ldr
-              assert v.History(j).acceptors[acc].HasPromisedAtLeast(ldr);
-              assert v.History(j).acceptors[acc].HasAcceptedAtMostBal(b);
-              Help(c, v, acc, j, i-1, ldr, b);
-              assert false;
-            }           
+          assert 0 < j by {
+            reveal_VariableNextPreserved();
           }
+          if v.History(j).acceptors[acc].HasAcceptedAtMostBal(b) {
+            // Acceptor cannot accept between b and ldr
+            NotHeardImpliesNotPromisedInHistorySeq(c, v, acc, j, i-1, ldr, b);
+          }
+          assert false;           
         } 
-      } else if dsStep.AcceptorStep? {
-        assert acc !in v'.History(i).leaders[ldr].receivedPromises;
       }
     }
   }
 }
 
-lemma Help(c: Constants, v: Variables, acc: AcceptorId, start: int, end: int, promised: LeaderId, acceptedAtMost: LeaderId)
+lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: AcceptorId, start: int, end: int, promised: LeaderId, acceptedAtMost: LeaderId)
   requires v.WF(c)
   requires VariableNextPreserved(c, v)
   requires c.ValidAcceptorIdx(acc)
@@ -949,36 +918,18 @@ lemma Help(c: Constants, v: Variables, acc: AcceptorId, start: int, end: int, pr
   :: 
     && v.History(i).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
 {
-  if start == end-1 {
-    reveal_VariableNextPreserved();
-    assert Next(c, v.Truncate(c, start), v.Truncate(c, end));
-  } else {
-    reveal_VariableNextPreserved();
-    Help(c, v, acc, start, end-1, promised, acceptedAtMost);
+  reveal_VariableNextPreserved();
+  if start < end-1 {
+    NotHeardImpliesNotPromisedInHistorySeq(c, v, acc, start, end-1, promised, acceptedAtMost);
     forall i | 
       && start <= i <= end 
       && v.History(i).acceptors[acc].HasAcceptedAtMostBal(promised)
     ensures
       && v.History(i).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
     {
-      assert forall j | 
-          && start <= j <= end-1
-          && v.History(j).acceptors[acc].HasAcceptedAtMostBal(promised)
-        :: 
-          && v.History(j).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
-      ;
-      assert Next(c, v.Truncate(c, end - 1), v.Truncate(c, end));
-
       if i == end {
-        assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(promised);
-
-
-        assert start <= end-1 <= end-1
-              && v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(promised);
-        // assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(promised);
-        assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost);
-        assert v.History(end).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost);
-
+        // trigger
+        assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost); 
       }
     }
   }
