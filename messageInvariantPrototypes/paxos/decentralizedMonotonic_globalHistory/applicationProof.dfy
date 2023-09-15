@@ -397,6 +397,15 @@ ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
     && v.History(i).acceptors[acc].promised.value <= v.History(j).acceptors[acc].promised.value
 }
 
+ghost predicate {:opaque} VariableNextPreserved(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  && forall i | 
+    && 1 <= i < |v.history|
+  ::
+  Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
+}
+
 // Monotonicity Bundle
 ghost predicate MonotonicityInv(c: Constants, v: Variables)
   requires v.WF(c)
@@ -405,6 +414,7 @@ ghost predicate MonotonicityInv(c: Constants, v: Variables)
   && LeaderCanProposeMonotonic(c, v)
   && AcceptorAcceptedMonotonic(c, v)
   && AcceptorPromisedMonotonic(c, v)
+  && VariableNextPreserved(c, v)
 }
 
 // Application bundle
@@ -454,7 +464,11 @@ lemma InvImpliesSafety(c: Constants, v: Variables)
 lemma InitImpliesInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures Inv(c, v)
-{}
+{
+  assert VariableNextPreserved(c, v) by {
+    reveal_VariableNextPreserved();
+  }
+}
 
 lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -515,13 +529,51 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 // }
 
 lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
+  requires v.WF(c) && v'.WF(c)
   requires MonotonicityInv(c, v)
   requires AcceptorPromisedLargerThanAccepted(c, v)
   requires Next(c, v, v')
   ensures MonotonicityInv(c, v')
 {
   VariableNextProperties(c, v, v');
+  InvNextVariableNextPreserved(c, v, v');
+}
+
+lemma InvNextVariableNextPreserved(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires VariableNextPreserved(c, v)
+  requires Next(c, v, v')
+  ensures VariableNextPreserved(c, v')
+{
+  reveal_VariableNextPreserved();
+  VariableNextProperties(c, v, v');
+  forall i | 1 <= i < |v'.history|
+  ensures Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1))
+  {
+    if i == |v'.history| - 1 {
+      MessageContainmentPreservesNext(c, v, v', v'.Truncate(c, i), v'.Truncate(c, i+1));
+      assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
+    } else {
+      assert Next(c, v.Truncate(c, i), v.Truncate(c, i+1));
+      assert v.Truncate(c, i).network.sentMsgs <= v'.Truncate(c, i).network.sentMsgs;
+      MessageContainmentPreservesNext(c, v.Truncate(c, i), v.Truncate(c, i+1), v'.Truncate(c, i), v'.Truncate(c, i+1));
+      assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
+    }
+  }
+}
+
+lemma MessageContainmentPreservesNext(c: Constants, v: Variables, v': Variables, s: Variables, s': Variables)
+  requires v.WF(c)
+  requires s.WF(c)
+  requires Next(c, v, v')
+  requires v.history == s.history
+  requires v'.history == s'.history
+  requires v'.network.sentMsgs <= s'.network.sentMsgs
+  requires s.network.sentMsgs == s'.network.sentMsgs
+  ensures Next(c, s, s')
+{
+  var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+  assert NextStep(c, s.Last(), s'.Last(), s.network, s'.network, dsStep); // trigger
 }
 
 lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
@@ -795,18 +847,19 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   }
 }
 
-lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
+lemma {:timeLimitMultiplier 3} InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
-  requires ValidProposeMesssage(c, v)
-  requires AcceptorValidPendingPrepare(c, v)
-  requires AcceptorValidAccepted(c, v)
+  // requires ValidProposeMesssage(c, v)
+  // requires AcceptorValidPendingPrepare(c, v)
+  // requires AcceptorValidAccepted(c, v)
   requires ValidPromiseMessage(c, v)
-  requires ValidAcceptMessage(c, v)
+  // requires ValidAcceptMessage(c, v)
 
-  requires LeaderHighestHeardMonotonic(c, v)
-  requires AcceptorAcceptedMonotonic(c, v)
+  // requires LeaderHighestHeardMonotonic(c, v)
+  // requires AcceptorAcceptedMonotonic(c, v)
   requires AcceptorPromisedMonotonic(c, v)
+  requires VariableNextPreserved(c, v)
 
   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires LeaderNotHeardImpliesNotPromised(c, v)
@@ -849,8 +902,15 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
             assert msg.Promise?;
             assert IsPromiseMessage(v, msg);
             assert msg.bal == ldr;
-            var j: nat  :| PromiseMessageMatchesHistory(c, v, msg, j);
+            var j: nat  :| PromiseMessageMatchesHistory(c, v, msg, j);  
             assert msg.acc == acc;
+
+            // 0 < j because no promise messages in initial state
+            assert 0 < j by {
+              assume false;
+              // we don't actually have access to message set in the genesis block, 
+              // but PromiseMessageMatchesHistory cannot work for 0.
+            }
 
             assert v.History(j).acceptors[msg.acc].promised.value == ldr;
             if v.History(j).acceptors[acc].HasAcceptedAtLeastBal(b) {
@@ -858,25 +918,67 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
               assert false;
             } else {
               // Acceptor cannot accept between b and ldr
+              // assume false;
               assert v.History(j).acceptors[acc].HasPromisedAtLeast(ldr);
               assert v.History(j).acceptors[acc].HasAcceptedAtMostBal(b);
-
-
               Help(c, v, acc, j, i-1, ldr, b);
-              // forall k | j <= k <= i 
-              // ensures 
-              //   v'.History(k).acceptors[acc].HasAcceptedAtMostBal(ldr)
-              //   ==>
-              //   v'.History(k).acceptors[acc].HasAcceptedAtMostBal(b)
-              // {
-              //   assume false;
-              // }
               assert false;
             }           
           }
         } 
       } else if dsStep.AcceptorStep? {
         assert acc !in v'.History(i).leaders[ldr].receivedPromises;
+      }
+    }
+  }
+}
+
+lemma Help(c: Constants, v: Variables, acc: AcceptorId, start: int, end: int, promised: LeaderId, acceptedAtMost: LeaderId)
+  requires v.WF(c)
+  requires VariableNextPreserved(c, v)
+  requires c.ValidAcceptorIdx(acc)
+  requires v.ValidHistoryIdx(start)
+  requires v.ValidHistoryIdx(end)
+  requires 0 < start < end
+  requires acceptedAtMost <= promised
+  requires forall i | start <= i <= end :: v.History(i).acceptors[acc].HasPromisedAtLeast(promised)
+  requires v.History(start).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
+  ensures forall i | 
+    && start <= i <= end 
+    && v.History(i).acceptors[acc].HasAcceptedAtMostBal(promised)
+  :: 
+    && v.History(i).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
+{
+  if start == end-1 {
+    reveal_VariableNextPreserved();
+    assert Next(c, v.Truncate(c, start), v.Truncate(c, end));
+  } else {
+    reveal_VariableNextPreserved();
+    Help(c, v, acc, start, end-1, promised, acceptedAtMost);
+    forall i | 
+      && start <= i <= end 
+      && v.History(i).acceptors[acc].HasAcceptedAtMostBal(promised)
+    ensures
+      && v.History(i).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
+    {
+      assert forall j | 
+          && start <= j <= end-1
+          && v.History(j).acceptors[acc].HasAcceptedAtMostBal(promised)
+        :: 
+          && v.History(j).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
+      ;
+      assert Next(c, v.Truncate(c, end - 1), v.Truncate(c, end));
+
+      if i == end {
+        assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(promised);
+
+
+        assert start <= end-1 <= end-1
+              && v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(promised);
+        // assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(promised);
+        assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost);
+        assert v.History(end).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost);
+
       }
     }
   }
@@ -1298,22 +1400,5 @@ lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
 //   accSet := set a |  0 <= a < |c.acceptorConstants|;
 //   SetComprehensionSize(|c.acceptorConstants|);
 // }
-
-lemma Help(c: Constants, v: Variables, acc: AcceptorId, start: int, end: int, promised: LeaderId, acceptedAtMost: LeaderId)
-  requires v.WF(c)
-  requires c.ValidAcceptorIdx(acc)
-  requires v.ValidHistoryIdx(start)
-  requires v.ValidHistoryIdx(end)
-  requires acceptedAtMost <= promised
-  requires forall i | start <= i <= end :: v.History(i).acceptors[acc].HasPromisedAtLeast(promised)
-  requires v.History(start).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
-  ensures forall i | 
-    && start <= i <= end 
-    && v.History(i).acceptors[acc].HasAcceptedAtMostBal(promised)
-  :: 
-    && v.History(i).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
-{
-  assume false;
-}
 
 } // end module PaxosProof

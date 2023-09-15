@@ -118,6 +118,15 @@ module DistributedSystem {
     {
       history[i]
     }
+
+    ghost function Truncate(c: Constants, i: int) : (v : Variables)
+      requires WF(c)
+      requires 0 <= i <= |history|
+      requires 0 < i
+      ensures v.WF(c)
+    {
+      Variables.Variables(history[..i], network)
+    }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
