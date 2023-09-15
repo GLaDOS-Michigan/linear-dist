@@ -436,7 +436,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LeaderHearedImpliesProposed(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
   && LeaderNotHeardImpliesNotPromised(c, v)
-  // && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
+  && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   // && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   // && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
   // && ChosenValImpliesLeaderOnlyHearsVal(c, v)
@@ -492,7 +492,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextLeaderHearedImpliesProposed(c, v, v');
   InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
   InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
-  // InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
+  InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
   // InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   // InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
   // InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
@@ -935,15 +935,77 @@ lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: Ac
   }
 }
 
-// lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
-//   requires Inv(c, v)
-//   requires v.WF(c) && v'.WF(c)
-//   requires Next(c, v, v')
-//   ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
-// {
-//   reveal_Chosen();
-//   reveal_ChosenAtHistory();
-// }
+lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+
+  requires MessageInv(c, v)
+
+
+  requires MonotonicityInv(c, v)
+
+  requires LearnerReceivedAcceptImpliesAccepted(c, v)
+  requires LeaderNotHeardImpliesNotPromised(c, v) && LeaderNotHeardImpliesNotPromised(c, v')
+  requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
+
+  requires Next(c, v, v')
+  ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
+{
+  forall ldr, acc, lnr, vb:ValBal, i | 
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && c.ValidLearnerIdx(lnr)
+    && vb in v'.History(i).learners[lnr].receivedAccepts
+    && vb.b < ldr
+    && v'.History(i).leaders[ldr].HeardAtMost(vb.b)
+    && acc in v'.History(i).leaders[ldr].receivedPromises
+  ensures
+    acc !in v'.History(i).learners[lnr].receivedAccepts[vb]
+  {
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      if && dsStep.LeaderStep?
+         && actor == ldr 
+      {
+        var lc, l, l' := c.leaderConstants[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
+        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+        if && step.ReceiveStep?
+           && acc in v'.History(i).learners[lnr].receivedAccepts[vb]
+        {
+          assert acc in v'.History(i-1).learners[lnr].receivedAccepts[vb];
+          var accMsg := Accept(vb, acc);
+          assert accMsg in v.network.sentMsgs;
+          assert IsAcceptMessage(v, accMsg);
+
+          // via ValidAcceptMessage
+          var j:int :|  && v.ValidHistoryIdx(j)
+                        && v.History(j).acceptors[accMsg.acc].acceptedVB == Some(accMsg.vb);
+          
+          assert v.History(i-1).acceptors[acc].HasAcceptedAtLeastBal(vb.b);
+          assert v.History(i-1).leaders[ldr].HeardAtMost(vb.b);
+          if v.History(i-1).acceptors[acc].HasAcceptedAtMostBal(ldr) {
+            // contradicts LeaderNotHeardImpliesNotPromised
+            assert false;
+          } else {
+
+
+
+            
+            assume false;
+          }
+          assert false;
+        }
+      } else if && dsStep.LearnerStep?
+                && actor == lnr 
+      {
+        assume false;
+        assert acc !in v'.History(i).learners[lnr].receivedAccepts[vb];
+      }
+    }
+  }
+}
 
 // lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
 //   requires v.WF(c) && v'.WF(c)
