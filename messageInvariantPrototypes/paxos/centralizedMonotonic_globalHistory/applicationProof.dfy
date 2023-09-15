@@ -552,14 +552,13 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
 }
 
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires v.WF(c) && v'.WF(c)
+  requires v.WF(c)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v)
+  requires LeaderNotHeardImpliesNotPromised(c, v)
+  requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   requires Next(c, v, v')
   ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
-{
-  reveal_Chosen();
-  reveal_ChosenAtHistory();
-}
+{}
 
 lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
