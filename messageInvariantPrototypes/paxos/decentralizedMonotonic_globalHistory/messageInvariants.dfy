@@ -35,9 +35,8 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && AcceptorValidAccepted(c, v)
   && ValidPromiseMessage(c, v)
   && ValidAcceptMessage(c, v)
-  // // From Learner transitions
+  // From Learner transitions
   && LearnerValidReceivedAccepts(c, v)
-  // && ValidLearnMessage(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)

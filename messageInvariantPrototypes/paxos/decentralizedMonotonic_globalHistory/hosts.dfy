@@ -169,8 +169,7 @@ module AcceptorHost {
     }
 
     ghost predicate HasAcceptedAtMostBal(b: LeaderId) {
-      && acceptedVB.Some?
-      && acceptedVB.value.b < b
+      acceptedVB.Some? ==> acceptedVB.value.b < b
     }
   } // end datatype Variables (acceptor)
 
