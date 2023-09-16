@@ -180,7 +180,7 @@ ghost predicate ValidAcceptMessage(c: Constants, v: Variables)
   ::
   (exists i :: 
     && v.ValidHistoryIdx(i)
-    && v.History(i).acceptors[accept.acc].acceptedVB == Some(accept.vb)
+    && v.History(i).acceptors[accept.acc].HasAccepted(accept.vb)
   )
 }
 
