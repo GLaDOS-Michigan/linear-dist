@@ -1461,33 +1461,33 @@ lemma Help(c: Constants, v: Variables, start:int, acc: AcceptorId, acceptedVB: V
 //   }
 // }
 
-// // Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
-// lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
-//   requires v.WF(c)
-//   requires Chosen(c, v, chosen)
-//   requires c.ValidLeaderIdx(ldr)
-//   requires v.Last().leaders[ldr].highestHeardBallot.Some?
-//   requires v.Last().leaders[ldr].highestHeardBallot.value >= chosen.b
-//   requires v.Last().leaders[ldr].value != chosen.v
-//   requires chosen.b < ldr
-//   requires OneValuePerBallot(c, v)
-//   requires LeaderHighestHeardUpperBound(c, v)
-//   requires LeaderHearedImpliesProposed(c, v)
-//   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
-//   ensures false
-// {
-//   /* 
-//     Suppose leader L hears a value v' != vb.v. Then by LeaderHearedImpliesProposed, another leader L' 
-//     such that vb.v <= L' < L must have proposed v', 
-//     Then do recursion all the way down.
-//   */
-//   var ldr' := v.Last().leaders[ldr].highestHeardBallot.value;
-//   assert v.Last().leaders[ldr'].value == v.Last().leaders[ldr].value;
-//   assert chosen.b <= ldr' < ldr;
-//   reveal_Chosen();
-//   reveal_ChosenAtHistory();
-//   LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
-// }
+// Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
+lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
+  requires v.WF(c)
+  requires Chosen(c, v, chosen)
+  requires c.ValidLeaderIdx(ldr)
+  requires v.Last().leaders[ldr].highestHeardBallot.Some?
+  requires v.Last().leaders[ldr].highestHeardBallot.value >= chosen.b
+  requires v.Last().leaders[ldr].value != chosen.v
+  requires chosen.b < ldr
+  requires OneValuePerBallot(c, v)
+  requires LeaderHighestHeardUpperBound(c, v)
+  requires LeaderHearedImpliesProposed(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  ensures false
+{
+  /* 
+    Suppose leader L hears a value v' != vb.v. Then by LeaderHearedImpliesProposed, another leader L' 
+    such that vb.v <= L' < L must have proposed v', 
+    Then do recursion all the way down.
+  */
+  var ldr' := v.Last().leaders[ldr].highestHeardBallot.value;
+  assert v.Last().leaders[ldr'].value == v.Last().leaders[ldr].value;
+  assert chosen.b <= ldr' < ldr;
+  reveal_Chosen();
+  reveal_ChosenAtHistory();
+  LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
+}
 
 // /***************************************************************************************
 // *                            Helper Definitions and Lemmas                             *
@@ -1592,38 +1592,38 @@ lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
 //   }
 // }
 
-// // Suppose vb is chosen. Return the quorum of acceptors supporting the chosen vb
-// lemma SupportingAcceptorsForChosen(c: Constants, v: Variables, i:int, vb: ValBal)
-// returns (supportingAccs: set<AcceptorId>)
-//   requires v.WF(c)
-//   requires v.ValidHistoryIdx(i)
-//   requires ChosenAtHistory(c, v.History(i), vb)
-//   requires LearnerReceivedAcceptImpliesAccepted(c, v)
-//   ensures |supportingAccs| >= c.f+1
-//   ensures forall a | a in supportingAccs :: 
-//     && c.ValidAcceptorIdx(a)
-//     && v.History(i).acceptors[a].HasAcceptedAtLeastBal(vb.b)
-//   ensures exists lnr :: 
-//     && c.ValidLearnerIdx(lnr)
-//     && vb in v.History(i).learners[lnr].receivedAccepts
-//     && supportingAccs <= v.History(i).learners[lnr].receivedAccepts[vb]
-// {
-//   reveal_ChosenAtHistory();
-//   var lnr: LearnerId :| ChosenAtLearner(c, v.History(i), vb, lnr);  // skolemize!
-//   supportingAccs := v.History(i).learners[lnr].receivedAccepts[vb];
-//   return supportingAccs;
-// }
+// Suppose vb is chosen. Return the quorum of acceptors supporting the chosen vb
+lemma SupportingAcceptorsForChosen(c: Constants, v: Variables, i:int, vb: ValBal)
+returns (supportingAccs: set<AcceptorId>)
+  requires v.WF(c)
+  requires v.ValidHistoryIdx(i)
+  requires ChosenAtHistory(c, v.History(i), vb)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v)
+  ensures |supportingAccs| >= c.f+1
+  ensures forall a | a in supportingAccs :: 
+    && c.ValidAcceptorIdx(a)
+    && v.History(i).acceptors[a].HasAcceptedAtLeastBal(vb.b)
+  ensures exists lnr :: 
+    && c.ValidLearnerIdx(lnr)
+    && vb in v.History(i).learners[lnr].receivedAccepts
+    && supportingAccs <= v.History(i).learners[lnr].receivedAccepts[vb]
+{
+  reveal_ChosenAtHistory();
+  var lnr: LearnerId :| ChosenAtLearner(c, v.History(i), vb, lnr);  // skolemize!
+  supportingAccs := v.History(i).learners[lnr].receivedAccepts[vb];
+  return supportingAccs;
+}
 
-// lemma GetAcceptorSet(c: Constants, v: Variables)
-// returns (accSet: set<AcceptorId>)
-//   requires v.WF(c)
-//   ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
-//   ensures |accSet| == 2 * c.f + 1
-// {
-//   assert v.history[0].WF(c);  // trigger for |c.acceptorConstants| == 2 * c.f+1
-//   accSet := set a |  0 <= a < |c.acceptorConstants|;
-//   SetComprehensionSize(|c.acceptorConstants|);
-// }
+lemma GetAcceptorSet(c: Constants, v: Variables)
+returns (accSet: set<AcceptorId>)
+  requires v.WF(c)
+  ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
+  ensures |accSet| == 2 * c.f + 1
+{
+  assert v.history[0].WF(c);  // trigger for |c.acceptorConstants| == 2 * c.f+1
+  accSet := set a |  0 <= a < |c.acceptorConstants|;
+  SetComprehensionSize(|c.acceptorConstants|);
+}
 
 lemma NotLeaderStepImpliesNoPrepareOrPropose(c: Constants, h: Hosts, h': Hosts, 
   n: Network.Variables, n': Network.Variables, dsStep: Step
