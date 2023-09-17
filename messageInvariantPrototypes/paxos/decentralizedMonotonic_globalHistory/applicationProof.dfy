@@ -1093,11 +1093,10 @@ lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: Ac
 
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
-
-  requires MessageInv(c, v)
-
-
-  requires MonotonicityInv(c, v)
+  // requires Inv(c, v)
+  requires MessageInv(c, v) && MessageInv(c, v')
+  
+  requires MonotonicityInv(c, v) && MonotonicityInv(c, v')
 
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   requires AcceptorPromisedLargerThanAccepted(c, v)
@@ -1123,99 +1122,51 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
-      if && dsStep.LeaderStep?
-         && actor == ldr 
-      {
-        var lc, l, l' := c.leaderConstants[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
-        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-        if && step.ReceiveStep?
-           && acc !in l.receivedPromises
-           && acc in v'.History(i).learners[lnr].receivedAccepts[vb]
-        {
-          assert acc in v'.History(i-1).learners[lnr].receivedAccepts[vb];
-          var accMsg := Accept(vb, acc);
-          assert accMsg in v.network.sentMsgs;
-          assert IsAcceptMessage(v, accMsg);
-
-          // via ValidAcceptMessage
-          var j:int :|  && v.ValidHistoryIdx(j)
-                        && v.History(j).acceptors[accMsg.acc].acceptedVB == Some(accMsg.vb);
-          
-          assert v.History(i-1).acceptors[acc].HasAcceptedAtLeastBal(vb.b);
-          assert v.History(i-1).leaders[ldr].HeardAtMost(vb.b);
-          if v.History(i-1).acceptors[acc].HasAcceptedAtMostBal(ldr) {
-            // contradicts LeaderNotHeardImpliesNotPromised
-            assert false;
-          } else {
-            assert v.History(i-1).acceptors[acc].HasAcceptedAtLeastBal(ldr);
-            assert vb in v.History(i-1).learners[lnr].receivedAccepts;
-            assert v.History(i-1).leaders[ldr].HeardAtMost(vb.b);
-            if acc in v.History(i-1).leaders[ldr].receivedPromises {
-              // by LeaderHighestHeardToPromisedRangeHasNoAccepts
-              assert acc in v.History(i-1).learners[lnr].receivedAccepts[vb];
-              assert false;
-            } else {
-              assume false;
-              Help(c, v, j, acc, vb, ldr);
-              assert msgOps.recv.value.Promise?;
-              var prom := msgOps.recv.value;
-              assert IsPromiseMessage(v, prom);
-              assume false;
-              assert false;
-              // Acc accepted vb in j.              
-              // assert v.History(j).acceptors[acc].promised.Some?;
-              // if v.History(j).acceptors[acc].promised.value < ldr {
-              //   // In this case, any Promise to L must contain
-              //   // a previous seen >= b. This will contradict v'.History(i).leaders[ldr].HeardAtMost(vb.b)
-              //   assume false;
-              // } else {
-              //   // In this case, any Promise to L must contain
-              //   // a previous seen >= b. This will contradict v'.History(i).leaders[ldr].HeardAtMost(vb.b)
-              //   assume false;
-              //   assert false;
-              // }
-            }
-          }
+      if dsStep.LeaderStep? {
+        NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
+          assert Accept(vb, acc) in v'.network.sentMsgs;
+          assert Accept(vb, acc) in v.network.sentMsgs;
+          var j :|
+            && v.ValidHistoryIdx(j)
+            && v.History(j).acceptors[acc].HasAccepted(vb);
+          assert v'.History(j) == v.History(j);
+          AcceptedAndPromisedImpliesSeen(c, v', j, i, acc, vb, ldr);
+          assert v'.History(i).leaders[ldr].HeardAtLeast(vb.b);
+          assert false;
         }
-      } else if && dsStep.LearnerStep?
-                && actor == lnr 
-      {
-        assume false;
-        assert acc !in v'.History(i).learners[lnr].receivedAccepts[vb];
+      } else if dsStep.LearnerStep? {
+        NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        // NotLeaderStepImpliesNoPrepareOrPropose(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
+          assert Accept(vb, acc) in v'.network.sentMsgs;
+          assert Accept(vb, acc) in v.network.sentMsgs;
+          var j :|
+            && v.ValidHistoryIdx(j)
+            && v.History(j).acceptors[acc].HasAccepted(vb);
+          AcceptedAndPromisedImpliesSeen(c, v, j, i-1, acc, vb, ldr);
+          assert v'.History(i).leaders[ldr].HeardAtLeast(vb.b);
+          assert false;
+          assert false;
+        }
       }
     }
   }
 }
 
-lemma Help(c: Constants, v: Variables, start:int, acc: AcceptorId, acceptedVB: ValBal, ldr: LeaderId)
+lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end: int, acc: AcceptorId, acceptedVB: ValBal, ldr: LeaderId)
   requires v.WF(c)
-  requires Inv(c, v)
+  // requires Inv(c, v)
   requires c.ValidAcceptorIdx(acc)
   requires v.ValidHistoryIdx(start)
+  requires v.ValidHistoryIdx(end)
+  requires start <= end
   requires v.History(start).acceptors[acc].acceptedVB == Some(acceptedVB)
   requires acceptedVB.b < ldr
-  ensures forall p | 
-    && IsPromiseMessage(v, p) 
-    && p.acc == acc
-    && p.bal == ldr
-  ::
-    && p.vbOpt.Some?
-    && p.vbOpt.value.b >= acceptedVB.b
+  requires acc in v.History(end).leaders[ldr].receivedPromises
+  ensures v.History(end).leaders[ldr].HeardAtLeast(acceptedVB.b)
 {
-  forall p | 
-    && IsPromiseMessage(v, p) 
-    && p.acc == acc
-    && p.bal == ldr
-  ensures
-    && p.vbOpt.Some?
-    && p.vbOpt.value.b >= acceptedVB.b
-  {
-    if p.vbOpt.None? || p.vbOpt < acceptedVB {
-      assume false;
-    } else {
-      assume false;
-    }
-  }
+  assume false;
 }
 
 // lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
