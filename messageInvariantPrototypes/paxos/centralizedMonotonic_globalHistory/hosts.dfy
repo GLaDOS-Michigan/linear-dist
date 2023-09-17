@@ -264,6 +264,7 @@ module AcceptorHost {
     && lbl.BroadcastAcceptedLbl?
     && v.pendingPrepare.None?
     && v.acceptedVB.Some?
+    && v.promised == Some(v.acceptedVB.value.b)
     && lbl.vb == v.acceptedVB.value
     && v' == v
   }

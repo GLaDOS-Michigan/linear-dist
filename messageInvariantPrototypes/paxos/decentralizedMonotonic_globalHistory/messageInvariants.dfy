@@ -181,6 +181,7 @@ ghost predicate ValidAcceptMessage(c: Constants, v: Variables)
   (exists i :: 
     && v.ValidHistoryIdx(i)
     && v.History(i).acceptors[accept.acc].HasAccepted(accept.vb)
+    && v.History(i).acceptors[accept.acc].HasPromised(accept.vb.b)
   )
 }
 

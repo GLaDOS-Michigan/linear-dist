@@ -426,7 +426,7 @@ ghost predicate HelperBundle1(c: Constants, v: Variables)
   && AcceptorAcceptedImpliesProposed(c, v)
 }
 
-lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
+lemma {:timeLimitMultiplier 2} InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
   requires HelperBundle1(c, v)
   requires Next(c, v, v')
@@ -463,7 +463,7 @@ lemma InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
   assert LeaderHearedImpliesProposed(c, v');
 }
 
-lemma {:timeLimitMultiplier 2} InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
+lemma {:timeLimitMultiplier 3} InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
   requires OneValuePerBallot(c, v)
   requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed

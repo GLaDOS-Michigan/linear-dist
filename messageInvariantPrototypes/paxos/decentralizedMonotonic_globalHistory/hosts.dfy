@@ -163,6 +163,11 @@ module AcceptorHost {
       && b <= promised.value
     }
 
+    ghost predicate HasPromised(b: LeaderId) {
+      && promised.Some?
+      && b == promised.value
+    }
+
     ghost predicate HasAcceptedAtLeastBal(b: LeaderId) {
       && acceptedVB.Some?
       && b <= acceptedVB.value.b
@@ -260,6 +265,7 @@ module AcceptorHost {
     && msgOps.recv == None
     && v.pendingPrepare.None?
     && v.acceptedVB.Some?
+    && v.promised == Some(v.acceptedVB.value.b)
     && msgOps.send == Some(Accept(v.acceptedVB.value, c.id))
     && v' == v
   }
