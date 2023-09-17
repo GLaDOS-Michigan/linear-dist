@@ -121,9 +121,9 @@ module DistributedSystem {
 
     ghost function Truncate(c: Constants, i: int) : (v : Variables)
       requires WF(c)
-      requires 0 <= i <= |history|
-      requires 0 < i
+      requires 0 < i <= |history|
       ensures v.WF(c)
+      ensures v.Last() == History(i-1)
     {
       Variables.Variables(history[..i], network)
     }
