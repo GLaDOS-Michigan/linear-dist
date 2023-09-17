@@ -1094,16 +1094,12 @@ lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: Ac
 
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
-  // requires Inv(c, v)
   requires MessageInv(c, v) && MessageInv(c, v')
-  
   requires MonotonicityInv(c, v) && MonotonicityInv(c, v')
-
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   requires AcceptorPromisedLargerThanAccepted(c, v)
   requires LeaderNotHeardImpliesNotPromised(c, v) && LeaderNotHeardImpliesNotPromised(c, v')
   requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
-  
   requires Next(c, v, v')
   ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
 {
@@ -1126,29 +1122,25 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
       if dsStep.LeaderStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
         if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
+          // trigger and witness
           assert Accept(vb, acc) in v'.network.sentMsgs;
-          assert Accept(vb, acc) in v.network.sentMsgs;
           var j :|
             && v.ValidHistoryIdx(j)
             && v.History(j).acceptors[acc].HasAccepted(vb)
             && v.History(j).acceptors[acc].HasPromised(vb.b);
-          assert v'.History(j) == v.History(j);
           AcceptedAndPromisedImpliesSeen(c, v', j, i, acc, vb, ldr);
-          assert v'.History(i).leaders[ldr].HeardAtLeast(vb.b);
           assert false;
         }
       } else if dsStep.LearnerStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
-        // NotLeaderStepImpliesNoPrepareOrPropose(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
         if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
-          assert Accept(vb, acc) in v'.network.sentMsgs;
+          // trigger and witness
           assert Accept(vb, acc) in v.network.sentMsgs;
           var j :|
             && v.ValidHistoryIdx(j)
             && v.History(j).acceptors[acc].HasAccepted(vb)
             && v.History(j).acceptors[acc].HasPromised(vb.b);
           AcceptedAndPromisedImpliesSeen(c, v, j, i-1, acc, vb, ldr);
-          assert v'.History(i).leaders[ldr].HeardAtLeast(vb.b);
           assert false;
         }
       }
@@ -1158,31 +1150,31 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
 
 lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end: int, acc: AcceptorId, acceptedVB: ValBal, ldr: LeaderId)
   requires v.WF(c)
+  // Needed invariants
   requires LeaderHighestHeardMonotonic(c, v)
   requires AcceptorAcceptedMonotonic(c, v)
   requires AcceptorPromisedMonotonic(c, v)
   requires VariableNextPreserved(c, v)
-  
   requires ValidMessageSrc(c, v)
-  // requires LeaderValidReceivedPromises(c, v)
-  // requires LeaderValidHighestHeard(c, v)
   requires ValidPromiseMessage(c, v)
-
+  // Input constraints
   requires c.ValidAcceptorIdx(acc)
   requires c.ValidLeaderIdx(ldr)
   requires v.ValidHistoryIdx(start)
   requires v.ValidHistoryIdx(end)
   requires start <= end
-
   requires v.History(start).acceptors[acc].acceptedVB == Some(acceptedVB)
   requires v.History(start).acceptors[acc].promised == Some(acceptedVB.b)
   requires acceptedVB.b < ldr
   requires LeaderNotHeardImpliesNotPromised(c, v)
+  
+  // Desired postcondition
   ensures forall i | 
           && start <= i <= end 
           && acc in v.History(i).leaders[ldr].receivedPromises
           :: 
           v.History(i).leaders[ldr].HeardAtLeast(acceptedVB.b)
+  // Needed to make postcondition inductive
   ensures forall p | 
           && IsPromiseMessage(v, p)
           && p.bal == ldr
@@ -1205,64 +1197,9 @@ lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end:
           assert Next(c, v.Truncate(c, i), v.Truncate(c, i+1)) by {
             reveal_VariableNextPreserved();
           }
-          assert v.Truncate(c, i).Last() == v.History(i-1);
-          assert v.Truncate(c, i+1).Last() == v.History(i);
-          var dsStep :| NextStep(c, v.History(i-1), v.History(i), v.network, v.network, dsStep);
-          if !dsStep.LeaderStep? {
-            assert v.History(i).leaders[ldr] == v.History(i-1).leaders[ldr];
-            assert false;
-          } else {
-            var actor, msgOps := dsStep.actor, dsStep.msgOps;
-            if actor == ldr {
-              var lc, l, l' := c.leaderConstants[ldr], v.History(i-1).leaders[ldr], v.History(i).leaders[ldr];
-              var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-              if step.ReceiveStep? {
-                var p := msgOps.recv.value;
-                assert IsPromiseMessage(v, p) by {
-                  reveal_VariableNextPreserved();
-                }
-                assert p.bal == ldr;
-                assert p.acc == acc by {
-                  if p.acc != acc {
-                    assert acc !in l'.receivedPromises;
-                    assert false;
-                  }
-                }
-                assert && p.vbOpt.Some?
-                      && p.vbOpt.value.b >= acceptedVB.b;
-                var doUpdate := 
-                    && p.vbOpt.Some? 
-                    && l.HeardAtMost(p.vbOpt.value.b);
-                if ! doUpdate {
-                  assert ! l.HeardAtMost(p.vbOpt.value.b);
-                  assert l.HeardAtLeast(p.vbOpt.value.b);
-                  assert l'.HeardAtLeast(p.vbOpt.value.b);
-                  assert v.History(i).leaders[ldr].HeardAtLeast(acceptedVB.b);
-                } else {
-                  assert v.History(i).leaders[ldr].HeardAtLeast(acceptedVB.b);
-                }
-              } else {
-                assert acc !in v.History(i).leaders[ldr].receivedPromises;  
-                assert false;
-              }              
-            } else {
-              assert v.History(i).leaders[ldr] == v.History(i-1).leaders[ldr];
-              assert false;
-            }
-          }
         }
       }
     }
-    // forall p | 
-    //   && IsPromiseMessage(v, p)
-    //   && p.bal == ldr
-    //   && p.acc == acc
-    // ensures
-    //   && p.vbOpt.Some?
-    //   && p.vbOpt.value.b >= acceptedVB.b
-    // {    }
-
-
   } else {
     // Base Case
     forall i | 
