@@ -636,7 +636,6 @@ lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables
   requires Next(c, v, v')
   ensures OneValuePerBallotLearners(c, v')
 {
-  assume false; // somehow time out
   VariableNextProperties(c, v, v');
   forall l1, l2, vb1, vb2, i|
     && v'.ValidHistoryIdx(i)
@@ -653,6 +652,9 @@ lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables
       VariableNextProperties(c, v, v');
       if dsStep.LearnerStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        assert vb1.v == vb2.v;
+      } else {
+        assert vb1.v == vb2.v;
       }
     }
   }
