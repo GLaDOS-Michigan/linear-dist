@@ -304,8 +304,7 @@ ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variable
     && v.ValidHistoryIdx(i)
     && ChosenAtHistory(c, v.History(i), vb)
     && c.ValidAcceptorIdx(acc)
-    && v.History(i).acceptors[acc].acceptedVB.Some?
-    && v.History(i).acceptors[acc].acceptedVB.value.b >= vb.b
+    && v.History(i).acceptors[acc].HasAcceptedAtLeastBal(vb.b)
   ::
      v.History(i).acceptors[acc].acceptedVB.value.v == vb.v
 }
@@ -492,6 +491,13 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
+
+  assert AtMostOneChosenVal(c, v) by {
+    // this should be implied by invariants
+    assume false;
+    reveal_Chosen();
+    reveal_ChosenAtHistory();
+  }
   MessageInvInductive(c, v, v');
   MonotonicityInvInductive(c, v, v');
   InvNextOneValuePerBallot(c, v, v');
@@ -1219,61 +1225,93 @@ lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end:
   }
 }
 
-// lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
-//   requires v.WF(c) && v'.WF(c)
-//   requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
-//   requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
-//   requires Next(c, v, v')
-//   requires AcceptorValidPromisedAndAccepted(c, v')  // prereq for AcceptorAcceptedImpliesProposed
+lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
   
-//   // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
-//   requires AcceptorAcceptedImpliesProposed(c, v')
-//   requires OneValuePerBallot(c, v')
-//   requires LeaderHighestHeardUpperBound(c, v')
-//   requires LeaderHearedImpliesProposed(c, v')
-//   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+  // requires Inv(c, v)
 
-//   // post-condition
-//   ensures ChosenValImpliesAcceptorOnlyAcceptsVal(c, v')
-// {
-//   forall vb, acc:AcceptorId, i | 
-//     && v'.ValidHistoryIdx(i)
-//     && ChosenAtHistory(c, v'.History(i), vb)
-//     && c.ValidAcceptorIdx(acc)
-//     && v'.History(i).acceptors[acc].acceptedVB.Some?
-//     && v'.History(i).acceptors[acc].acceptedVB.value.b >= vb.b
-//   ensures
-//      v'.History(i).acceptors[acc].acceptedVB.value.v == vb.v
-//   {
-//     var sysStep :| NextStep(c, v.Last(), v'.Last(), sysStep);
-//     if sysStep.P2bStep? {
-//       if i == |v'.history| - 1 {
-//         if v'.History(i).acceptors[acc].acceptedVB.value.v != vb.v {
-//           var ldr := v'.Last().acceptors[acc].acceptedVB.value.b;
-//           reveal_Chosen();
-//           reveal_ChosenAtHistory();
-//           LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldr, vb);
-//         }
-//       } else {
-//         assert ChosenAtHistory(c, v.History(i), vb) by {
-//           reveal_ChosenAtHistory();
-//         }
-//       }
-//     } else {
-//       InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c, v, v', sysStep, i, acc, vb);
-//     }
-//   }
-// }
+  requires MessageInv(c, v) && MessageInv(c, v')
+  requires MonotonicityInv(c, v) && MonotonicityInv(c, v')
+
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  requires AcceptorPromisedLargerThanAccepted(c, v)
+  requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')  // prereq for AcceptorAcceptedImpliesProposed
+  
+  // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
+  requires AcceptorAcceptedImpliesProposed(c, v')
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+
+  // post-condition
+  ensures ChosenValImpliesAcceptorOnlyAcceptsVal(c, v')
+{
+  forall vb, acc:AcceptorId, i | 
+    && v'.ValidHistoryIdx(i)
+    && ChosenAtHistory(c, v'.History(i), vb)
+    && c.ValidAcceptorIdx(acc)
+    && v'.History(i).acceptors[acc].HasAcceptedAtLeastBal(vb.b)
+  ensures
+     v'.History(i).acceptors[acc].acceptedVB.value.v == vb.v
+  {
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      if dsStep.LeaderStep? {
+        NewChosenOnlyInLearnerStep(c, v, v', dsStep);
+      } else if 
+        && dsStep.AcceptorStep?
+        && actor == acc 
+      {
+        NewChosenOnlyInLearnerStep(c, v, v', dsStep);
+        var ac, a, a' := c.acceptorConstants[actor], v.Last().acceptors[actor], v'.Last().acceptors[actor];
+        var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
+        if step.MaybeAcceptStep? {
+          ChosenImpliesProposeMessagesOnlyContainValue(c, v, vb);
+        } else {
+          AcceptorHost.UpdateReceiveAcceptedStep(ac, a, a', step, msgOps);
+        }
+      } else {
+        if v'.History(i).acceptors[acc].acceptedVB.value.v != vb.v {
+          var ldr := v'.Last().acceptors[acc].acceptedVB.value.b;
+          reveal_Chosen();
+          reveal_ChosenAtHistory();
+          LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldr, vb);
+        }
+      }
+    }
+  }
+}
+
+lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, vb: ValBal) 
+  requires v.WF(c)
+  requires ChosenAtHistory(c, v.Last(), vb)
+  ensures forall propMsg | 
+    && IsProposeMessage(v, propMsg)
+    && vb.b <= propMsg.bal
+  ::
+    vb.v == propMsg.val
+{
+  assume false;
+}
 
 // lemma InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c: Constants, v: Variables, v': Variables, 
-// sysStep: Step, i:int, acc: AcceptorId, vb: ValBal)
+// dsStep: Step, i:int, acc: AcceptorId, vb: ValBal)
 //   requires v.WF(c) && v'.WF(c)
 //   requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
 //   requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
 //   requires Next(c, v, v')
-//   requires NextStep(c, v.Last(), v'.Last(), sysStep)
-//   requires !sysStep.P2bStep?
+//   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
+//   requires !dsStep.LearnerStep?
 //   requires AcceptorValidPromisedAndAccepted(c, v')  // prereq for AcceptorAcceptedImpliesProposed
+
+//   requires MessageInv(c, v) && MessageInv(c, v')
+//   requires MonotonicityInv(c, v) && MonotonicityInv(c, v')
   
 //   // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
 //   requires AcceptorAcceptedImpliesProposed(c, v')
@@ -1289,7 +1327,7 @@ lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end:
 //             && v'.History(i).acceptors[acc].acceptedVB.value.b >= vb.b
 //   ensures v'.History(i).acceptors[acc].acceptedVB.value.v == vb.v
 // {
-//   NewChosenOnlyInP2bStep(c, v, v', sysStep);
+//   NewChosenOnlyInLearnerStep(c, v, v', dsStep);
 //   reveal_ChosenAtHistory();
 // }
 
@@ -1527,7 +1565,11 @@ ghost predicate ChosenAtLearner(c: Constants, h: Hosts, vb: ValBal, lnr:LearnerI
 ghost predicate AtMostOneChosenVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall vb1, vb2 | Chosen(c, v, vb1) && Chosen(c, v, vb2) 
+  forall i, j, vb1, vb2| 
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && ChosenAtHistory(c, v.History(i), vb1) 
+    && ChosenAtHistory(c, v.History(j), vb2)
   :: vb1.v == vb2.v
 }
 
@@ -1567,31 +1609,32 @@ lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
     ;
     var vb1 := LearnedImpliesChosen(c, v, l1, v.Last().learners[l1].learned.value);
     var vb2 := LearnedImpliesChosen(c, v, l2, v.Last().learners[l2].learned.value);
+    reveal_Chosen();
     assert false;
   }
 }
 
-// // Lemma: The only system step in which a new vb can be chosen is a P2bStep 
-// lemma NewChosenOnlyInP2bStep(c: Constants, v: Variables, v': Variables, sysStep: Step) 
-//   requires v.WF(c)
-//   requires Next(c, v, v')
-//   requires NextStep(c, v.Last(), v'.Last(), sysStep)
-//   requires !sysStep.P2bStep?
-//   ensures forall vb | Chosen(c, v', vb) :: Chosen(c, v, vb)
-//   ensures forall vb | ChosenAtHistory(c, v'.history[|v'.history|-1], vb) 
-//       :: && ChosenAtHistory(c, v'.history[|v'.history|-2], vb)
-//          && ChosenAtHistory(c, v'.history[|v'.history|-2], vb)
-//          && ChosenAtHistory(c, v.history[|v.history|-1], vb)
+// Lemma: The only system step in which a new vb can be chosen is a P2bStep 
+lemma NewChosenOnlyInLearnerStep(c: Constants, v: Variables, v': Variables, dsStep: Step) 
+  requires v.WF(c)
+  requires Next(c, v, v')
+  requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
+  requires !dsStep.LearnerStep?
+  ensures forall vb | Chosen(c, v', vb) :: Chosen(c, v, vb)
+  ensures forall vb | ChosenAtHistory(c, v'.history[|v'.history|-1], vb) 
+      :: && ChosenAtHistory(c, v'.history[|v'.history|-2], vb)
+         && ChosenAtHistory(c, v'.history[|v'.history|-2], vb)
+         && ChosenAtHistory(c, v.history[|v.history|-1], vb)
         
-// {
-//   reveal_Chosen();
-//   reveal_ChosenAtHistory();
-//   forall vb | ChosenAtHistory(c, v'.Last(), vb) 
-//   ensures ChosenAtHistory(c, v'.history[|v'.history|-2], vb) {
-//     var lnr:LearnerId :| ChosenAtLearner(c, v'.Last(), vb, lnr);   // witness
-//     assert ChosenAtLearner(c, v.Last(), vb, lnr);                  // trigger
-//   }
-// }
+{
+  reveal_Chosen();
+  reveal_ChosenAtHistory();
+  forall vb | ChosenAtHistory(c, v'.Last(), vb) 
+  ensures ChosenAtHistory(c, v'.history[|v'.history|-2], vb) {
+    var lnr:LearnerId :| ChosenAtLearner(c, v'.Last(), vb, lnr);   // witness
+    assert ChosenAtLearner(c, v.Last(), vb, lnr);                  // trigger
+  }
+}
 
 // Suppose vb is chosen. Return the quorum of acceptors supporting the chosen vb
 lemma SupportingAcceptorsForChosen(c: Constants, v: Variables, i:int, vb: ValBal)
@@ -1651,5 +1694,4 @@ lemma NotAcceptorStepImpliesNoPromiseOrAccept(c: Constants, h: Hosts, h': Hosts,
   :: 
     p in n.sentMsgs
 {}
-
 } // end module PaxosProof

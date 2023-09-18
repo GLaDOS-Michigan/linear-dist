@@ -280,6 +280,15 @@ module AcceptorHost {
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
+
+  lemma UpdateReceiveAcceptedStep(c: Constants, v: Variables, v': Variables, 
+    step: Step, msgOps: MessageOps)
+    requires NextStep(c, v, v', step, msgOps)
+    requires !step.MaybeAcceptStep?
+    ensures v'.acceptedVB == v.acceptedVB
+  {}
+
+
 }  // end module AcceptorHost
 
 
