@@ -332,8 +332,7 @@ ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
     && v.ValidHistoryIdx(i)
     && ChosenAtHistory(c, v.History(i), vb)
     && c.ValidLeaderIdx(ldrBal)
-    && v.History(i).leaders[ldrBal].highestHeardBallot.Some?
-    && v.History(i).leaders[ldrBal].highestHeardBallot.value >= vb.b
+    && v.History(i).leaders[ldrBal].HeardAtLeast(vb.b)
   ::
     v.History(i).leaders[ldrBal].value == vb.v
 }
@@ -491,13 +490,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-
-  assert AtMostOneChosenVal(c, v) by {
-    // this should be implied by invariants
-    assume false;
-    reveal_Chosen();
-    reveal_ChosenAtHistory();
-  }
   MessageInvInductive(c, v, v');
   MonotonicityInvInductive(c, v, v');
   InvNextOneValuePerBallot(c, v, v');
@@ -519,13 +511,11 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   // InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
   // InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
 
-  assert ApplicationInv(c, v');
-  assume false;
-  assert AtMostOneChosenVal(c, v') by {
-    // this should be implied by invariants
-    reveal_Chosen();
-    reveal_ChosenAtHistory();
-  }
+  assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
+  assume ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
+  assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
+
+  InvImpliesAtMostOneChosenVal(c, v');
   AtMostOneChosenImpliesSafety(c, v');
 }
 
@@ -1565,9 +1555,11 @@ ghost predicate ChosenAtLearner(c: Constants, h: Hosts, vb: ValBal, lnr:LearnerI
 ghost predicate AtMostOneChosenVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall i, j, vb1, vb2| 
+  forall i, j, vb1: ValBal, vb2: ValBal | 
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
+    && i <= j
+    && vb1.b <= vb2.b 
     && ChosenAtHistory(c, v.History(i), vb1) 
     && ChosenAtHistory(c, v.History(j), vb2)
   :: vb1.v == vb2.v
@@ -1694,4 +1686,39 @@ lemma NotAcceptorStepImpliesNoPromiseOrAccept(c: Constants, h: Hosts, h': Hosts,
   :: 
     p in n.sentMsgs
 {}
+
+lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires LearnerReceivedAcceptsMonotonic(c, v)
+  requires OneValuePerBallot(c, v)
+  requires LearnerValidReceivedAccepts(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  ensures AtMostOneChosenVal(c, v)
+{
+  forall i, j, vb1: ValBal, vb2: ValBal | 
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && i <= j
+    && vb1.b <= vb2.b
+    && ChosenAtHistory(c, v.History(i), vb1)
+    && ChosenAtHistory(c, v.History(j), vb2)
+  ensures 
+    vb1.v == vb2.v
+  {
+    reveal_ChosenAtHistory();
+    // vb1 chosen at i implies that vb1 is also chosen at j, by LearnerReceivedAcceptsMonotonic.
+    // This means that a leader proposed vb1, and another proposed vb2, by LearnerReceivedAcceptImpliesProposed.
+    var lnr1: nat :| ChosenAtLearner(c, v.History(i), vb1, lnr1);
+    assert ChosenAtHistory(c, v.History(j), vb1) by {
+      SetContainmentCardinality(v.History(i).learners[lnr1].receivedAccepts[vb1], v.History(j).learners[lnr1].receivedAccepts[vb1]);
+      assert ChosenAtLearner(c, v.History(j), vb1, lnr1);  // trigger
+    }
+    // There are then two cases. If vb1.b == vb2.b, then the conclusion holds via OneValuePerBallot
+    // Otherwise, leader 2 must hear leader 1's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
+    // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
+  }
+}
 } // end module PaxosProof
