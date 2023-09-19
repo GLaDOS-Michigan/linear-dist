@@ -1233,6 +1233,11 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
 
+  // prereqs for ChosenImpliesProposeMessagesOnlyContainValue
+  requires LearnerValidReceivedAcceptsKeys(c, v)
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+
   // post-condition
   ensures ChosenValImpliesAcceptorOnlyAcceptsVal(c, v')
 {
@@ -1276,46 +1281,39 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
 
 lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, vb: ValBal) 
   requires v.WF(c)
+  requires MessageInv(c, v)
+  requires LeaderCanProposeMonotonic(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+
+  // Boundary condition
   requires ChosenAtHistory(c, v.Last(), vb)
-  ensures forall propMsg | 
-    && IsProposeMessage(v, propMsg)
-    && vb.b <= propMsg.bal
+
+  ensures forall prop | 
+    && IsProposeMessage(v, prop)
+    && vb.b <= prop.bal
   ::
-    vb.v == propMsg.val
+    vb.v == prop.val
 {
-  assume false;
+  forall prop | 
+    && IsProposeMessage(v, prop)
+    && vb.b <= prop.bal
+  ensures
+    vb.v == prop.val
+  {
+    if vb.b == prop.bal {
+      // Because vb is chosen, leader vb.b proposed it, by LearnerReceivedAcceptImpliesProposed. 
+      // Also, leader vb.b sent prop, and so must proposed prob.val, by MessageInv.
+      // Result then follows from LeaderCanProposeMonotonic
+      reveal_ChosenAtHistory();
+    } else {
+      // Leader prop.bal must hear leader vb.b's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
+      // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
+    }
+  }
 }
-
-// lemma InvNextChosenValImpliesAcceptorOnlyAcceptsValHelper(c: Constants, v: Variables, v': Variables, 
-// dsStep: Step, i:int, acc: AcceptorId, vb: ValBal)
-//   requires v.WF(c) && v'.WF(c)
-//   requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
-//   requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
-//   requires Next(c, v, v')
-//   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
-//   requires !dsStep.LearnerStep?
-//   requires AcceptorValidPromisedAndAccepted(c, v')  // prereq for AcceptorAcceptedImpliesProposed
-
-//   requires MessageInv(c, v) && MessageInv(c, v')
-//   requires MonotonicityInv(c, v) && MonotonicityInv(c, v')
-  
-//   // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
-//   requires AcceptorAcceptedImpliesProposed(c, v')
-//   requires OneValuePerBallot(c, v')
-//   requires LeaderHighestHeardUpperBound(c, v')
-//   requires LeaderHearedImpliesProposed(c, v')
-//   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
-
-//   requires && v'.ValidHistoryIdx(i)
-//             && ChosenAtHistory(c, v'.History(i), vb)
-//             && c.ValidAcceptorIdx(acc)
-//             && v'.History(i).acceptors[acc].acceptedVB.Some?
-//             && v'.History(i).acceptors[acc].acceptedVB.value.b >= vb.b
-//   ensures v'.History(i).acceptors[acc].acceptedVB.value.v == vb.v
-// {
-//   NewChosenOnlyInLearnerStep(c, v, v', dsStep);
-//   reveal_ChosenAtHistory();
-// }
 
 // lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables)
 //   requires Inv(c, v)
