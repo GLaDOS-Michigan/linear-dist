@@ -451,9 +451,9 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
   && LeaderNotHeardImpliesNotPromised(c, v)
   && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
-  // && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
-  // && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
-  // && ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
+  && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  && ChosenValImpliesLeaderOnlyHearsVal(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)
@@ -490,6 +490,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
+  assert v'.WF(c);
   MessageInvInductive(c, v, v');
   MonotonicityInvInductive(c, v, v');
   InvNextOneValuePerBallot(c, v, v');
@@ -507,12 +508,12 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
   InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
+
   // InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
-  // InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
   // InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
 
   assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
-  assume ChosenValImpliesAcceptorOnlyAcceptsVal(c, v');
+  InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
   assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
 
   InvImpliesAtMostOneChosenVal(c, v');
@@ -1217,13 +1218,8 @@ lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end:
 
 lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
-  
-  // requires Inv(c, v)
-
-  requires MessageInv(c, v) && MessageInv(c, v')
-  requires MonotonicityInv(c, v) && MonotonicityInv(c, v')
-
-  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
   requires ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   requires AcceptorPromisedLargerThanAccepted(c, v)
   requires Next(c, v, v')
