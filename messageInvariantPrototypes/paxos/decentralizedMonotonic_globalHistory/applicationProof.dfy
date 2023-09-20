@@ -1350,17 +1350,60 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Vari
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       var lc, l, l' := c.leaderConstants[ldr], v.Last().leaders[ldr], v'.Last().leaders[ldr];
       if dsStep.LeaderStep? {
-        NewChosenOnlyInLearnerStep(c, v, v', dsStep);
-        // Quorum intersection stuff probably invoved here
-        // reveal_Chosen();
-        // reveal_ChosenAtHistory();
-        assume false;
+        InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(c, v, v', dsStep, vb, ldr);
       } else if dsStep.AcceptorStep? {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
       } else {
         InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(c, v, v', dsStep, vb, ldr);
       }
     }
+  }
+}
+
+lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
+  c: Constants, v: Variables, v': Variables, dsStep: Step,
+  vb: ValBal, ldr:LeaderId)
+  requires v.WF(c)
+  requires Next(c, v, v')
+  requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
+  requires dsStep.LeaderStep?
+  requires ValidMessageSrc(c, v)
+  requires ValidPromiseMessage(c, v)
+  // requires Inv(c, v)
+  requires LeaderValidReceivedPromises(c, v)
+  requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
+  requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
+
+  // input constraints
+  requires ChosenAtHistory(c, v'.Last(), vb)
+  requires c.ValidLeaderIdx(ldr)
+  requires vb.b < ldr
+  requires v'.Last().LeaderCanPropose(c, ldr)
+  ensures v'.Last().leaders[ldr].HeardAtLeast(vb.b)
+{
+  // Note that proof is identical to atomic case
+  VariableNextProperties(c, v, v');
+  NewChosenOnlyInLearnerStep(c, v, v', dsStep);
+  if ldr == dsStep.actor {  // if the leader in question is now taking a step
+    assert ChosenAtHistory(c, v.Last(), vb) by {
+      reveal_ChosenAtHistory();
+    }
+    var choosingAccs := SupportingAcceptorsForChosen(c, v, |v.history|-1, vb);
+    var h, h' := v.Last(), v'.Last();
+    if h.leaders[ldr].HeardAtMost(vb.b) {
+      //Ldr has yet to see ballot b in this step. By quorum intersection, it must see
+      // an acceptor in choosingAccs in this step
+      var acc := dsStep.msgOps.recv.value.acc;
+      if acc !in choosingAccs {
+        // In this case, by quorum intersection, acc must already be in ldr.receivePromises
+        // Because, choosingAccs !! v.leaders[ldr].receivedPromises
+        var allAccs := GetAcceptorSet(c, v);
+        var e := QuorumIntersection(allAccs, choosingAccs, h.leaders[ldr].receivedPromises + {acc});
+        assert false;
+      }      
+    }    
   }
 }
 
@@ -1371,7 +1414,6 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
   requires Next(c, v, v')
   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
   requires dsStep.LearnerStep?
-  requires MessageInv(c, v)
   requires LeaderValidReceivedPromises(c, v)
   requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -1384,6 +1426,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
   requires v'.Last().LeaderCanPropose(c, ldr)
   ensures v'.Last().leaders[ldr].HeardAtLeast(vb.b)
 {
+  // Note that proof is identical to atomic case
   VariableNextProperties(c, v, v');
   reveal_ChosenAtHistory();
   if !ChosenAtHistory(c, v.Last(), vb) {
@@ -1403,57 +1446,6 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
     }
   }
 }
-
-// // Helper lemma for P1b branch of InvNextChosenImpliesProposingLeaderHearsChosenBallot
-// lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, v: Variables, v': Variables, sysStep: Step)
-//   requires Inv(c, v)
-//   requires sysStep.P1bStep?
-//   requires Next(c, v, v')
-//   requires NextStep(c, v.Last(), v'.Last(), sysStep)
-//   ensures ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
-// {
-//   NewChosenOnlyInP2bStep(c, v, v', sysStep);
-//   forall vb, ldr:LeaderId, i | 
-//     && v'.ValidHistoryIdx(i)
-//     && ChosenAtHistory(c, v'.History(i), vb)
-//     && c.ValidLeaderIdx(ldr)
-//     && vb.b < ldr 
-//     && v'.History(i).LeaderCanPropose(c, ldr)
-//   ensures
-//     v'.History(i).leaders[ldr].HeardAtLeast(vb.b)
-//   {
-//     VariableNextProperties(c, v, v', sysStep);
-//     reveal_Chosen();
-//     reveal_ChosenAtHistory();
-//     if i == |v'.history|-1 {
-//       if ldr == sysStep.leader {  // if the leader in question is now taking a step
-//         assert ChosenAtHistory(c, v.Last(), vb);
-//         var choosingAccs := SupportingAcceptorsForChosen(c, v, |v.history|-1, vb);
-//         var h, h' := v.Last(), v'.Last();
-//         if h.leaders[ldr].HeardAtMost(vb.b) {
-//           // Ldr has yet to see ballot b in this step. By quorum intersection, it must see
-//           // an acceptor in choosingAccs in this step
-//           var acc := sysStep.acceptor;
-//           if acc !in choosingAccs {
-//             // In this case, by quorum intersection, acc must already be in ldr.receivePromises
-//             // First prove that choosingAccs !! v.leaders[ldr].receivedPromises
-//             forall a | a in choosingAccs 
-//             ensures a !in h.leaders[ldr].receivedPromises
-//             {
-//               if !h.acceptors[a].HasAcceptedAtMostBal(ldr) && a in h.leaders[ldr].receivedPromises {
-//                 // via LeaderHighestHeardToPromisedRangeHasNoAccepts
-//                 assert false;
-//               }
-//             }
-//             var allAccs := GetAcceptorSet(c, v);
-//             var e := QuorumIntersection(allAccs, choosingAccs, h.leaders[ldr].receivedPromises + {acc});
-//             assert false;
-//           }
-//         }
-//       }
-//     }
-//   }
-// }
 
 // Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
 lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
