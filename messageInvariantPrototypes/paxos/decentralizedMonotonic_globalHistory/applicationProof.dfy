@@ -514,7 +514,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
   assume ChosenImpliesProposingLeaderHearsChosenBallot(c, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
-  assume ChosenValImpliesLeaderOnlyHearsVal(c, v');
+  InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
 
   InvImpliesAtMostOneChosenVal(c, v');
   AtMostOneChosenImpliesSafety(c, v');
@@ -1065,6 +1065,8 @@ lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: Ac
   requires v.ValidHistoryIdx(start)
   requires v.ValidHistoryIdx(end)
   requires 0 < start < end
+
+  // Input constraints
   requires acceptedAtMost <= promised
   requires forall i | start <= i <= end :: v.History(i).acceptors[acc].HasPromisedAtLeast(promised)
   requires v.History(start).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
@@ -1279,80 +1281,49 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
   }
 }
 
-lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, vb: ValBal) 
+lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
-  requires MessageInv(c, v)
-  requires LeaderCanProposeMonotonic(c, v)
+  requires Next(c, v, v')
   requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
   requires LearnerReceivedAcceptImpliesProposed(c, v)
-  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
   requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
 
-  // Boundary condition
-  requires ChosenAtHistory(c, v.Last(), vb)
-
-  ensures forall prop | 
-    && IsProposeMessage(v, prop)
-    && vb.b <= prop.bal
-  ::
-    vb.v == prop.val
+  // Prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
+  requires OneValuePerBallot(c, v')
+  requires LeaderHighestHeardUpperBound(c, v')
+  requires LeaderHearedImpliesProposed(c, v')
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
+  ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
 {
-  forall prop | 
-    && IsProposeMessage(v, prop)
-    && vb.b <= prop.bal
+  forall vb, ldrBal:LeaderId, i | 
+    && v'.ValidHistoryIdx(i)
+    && ChosenAtHistory(c, v'.History(i), vb)
+    && c.ValidLeaderIdx(ldrBal)
+    && v'.History(i).leaders[ldrBal].HeardAtLeast(vb.b)
   ensures
-    vb.v == prop.val
+    v'.History(i).leaders[ldrBal].value == vb.v
   {
-    if vb.b == prop.bal {
-      // Because vb is chosen, leader vb.b proposed it, by LearnerReceivedAcceptImpliesProposed. 
-      // Also, leader vb.b sent prop, and so must proposed prob.val, by MessageInv.
-      // Result then follows from LeaderCanProposeMonotonic
-      reveal_ChosenAtHistory();
-    } else {
-      // Leader prop.bal must hear leader vb.b's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
-      // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      var actor, msgOps := dsStep.actor, dsStep.msgOps;
+      var lc, l, l' := c.leaderConstants[ldrBal], v.Last().leaders[ldrBal], v'.Last().leaders[ldrBal];
+      if dsStep.LeaderStep? {
+        NewChosenOnlyInLearnerStep(c, v, v', dsStep);
+        reveal_ChosenAtHistory();
+      } else if dsStep.AcceptorStep? {
+        NewChosenOnlyInLearnerStep(c, v, v', dsStep);
+      } else {
+        if v'.History(i).leaders[ldrBal].value != vb.v {
+          assert Chosen(c, v', vb) by {
+            reveal_Chosen();
+          }
+          LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldrBal, vb);
+        }
+      }
     }
   }
 }
-
-// lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables)
-//   requires Inv(c, v)
-//   requires Next(c, v, v')
-//   requires OneValuePerBallot(c, v')
-//   requires LeaderHighestHeardUpperBound(c, v')
-//   requires LeaderHearedImpliesProposed(c, v')
-//   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
-//   ensures ChosenValImpliesLeaderOnlyHearsVal(c, v')
-// {
-//   forall vb, ldrBal:LeaderId, i | 
-//     && v'.ValidHistoryIdx(i)
-//     && ChosenAtHistory(c, v'.History(i), vb)
-//     && c.ValidLeaderIdx(ldrBal)
-//     && v'.History(i).leaders[ldrBal].highestHeardBallot.Some?
-//     && v'.History(i).leaders[ldrBal].highestHeardBallot.value >= vb.b
-//   ensures
-//     v'.History(i).leaders[ldrBal].value == vb.v
-//   {
-//     var sysStep :| NextStep(c, v.Last(), v'.Last(), sysStep);
-//     if sysStep.P2bStep? {
-//       if i == |v'.history| - 1 {
-//         if v'.History(i).leaders[ldrBal].value != vb.v {
-//           if vb.b < ldrBal {
-//             reveal_Chosen();
-//             reveal_ChosenAtHistory();
-//             LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldrBal, vb);
-//           }
-//         }
-//       } else {
-//         assert ChosenAtHistory(c, v.History(i), vb) by {
-//           reveal_ChosenAtHistory();
-//         }
-//       }
-//     } else {
-//       InvNextChosenValImpliesLeaderOnlyHearsValHelper(c, v, v', sysStep, i, ldrBal, vb);
-//     }
-//   }
-// }
 
 // lemma InvNextChosenValImpliesLeaderOnlyHearsValHelper(c: Constants, v: Variables, v': Variables,
 // sysStep: Step, i:int, ldrBal: LeaderId, vb: ValBal)
@@ -1489,8 +1460,7 @@ lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables
   requires v.WF(c)
   requires Chosen(c, v, chosen)
   requires c.ValidLeaderIdx(ldr)
-  requires v.Last().leaders[ldr].highestHeardBallot.Some?
-  requires v.Last().leaders[ldr].highestHeardBallot.value >= chosen.b
+  requires v.Last().leaders[ldr].HeardAtLeast(chosen.b)
   requires v.Last().leaders[ldr].value != chosen.v
   requires chosen.b < ldr
   requires OneValuePerBallot(c, v)
@@ -1713,6 +1683,42 @@ lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
     // There are then two cases. If vb1.b == vb2.b, then the conclusion holds via OneValuePerBallot
     // Otherwise, leader 2 must hear leader 1's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
     // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
+  }
+}
+
+lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, vb: ValBal) 
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires LeaderCanProposeMonotonic(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
+
+  // Boundary condition
+  requires ChosenAtHistory(c, v.Last(), vb)
+
+  ensures forall prop | 
+    && IsProposeMessage(v, prop)
+    && vb.b <= prop.bal
+  ::
+    vb.v == prop.val
+{
+  forall prop | 
+    && IsProposeMessage(v, prop)
+    && vb.b <= prop.bal
+  ensures
+    vb.v == prop.val
+  {
+    if vb.b == prop.bal {
+      // Because vb is chosen, leader vb.b proposed it, by LearnerReceivedAcceptImpliesProposed. 
+      // Also, leader vb.b sent prop, and so must proposed prob.val, by MessageInv.
+      // Result then follows from LeaderCanProposeMonotonic
+      reveal_ChosenAtHistory();
+    } else {
+      // Leader prop.bal must hear leader vb.b's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
+      // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
+    }
   }
 }
 } // end module PaxosProof
