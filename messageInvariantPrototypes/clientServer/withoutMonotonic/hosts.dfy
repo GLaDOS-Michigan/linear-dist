@@ -44,11 +44,8 @@ module ServerHost {
     && msgOps.recv.Some?
     && msgOps.send.None?
     && v.currentRequest.None?
-    && match msgOps.recv.value
-        case RequestMsg(r) =>
-          && v' == v.(currentRequest := Some(r))
-        case _ =>
-          && v' == v //stutter
+    && msgOps.recv.value.RequestMsg?
+    && v' == v.(currentRequest := Some(msgOps.recv.value.r))
   }
 
   ghost predicate NextProcessStep(v: Variables, v': Variables, msgOps: MessageOps) {
@@ -115,14 +112,10 @@ module ClientHost {
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && match msgOps.recv.value
-        case ResponseMsg(r) =>
-          if r.clientId == c.clientId then 
-            v' == v.(responses := v.responses + {r.reqId})
-          else 
-            v' == v 
-        case _ => 
-          && v' == v
+    && msgOps.recv.value.ResponseMsg?
+    && var msg := msgOps.recv.value;
+    && msg.r.clientId == c.clientId
+    && v' == v.(responses := v.responses + {msg.r.reqId})
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
