@@ -104,9 +104,9 @@ module ClientHost {
 
   ghost predicate NextRequestStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, reqId: nat) {
     && msgOps.recv.None?
-    && reqId !in v.requests  // reqId must be fresh
+    && reqId in v.requests
     && msgOps.send == Some(RequestMsg(Req(c.clientId, reqId)))
-    && v' == v.(requests := v.requests + {reqId})
+    && v' == v
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {

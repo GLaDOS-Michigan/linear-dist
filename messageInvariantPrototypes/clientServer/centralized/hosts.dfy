@@ -85,7 +85,7 @@ module ClientHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && v.requests == {}
+    && 0 < |v.requests|  // non-deterministic set
     && v.responses == {}
   }
 
@@ -108,10 +108,10 @@ module ClientHost {
 
   ghost predicate NextRequestStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel, reqId: nat) {
     && lbl.RequestLbl?
-    && lbl.r.clientId == c.clientId   // label id must match
+    && lbl.r.clientId == c.clientId  // label id must match
     && lbl.r.reqId == reqId
-    && lbl.r.reqId !in v.requests     // reqId must be fresh
-    && v' == v.(requests := v.requests + {lbl.r.reqId})
+    && lbl.r.reqId in v.requests     // non-deterministically pick a request to send
+    && v' == v
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables,lbl: TransitionLabel) {
