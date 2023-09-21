@@ -50,10 +50,9 @@ ghost predicate Init(c: Constants, v: Variables)
   && Host.GroupInit(c.hosts, v.hosts)
 }
 
-ghost predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx: nat, reqId: nat)
+ghost predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx: nat, req: Request)
   requires v.WF(c) && v'.WF(c)
 {
-  var req := Req(cidx, reqId);
   var clientLbl := ClientHost.RequestLbl(req);
   var serverLbl := ServerHost.ReceiveLbl(req);
   && c.ValidClientIdx(cidx)
@@ -75,7 +74,7 @@ ghost predicate NextServerProcessStep(c: Constants, v: Variables, v': Variables,
 }
 
 datatype Step =
-  | ClientRequestStep(clientIdx: nat, reqId: nat) // step where client initializes a request
+  | ClientRequestStep(clientIdx: nat, req: Request) // step where client initializes a request
   | ServerProcessStep(r: Request)                 // step where server processes a request
   | StutterStep()
 
@@ -83,7 +82,7 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
 {
   match step
-      case ClientRequestStep(idx, reqId) => NextClientRequestStep(c, v, v', idx, reqId)
+      case ClientRequestStep(idx, req) => NextClientRequestStep(c, v, v', idx, req)
       case ServerProcessStep(req) => NextServerProcessStep(c, v, v', req)
       case StutterStep => && v == v'
 }

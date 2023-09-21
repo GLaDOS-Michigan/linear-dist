@@ -93,22 +93,23 @@ module ClientHost {
     RequestLbl(r: Request) | ReceiveLbl(r: Request) | InternalLbl()
 
   datatype Step =
-      RequestStep()
+      RequestStep(reqId: nat)
     | ReceiveStep()
     | StutterStep
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel) {
     match step
-      case RequestStep => NextRequestStep(c, v, v', lbl)
+      case RequestStep(reqId) => NextRequestStep(c, v, v', lbl, reqId)
       case ReceiveStep => NextReceiveStep(c, v, v', lbl)
       case StutterStep => && v == v'
                           && lbl.InternalLbl?
 
   }
 
-  ghost predicate NextRequestStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+  ghost predicate NextRequestStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel, reqId: nat) {
     && lbl.RequestLbl?
     && lbl.r.clientId == c.clientId   // label id must match
+    && lbl.r.reqId == reqId
     && lbl.r.reqId !in v.requests     // reqId must be fresh
     && v' == v.(requests := v.requests + {lbl.r.reqId})
   }
