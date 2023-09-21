@@ -79,8 +79,9 @@ module DistributedSystem {
       history[i]
     }
 
-    ghost function Last() : Hosts 
+    ghost function Last() : (h: Hosts) 
       requires 0 < |history|
+      ensures h == history[|history|-1]
     {
       UtilitiesLibrary.Last(history)
     }
