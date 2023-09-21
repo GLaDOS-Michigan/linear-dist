@@ -57,6 +57,13 @@ datatype Variables = Variables(history: seq<Hosts>)
     && (forall i | ValidHistoryIdx(i) :: history[i].WF(c))
   }
 
+  ghost function History(i: int) : (h: Hosts)
+    requires ValidHistoryIdx(i)
+    ensures h == history[i]
+  {
+    history[i]
+  }
+
   ghost function Last() : Hosts 
     requires 0 < |history|
   {

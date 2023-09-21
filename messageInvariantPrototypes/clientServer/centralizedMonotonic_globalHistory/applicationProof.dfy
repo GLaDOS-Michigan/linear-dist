@@ -16,18 +16,20 @@ import opened Obligations
 ghost predicate ServerRequestsValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  // v.GetServer(c).server.currentRequest.Some?
-  // ==> 
-  // && var req := v.GetServer(c).server.currentRequest.value;
-  // && c.ValidClientIdx(req.clientId)
-  // && req.reqId in v.hosts[req.clientId].client.requests
-  false // TODO
+  forall i| 
+    && v.ValidHistoryIdx(i)
+    && v.History(i).GetServer(c).server.currentRequest.Some?
+  ::
+    && var req := v.History(i).GetServer(c).server.currentRequest.value;
+    && c.ValidClientIdx(req.clientId)
+    && req.reqId in v.History(i).hosts[req.clientId].client.requests
 }
 
 
 ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
+  && ServerRequestsValid(c, v)
   && Safety(c, v)
 }
 
@@ -49,6 +51,29 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures Inv(c, v')
-{}
+{
+  InvNextServerRequestsValid(c, v, v');
+}
+
+lemma InvNextServerRequestsValid(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ServerRequestsValid(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
+
+lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires Next(c, v, v')
+  ensures 1 < |v'.history|
+  ensures |v.history| == |v'.history| - 1
+  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)
+  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)
+{
+  assert 0 < |v.history|;
+  assert 1 < |v'.history|;
+}
+
 }  // end module ClientServerProof
 
