@@ -53,6 +53,7 @@ datatype Variables = Variables(
 
   ghost function Last() : Hosts 
     requires 0 < |history|
+    ensures Last() == history[|history|-1]
   {
     UtilitiesLibrary.Last(history)
   }
