@@ -89,6 +89,7 @@ module DistributedSystem {
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
+    && |v.history| == 1
     && Host.GroupInit(c.hostConstants, v.History(0).hosts)
     && Network.Init(v.network)
   }
