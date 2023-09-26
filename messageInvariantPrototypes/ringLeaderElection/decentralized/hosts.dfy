@@ -5,7 +5,7 @@ module Types {
 
   type HostId = nat
 
-  datatype Message = Msg(src: nat, val: int)  // A host can receive if its ringPos == succ(src)
+  datatype Message = Msg(val: nat, src: nat)  // A host can receive if its ringPos == succ(src)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 } // end module Types
@@ -73,7 +73,7 @@ module Host {
     requires v.WF(c)
   {
     var payload := max(v.highestHeard, c.hostId); // max of what I heard vs my own hostId
-    var msg := Msg(c.ringPos, payload);
+    var msg := Msg(payload, c.ringPos);
     && msgOps.recv.None?
     && msgOps.send == Some(msg)
     && v == v'
