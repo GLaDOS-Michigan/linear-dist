@@ -81,7 +81,8 @@ module Host {
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.ReceiveLbl?
-    && v' == v.(highestHeard := max(lbl.previousHighest, v.highestHeard)) // max of what I heard vs incoming
+    && v.highestHeard < lbl.previousHighest   // max of what I heard vs incoming
+    && v' == v.(highestHeard := lbl.previousHighest)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
