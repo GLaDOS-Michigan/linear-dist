@@ -26,7 +26,7 @@ ghost predicate TransmissionValidity(c: Constants, v: Variables)
   (exists i, src ::
       && v.ValidHistoryIdx(i)
       && c.ValidIdx(src)
-      && msg == Msg(max(v.History(i).hosts[src].highestHeard, c.hostConstants[src].hostId), src)
+      && Host.SendMsg(c.hostConstants[src], v.History(i).hosts[src], msg)
   )
 }
 
@@ -38,14 +38,11 @@ ghost predicate ReceiveValidity(c: Constants, v: Variables)
   forall i, idx | 
     && v.ValidHistoryIdx(i)
     && c.ValidIdx(idx)
-    && v.History(i).hosts[idx].highestHeard > -1
+    && -1 < v.History(i).hosts[idx].highestHeard
   :: 
     (exists msg :: 
         && msg in v.network.sentMsgs 
-        && msg.src < c.hostConstants[idx].numParticipants
-        && idx == Successor(c.hostConstants[idx].numParticipants, msg.src)
-        // && v.History(i).hosts[idx].highestHeard < msg.val
-        && msg.val == v.History(i).hosts[idx].highestHeard 
+        && Host.ReceiveMsg(c.hostConstants[idx], v.History(i).hosts[idx], msg)
     )
 }
 
@@ -93,30 +90,6 @@ lemma InvNextReceiveValidity(c: Constants, v: Variables, v': Variables)
   ensures ReceiveValidity(c, v')
 {
   VariableNextProperties(c, v, v');
-  forall i, idx | 
-    && v'.ValidHistoryIdx(i)
-    && c.ValidIdx(idx)
-    && v'.History(i).hosts[idx].highestHeard > -1
-  ensures
-    (exists msg :: 
-        && msg in v'.network.sentMsgs 
-        && msg.src < c.hostConstants[idx].numParticipants
-        && idx == Successor(c.hostConstants[idx].numParticipants, msg.src)
-        // && v'.History(i).hosts[idx].highestHeard < msg.val
-        && msg.val == v'.History(i).hosts[idx].highestHeard 
-    )
-  {
-    if i == |v'.history|-1 {
-      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      var h, h', actor, msgOps := v.Last(), v'.Last(), dsStep.actorIdx, dsStep.msgOps;
-      assert Host.Next(c.hostConstants[actor], h.hosts[actor], h'.hosts[actor], msgOps);
-      var cs, s, s' := c.hostConstants[actor], h.hosts[actor], h'.hosts[actor];
-      var step :| Host.NextStep(cs, s, s', step, msgOps);
-      if step.ReceiveStep? {
-        var msg := msgOps.recv.value;
-      }
-    }
-  }
 }
 
 

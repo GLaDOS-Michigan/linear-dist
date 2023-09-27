@@ -24,12 +24,11 @@ module Host {
   }
 
   datatype Variables = Variables(
-    highestHeard: int   // monotonic int
+    highestHeard: int
   )
   {
     ghost predicate WF(c: Constants) {
       && 0 < c.numParticipants
-      && highestHeard >= -1  // not really useful, but just for fun :)
     }
   }
 
@@ -72,20 +71,34 @@ module Host {
   ghost predicate NextTransmissionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
     requires v.WF(c)
   {
-    var payload := max(v.highestHeard, c.hostId); // max of what I heard vs my own hostId
-    var msg := Msg(payload, c.ringPos);
     && msgOps.recv.None?
-    && msgOps.send == Some(msg)
+    && msgOps.send.Some?
+    && SendMsg(c, v, msgOps.send.value)
     && v == v'
+  }
+
+  // Send Invariant
+  ghost predicate SendMsg(c: Constants, v: Variables, msg: Message) {
+    && msg.src == c.ringPos
+    && msg.val == max(v.highestHeard, c.hostId) // max of what I heard vs my own hostId
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
     && msgOps.recv.Some?
-    && msgOps.recv.value.src < c.numParticipants
-    && c.ringPos == Successor(c.numParticipants, msgOps.recv.value.src)
-    && v.highestHeard < msgOps.recv.value.val
-    && v' == v.(highestHeard := msgOps.recv.value.val) // max of what I heard vs incoming
+    && v.highestHeard < msgOps.recv.value.val // max of what I heard vs incoming
+    && v' == v.(
+        highestHeard := v'.highestHeard  // constrained by ReceiveMsg
+    )
+    && ReceiveMsg(c, v', msgOps.recv.value)
+  }
+
+  // Receive Invariant
+  // #[triggered on v.highestHeard > -1]
+  ghost predicate ReceiveMsg(c: Constants, v': Variables, msg: Message) {
+    && msg.src < c.numParticipants
+    && c.ringPos == Successor(c.numParticipants, msg.src)
+    && v'.highestHeard == msg.val
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
