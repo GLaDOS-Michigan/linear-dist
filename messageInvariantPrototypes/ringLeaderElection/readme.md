@@ -3,8 +3,10 @@
 ## Files
 
 * centralizedMonotonic
-  * Syncronous atomic version with global host histories
+  * Synchronous atomic version with global host histories
 * decentralized
-  * Standard Asyncronous version
+  * Standard Asynchronous version
 * decentralizedMonotonic
-  * Asyncrhonous version with global host histories
+  * Asynchronous version with global host histories
+* automate
+  * Asynchronous monotonic version written to aid message invariant automation
