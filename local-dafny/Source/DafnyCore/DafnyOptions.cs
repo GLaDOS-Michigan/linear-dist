@@ -335,6 +335,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
     public HashSet<string> LibraryFiles { get; set; } = new();
     public ContractTestingMode TestContracts = ContractTestingMode.None;
 
+    public bool msgInvs = false;
+
     public bool ForbidNondeterminism { get; set; }
 
     public int DeprecationNoise = 1;
@@ -789,6 +791,16 @@ NoGhost - disable printing of functions, ghost methods, and proof
               InvalidArgumentError(name, ps);
             }
           }
+          return true;
+
+        case "msgInvs":
+          // Console. WriteLine("msgInvs option is ON");
+          msgInvs = true;
+
+          var test = new MessageInvariantsFile();
+          
+          Console. WriteLine(test.ToString());
+
           return true;
       }
 
