@@ -23,10 +23,9 @@ ghost predicate TransmissionValidity(c: Constants, v: Variables)
 {
   forall msg | msg in v.network.sentMsgs
   :: 
-  (exists i, src ::
+  (exists i ::
       && v.ValidHistoryIdx(i)
-      && c.ValidIdx(src)
-      && Host.SendMsg(c.hostConstants[src], v.History(i).hosts[src], msg)
+      && Host.SendMsg(c.hostConstants[msg.src], v.History(i).hosts[msg.src], msg)
   )
 }
 
