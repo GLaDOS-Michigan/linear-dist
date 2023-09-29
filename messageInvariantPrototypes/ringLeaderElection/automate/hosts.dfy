@@ -77,8 +77,9 @@ module Host {
     && v == v'
   }
 
-  // Send Invariant
-  ghost predicate SendMsg(c: Constants, v: Variables, msg: Message) {
+  // Send predicate
+  ghost predicate SendMsg(c: Constants, v: Variables, msg: Message)
+  {
     && msg.src == c.ringPos
     && msg.val == max(v.highestHeard, c.hostId) // max of what I heard vs my own hostId
   }

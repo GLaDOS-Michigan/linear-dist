@@ -71,7 +71,9 @@ lemma InvImpliesSafety(c: Constants, v: Variables)
 lemma InitImpliesInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures Inv(c, v)
-{}
+{
+  InitImpliesMessageInv(c, v);
+}
 
 lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -96,18 +98,5 @@ lemma ChordDominatesInductive(c: Constants, v: Variables, v': Variables)
 {
   VariableNextProperties(c, v, v');
 }
-
-lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires Next(c, v, v')
-  ensures 1 < |v'.history|
-  ensures |v.history| == |v'.history| - 1
-  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)
-  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)
-{
-  assert 0 < |v.history|;
-  assert 1 < |v'.history|;
-}
-
 }  // end module RingLeaderElectionProof
 

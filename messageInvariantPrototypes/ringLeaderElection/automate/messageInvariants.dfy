@@ -33,11 +33,13 @@ ghost predicate TransmissionValidity(c: Constants, v: Variables)
 // from its predecessor
 ghost predicate ReceiveValidity(c: Constants, v: Variables) 
   requires v.WF(c)
+  requires ValidHistory(c, v)
 {
+  reveal_ValidHistory();
   forall i, idx | 
-    && v.ValidHistoryIdx(i)
+    && 1 <= i < |v.history|
     && c.ValidIdx(idx)
-    && -1 < v.History(i).hosts[idx].highestHeard
+    && IsReceiveStepByActor(c, v, i, idx)
   :: 
     (exists msg :: 
         && msg in v.network.sentMsgs 
@@ -48,6 +50,7 @@ ghost predicate ReceiveValidity(c: Constants, v: Variables)
 ghost predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
+  && ValidHistory(c, v)
   && VoteMsgValidSrc(c, v)
   && TransmissionValidity(c, v)
   && ReceiveValidity(c, v)
@@ -56,13 +59,16 @@ ghost predicate MessageInv(c: Constants, v: Variables)
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures MessageInv(c, v)
-{}
+{
+  InitImpliesValidHistory(c, v);
+}
 
 lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires MessageInv(c, v)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
 {
+  InvNextValidHistory(c, v, v');
   InvNextTransmissionValidity(c, v, v');
   InvNextReceiveValidity(c, v, v');
 }
@@ -83,25 +89,13 @@ lemma InvNextTransmissionValidity(c: Constants, v: Variables, v': Variables)
 }
 
 lemma InvNextReceiveValidity(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidHistory(c, v) && ValidHistory(c, v')
   requires ReceiveValidity(c, v)
   requires Next(c, v, v')
   ensures ReceiveValidity(c, v')
 {
   VariableNextProperties(c, v, v');
-}
-
-
-lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires Next(c, v, v')
-  ensures 1 < |v'.history|
-  ensures |v.history| == |v'.history| - 1
-  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)
-  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)
-{
-  assert 0 < |v.history|;
-  assert 1 < |v'.history|;
 }
 } // end module MessageInvariants
 
