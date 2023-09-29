@@ -10,3 +10,5 @@
   * Asynchronous version with global host histories
 * automate
   * Asynchronous monotonic version written to aid message invariant automation
+
+All the decentralized versions share the same hosts.dfy
