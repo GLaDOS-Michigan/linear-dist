@@ -1,4 +1,4 @@
-include "hosts.dfy"
+include "../hosts.dfy"
 
 module Network {
   import opened Types
