@@ -225,7 +225,7 @@ module AcceptorHost {
   ghost predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
     && lbl.ReceivePrepareLbl?
     && v.pendingPrepare.None?
-    && v' == v.(pendingPrepare := Some(Prepare(lbl.bal)))
+    && v' == v.(pendingPrepare := Some(PendingPrepare.Prepare(lbl.bal)))
   }
 
   ghost predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
@@ -264,6 +264,7 @@ module AcceptorHost {
     && lbl.BroadcastAcceptedLbl?
     && v.pendingPrepare.None?
     && v.acceptedVB.Some?
+    && v.promised == Some(v.acceptedVB.value.b)
     && lbl.vb == v.acceptedVB.value
     && v' == v
   }

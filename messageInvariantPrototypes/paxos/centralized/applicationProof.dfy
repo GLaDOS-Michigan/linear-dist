@@ -362,7 +362,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  InvInductiveHelper(c, v, v');
+  InvInductiveHelper1(c, v, v');
+  InvInductiveHelper2(c, v, v');
   InvNextOneValuePerBallot(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
@@ -382,7 +383,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
 
 // Bundle for simple-to-prove invariants
-lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
+lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
@@ -392,17 +393,23 @@ lemma InvInductiveHelper(c: Constants, v: Variables, v': Variables)
   ensures AcceptorValidPromisedAndAccepted(c, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
   ensures AcceptorPromisedLargerThanAccepted(c, v')
+{}
+
+lemma InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires LearnerValidReceivedAccepts(c, v')
+  requires LearnerValidReceivedAcceptsKeys(c, v')
+  requires LearnerReceivedAcceptImpliesProposed(c, v')
+  requires LearnerReceivedAcceptImpliesAccepted(c, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')
+  requires AcceptorAcceptedImpliesProposed(c, v')
+  requires AcceptorPromisedLargerThanAccepted(c, v')
   ensures LeaderValidReceivedPromises(c, v')
   ensures LeaderHighestHeardUpperBound(c, v')
   ensures LeaderHearedImpliesProposed(c, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
-{
-  assert LearnerValidReceivedAccepts(c, v');
-  assert LearnerValidReceivedAcceptsKeys(c, v');
-  assert LearnerReceivedAcceptImpliesProposed(c, v');
-  assert LearnerReceivedAcceptImpliesAccepted(c, v');
-  assert AcceptorValidPromisedAndAccepted(c, v');
-}
+{}
 
 lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)

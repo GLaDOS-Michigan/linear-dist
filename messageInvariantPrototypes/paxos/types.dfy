@@ -1,4 +1,4 @@
-include "../../lib/UtilitiesLibrary.dfy"
+include "../lib/UtilitiesLibrary.dfy"
 
 module Types {
 import opened UtilitiesLibrary

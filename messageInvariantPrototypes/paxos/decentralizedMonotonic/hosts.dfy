@@ -1,4 +1,4 @@
-include "types.dfy"
+include "../types.dfy"
 
 
 /***************************************************************************************
@@ -65,33 +65,32 @@ module LeaderHost {
     && v.highestHeardBallot == None
   }
 
-  datatype TransitionLabel =
-    | PrepareLbl()
-    | ReceivePromiseLbl(acc: AcceptorId, vbOpt:Option<ValBal>) 
-    | ProposeLbl(val:Value) 
-    | InternalLbl()
-
   datatype Step =
     PrepareStep() | ReceiveStep() | ProposeStep() | StutterStep()
 
-  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
-      case PrepareStep => NextPrepareStep(c, v, v', lbl)
-      case ReceiveStep => NextReceivePromiseStep(c, v, v', lbl)
-      case ProposeStep => NextProposeStep(c, v, v', lbl)
-      case StutterStep => NextStutterStep(c, v, v', lbl)
+      case PrepareStep => NextPrepareStep(c, v, v', msgOps)
+      case ReceiveStep => NextReceivePromiseStep(c, v, v', msgOps)
+      case ProposeStep => NextProposeStep(c, v, v', msgOps)
+      case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
-  ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.PrepareLbl?
+  ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && msgOps.send == Some(Prepare(c.id))
     && v' == v
   }
 
-  ghost predicate NextReceivePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.ReceivePromiseLbl?
-    && var acc := lbl.acc;
-    && var vbOpt := lbl.vbOpt;
+  ghost predicate NextReceivePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && msgOps.recv.value.Promise?
+    && var bal := msgOps.recv.value.bal;
+    && var acc := msgOps.recv.value.acc;
+    && var vbOpt := msgOps.recv.value.vbOpt;
+    && bal == c.id  // message is meant for me
     // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
     // probably simplify proof, preventing the leader from potentially equivocating
     // on its proposed value after receiving extraneous straggling promises.
@@ -99,30 +98,30 @@ module LeaderHost {
     && acc !in v.receivedPromises
     && var doUpdate := 
           && vbOpt.Some? 
-          && (|| v.highestHeardBallot.None?
-              || (v.highestHeardBallot.Some? && vbOpt.value.b > v.highestHeardBallot.value));
-    && v' == v.(
-        receivedPromises := v.receivedPromises + {acc},
-        value := if doUpdate then vbOpt.value.v else v.value,
-        highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
-      )
+          && v.HeardAtMost(vbOpt.value.b);
+    v' == v.(
+              receivedPromises := v.receivedPromises + {acc},
+              value :=  if doUpdate then vbOpt.value.v else v.value,
+              highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
+            )
   }
 
-  ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.ProposeLbl?
-    && lbl.val == v.value
+  ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
     && v.CanPropose(c)
+    && msgOps.send == Some(Propose(c.id, v.value))
     && v' == v
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.InternalLbl?
-    && v' == v
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && v == v'
+    && msgOps.send == None
+    && msgOps.recv == None
   }
 
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
-    exists step :: NextStep(c, v, v', step, lbl)
+    exists step :: NextStep(c, v, v', step, msgOps)
   }
 }  // end module LeaderHost
 
@@ -164,14 +163,18 @@ module AcceptorHost {
       && b <= promised.value
     }
 
+    ghost predicate HasPromised(b: LeaderId) {
+      && promised.Some?
+      && b == promised.value
+    }
+
     ghost predicate HasAcceptedAtLeastBal(b: LeaderId) {
       && acceptedVB.Some?
       && b <= acceptedVB.value.b
     }
 
     ghost predicate HasAcceptedAtMostBal(b: LeaderId) {
-      && acceptedVB.Some?
-      && acceptedVB.value.b < b
+      acceptedVB.Some? ==> acceptedVB.value.b < b
     }
   } // end datatype Variables (acceptor)
 
@@ -198,13 +201,6 @@ module AcceptorHost {
     && v.pendingPrepare == None
   }
 
-  datatype TransitionLabel =
-    | ReceivePrepareLbl(bal:LeaderId)
-    | MaybePromiseLbl(balOpt:Option<LeaderId>, vbOptOpt:Option<Option<ValBal>>)
-    | MaybeAcceptLbl(bal:LeaderId, val:Value)
-    | BroadcastAcceptedLbl(vb: ValBal)
-    | InternalLbl()
-
   datatype Step =
     ReceivePrepareStep() 
     | MaybePromiseStep() 
@@ -212,25 +208,29 @@ module AcceptorHost {
     | BroadcastAcceptedStep() 
     | StutterStep()
 
-  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
-      case ReceivePrepareStep => NextReceivePrepareStep(c, v, v', lbl)
-      case MaybePromiseStep => NextMaybePromiseStep(c, v, v', lbl)
-      case MaybeAcceptStep => NextMaybeAcceptStep(c, v, v', lbl)
-      case BroadcastAcceptedStep => NextBroadcastAcceptedStep(c, v, v', lbl)
-      case StutterStep => NextStutterStep(c, v, v', lbl)
+      case ReceivePrepareStep => NextReceivePrepareStep(c, v, v', msgOps)
+      case MaybePromiseStep => NextMaybePromiseStep(c, v, v', msgOps)
+      case MaybeAcceptStep => NextMaybeAcceptStep(c, v, v', msgOps)
+      case BroadcastAcceptedStep => NextBroadcastAcceptedStep(c, v, v', msgOps)
+      case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
-  ghost predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.ReceivePrepareLbl?
+  ghost predicate NextReceivePrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && msgOps.recv.value.Prepare?
     && v.pendingPrepare.None?
-    && v' == v.(pendingPrepare := Some(Prepare(lbl.bal)))
+    && v' == v.(
+      pendingPrepare := Some(PendingPrepare.Prepare(msgOps.recv.value.bal))
+    )
   }
 
-  ghost predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate NextMaybePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
-    && lbl.MaybePromiseLbl?
+    && msgOps.recv.None?
     && v.pendingPrepare.Some?
     && var bal := v.pendingPrepare.value.bal;
     && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
@@ -238,46 +238,57 @@ module AcceptorHost {
           && v' == v.(
             promised := Some(bal),
             pendingPrepare := None)
-          && lbl == MaybePromiseLbl(Some(bal), Some(v.acceptedVB))
+          && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
         else
           && v' == v.(pendingPrepare := None)
-          && lbl == MaybePromiseLbl(None, None)
+          && msgOps.send == None
   }
 
-  ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.MaybeAcceptLbl?
+  ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && msgOps.recv.value.Propose?
     && v.pendingPrepare.None?
-    && var bal := lbl.bal;
-    && var val := lbl.val;
+    && var bal := msgOps.recv.value.bal;
+    && var val := msgOps.recv.value.val;
     && var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
     &&  if doAccept then
           && v' == v.(
                 promised := Some(bal), 
-                acceptedVB := Some(VB(val, bal))
-              )
+                acceptedVB := Some(VB(val, bal)))
         else
           && v' == v
   }
 
-  ghost predicate NextBroadcastAcceptedStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate NextBroadcastAcceptedStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
-    && lbl.BroadcastAcceptedLbl?
+    && msgOps.recv == None
     && v.pendingPrepare.None?
     && v.acceptedVB.Some?
     && v.promised == Some(v.acceptedVB.value.b)
-    && lbl.vb == v.acceptedVB.value
+    && msgOps.send == Some(Accept(v.acceptedVB.value, c.id))
     && v' == v
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.InternalLbl?
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.send == None
+    && msgOps.recv == None
     && v' == v
   }
 
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
-    exists step :: NextStep(c, v, v', step, lbl)
+    exists step :: NextStep(c, v, v', step, msgOps)
   }
+
+  lemma UpdateReceiveAcceptedStep(c: Constants, v: Variables, v': Variables, 
+    step: Step, msgOps: MessageOps)
+    requires NextStep(c, v, v', step, msgOps)
+    requires !step.MaybeAcceptStep?
+    ensures v'.acceptedVB == v.acceptedVB
+  {}
+
+
 }  // end module AcceptorHost
 
 
@@ -330,19 +341,15 @@ module LearnerHost {
     && v.learned == None
   }
 
-  datatype TransitionLabel =
-    | ReceiveAcceptLbl(vb:ValBal, acc:AcceptorId)
-    | InternalLbl()
-
   datatype Step =
     ReceiveStep() | LearnStep(vb: ValBal) | StutterStep()
 
-  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
+  ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
-      case ReceiveStep => NextReceiveAcceptStep(c, v, v', lbl)
-      case LearnStep(vb) => NextLearnStep(c, v, v', vb, lbl)
-      case StutterStep => NextStutterStep(c, v, v', lbl)
+      case ReceiveStep => NextReceiveAcceptStep(c, v, v', msgOps)
+      case LearnStep(vb) => NextLearnStep(c, v, v', vb, msgOps)
+      case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
   function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
@@ -359,25 +366,31 @@ module LearnerHost {
       receivedAccepts[vb := {acc}]
   }
 
-  ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.ReceiveAcceptLbl?
-    && v' == Variables(UpdateReceivedAccepts(v.receivedAccepts, lbl.vb, lbl.acc), v.learned)
+  ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && msgOps.recv.value.Accept?
+    && v' == v.(
+      receivedAccepts := UpdateReceivedAccepts(v.receivedAccepts, msgOps.recv.value.vb, msgOps.recv.value.acc)
+    )
   }
 
-  ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, lbl: TransitionLabel) {
-    && lbl.InternalLbl?
+  ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && msgOps.send.None?
     && vb in v.receivedAccepts              // enabling
     && |v.receivedAccepts[vb]| >= c.f + 1   // enabling
     && v' == v.(learned := Some(vb.v))      // learn new value
   }
 
-  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && lbl.InternalLbl?
+  ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && msgOps.send.None?
     && v' == v
   }
 
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
+  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
-    exists step :: NextStep(c, v, v', step, lbl)
+    exists step :: NextStep(c, v, v', step, msgOps)
   }
 }  // end module LearnerHost
