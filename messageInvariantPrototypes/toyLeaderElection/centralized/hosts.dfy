@@ -68,44 +68,62 @@ module Host {
     | InternalLbl()
 
   datatype Step =
-    HostStep() | VictoryStep() | StutterStep()
+    NominateSelfStep() 
+    | SendVoteReqStep()
+    | RecvVoteReqStep() 
+    | SendVoteStep()
+    | RecvVoteStep()
+    | VictoryStep() 
+    | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
-      case HostStep => NextHostStep(c, v, v', lbl)
+      case NominateSelfStep => NextHostNominateSelfStep(c, v, v', lbl)
+      case SendVoteReqStep => NextHostSendVoteReqStep(c, v, v', lbl)
+      case RecvVoteReqStep => NextHostRecvVoteReqStep(c, v, v', lbl)
+      case SendVoteStep => NextHostSendVoteStep(c, v, v', lbl)
+      case RecvVoteStep => NextHostRecvVoteStep(c, v, v', lbl)
       case VictoryStep => NextVictoryStep(c, v, v', lbl)
       case StutterStep => 
           && v == v'
           && lbl.InternalLbl?
   }
 
-  ghost predicate NextHostStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && match lbl
-        case InternalLbl() =>
-            && v.nominee.None?
-            && v' == v.(
-                  nominee := Some(c.hostId),
-                  receivedVotes := v.receivedVotes + {c.hostId}
-                )
-        case SendVoteReqLbl(nominee) =>
-            && v.nominee.Some?
-            && nominee == v.nominee.value == c.hostId
-            && v' == v
-        case RecvVoteReqLbl(nominee) =>
-            if v.nominee.None? then
-              v' == v.(nominee := Some(nominee))
-            else 
-              v' == v
-        case SendVoteLbl(voter: HostId, nominee: HostId) => 
-          && voter == c.hostId
-          && v.nominee.Some?
-          && nominee == v.nominee.value
-          && v' == v
-        case RecvVoteLbl(voter, nominee) =>
-          // I received a vote
-          && nominee == c.hostId
-          && v' == v.(receivedVotes := v.receivedVotes + {voter})
+  ghost predicate NextHostNominateSelfStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.InternalLbl?
+    && v.nominee.None?
+    && v' == v.(
+        nominee := Some(c.hostId),
+        receivedVotes := v.receivedVotes + {c.hostId}
+      )
+  }
+
+  ghost predicate NextHostSendVoteReqStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.SendVoteReqLbl?
+    && v.nominee.Some?
+    && lbl.nominee == v.nominee.value == c.hostId
+    && v' == v
+  }
+
+  ghost predicate NextHostRecvVoteReqStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.RecvVoteReqLbl?
+    && v.nominee.None?
+    && v' == v.(nominee := Some(lbl.nominee))
+  }
+
+  ghost predicate NextHostSendVoteStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.SendVoteLbl?
+    && lbl.voter == c.hostId
+    && v.nominee.Some?
+    && lbl.nominee == v.nominee.value
+    && v' == v
+  }
+
+  ghost predicate NextHostRecvVoteStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.RecvVoteLbl?
+    && lbl.nominee == c.hostId
+    && v' == v.(receivedVotes := v.receivedVotes + {lbl.voter})
   }
 
   ghost predicate NextVictoryStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {

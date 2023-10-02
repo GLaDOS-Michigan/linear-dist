@@ -95,25 +95,10 @@ lemma IsLeaderImpliesHasQuorumInductive(c: Constants, v: Variables, v': Variable
     && SetIsQuorum(c.hostConstants[h].clusterSize, v'.hosts[h].receivedVotes)
   {
     var step :| NextStep(c, v, v', step);
-    if step.HostLocalStep? {
-      var actor := step.host;
-      assert c.ValidHostId(actor);
-      var lbl := Host.InternalLbl();
-      var hc := c.hostConstants[actor];
-      var hv, hv' := v.hosts[actor], v'.hosts[actor];
-      assert Host.Next(c.hostConstants[actor], v.hosts[actor], v'.hosts[actor], lbl);
-      var hostStep :| Host.NextStep(hc, hv, hv', hostStep, lbl);
-      if hostStep.HostStep? {
-        // trigger
-        assert SetIsQuorum(c.hostConstants[h].clusterSize, v'.hosts[h].receivedVotes);
-      } else if hostStep.VictoryStep? {
-        if !v.IsLeader(c, h) {
-          // triggers
-          assert v'.hosts[h].receivedVotes == v.hosts[h].receivedVotes;
-          assert SetIsQuorum(hc.clusterSize, hv.receivedVotes);
-        }
-      } 
-    } else if step.VoteStep? {
+    // Some very strange triggers
+    if step.HostLocalStep? 
+    {} 
+    else if step.VoteStep? {
       // trigger
       assert SetIsQuorum(c.hostConstants[h].clusterSize, v'.hosts[h].receivedVotes);
     }
