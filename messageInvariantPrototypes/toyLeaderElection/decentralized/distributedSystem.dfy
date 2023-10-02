@@ -7,7 +7,7 @@ module Network {
 
   ghost predicate Init(v: Variables)
   {
-    && v.sentMsgs == {StartElection}
+    && v.sentMsgs == {}
   }
 
   ghost predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
@@ -26,12 +26,12 @@ module DistributedSystem {
 
   datatype Constants = Constants(hostConstants: seq<Host.Constants>)
   {
-    ghost predicate ValidIdx(id: int) {
+    ghost predicate ValidHostId(id: int) {
       0 <= id < |hostConstants|
     }
 
     ghost predicate UniqueIds() {
-      forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i].hostId == hostConstants[j].hostId :: i == j
+      forall i, j | ValidHostId(i) && ValidHostId(j) && hostConstants[i].hostId == hostConstants[j].hostId :: i == j
     }
 
     ghost predicate WF() {
@@ -48,6 +48,13 @@ module DistributedSystem {
       && c.WF()
       && Host.GroupWF(c.hostConstants, hosts)
     }
+
+    ghost predicate IsLeader(c: Constants, h: HostId) 
+      requires WF(c)
+      requires c.ValidHostId(h)
+    {
+      hosts[h].isLeader
+    }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -61,10 +68,10 @@ module DistributedSystem {
   {
     && v.WF(c)
     && v'.WF(c)
-    && c.ValidIdx(actorIdx)
+    && c.ValidHostId(actorIdx)
     && Host.Next(c.hostConstants[actorIdx], v.hosts[actorIdx], v'.hosts[actorIdx], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherHostIdx | c.ValidIdx(otherHostIdx) && otherHostIdx != actorIdx :: v'.hosts[otherHostIdx] == v.hosts[otherHostIdx])
+    && (forall otherHostIdx | c.ValidHostId(otherHostIdx) && otherHostIdx != actorIdx :: v'.hosts[otherHostIdx] == v.hosts[otherHostIdx])
   }
 
   datatype Step = HostActionStep(actorIdx: int, msgOps: MessageOps)

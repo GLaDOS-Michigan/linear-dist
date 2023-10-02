@@ -1,5 +1,7 @@
 include "../../lib/UtilitiesLibrary.dfy"
 
+// TODO: There is something wrong with this protocol. It looks like in no step do we send VoteReq
+
 module Types {
   import opened UtilitiesLibrary
 

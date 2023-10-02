@@ -6,7 +6,7 @@ module Types {
   type HostId = nat
 
   datatype Message =
-    StartElection | VoteReq(candidate: HostId) | Vote(voter: HostId, candidate: HostId) | Leader(src: HostId)
+    VoteReq(candidate: HostId) | Vote(voter: HostId, candidate: HostId)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 }
@@ -24,7 +24,7 @@ module Host {
   }
 
   datatype Variables = Variables(
-    receivedVotes: set<HostId>,   // monotonic seq
+    receivedVotes: set<HostId>,   // monotonic set
     nominee: Option<HostId>,      // monotonic option
     isLeader: bool                // am I the leader?
   ) {
@@ -60,69 +60,82 @@ module Host {
   {
     && v.receivedVotes == {}
     && v.nominee == None
+    && v.isLeader == false
   }
 
   datatype Step =
-    ReceiveStep() | ProcessStep() | VictoryStep() | StutterStep()
+    NominateSelfStep() 
+    | SendVoteReqStep()
+    | RecvVoteReqStep() 
+    | SendVoteStep()
+    | RecvVoteStep()
+    | VictoryStep() 
+    | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
-      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
-      case ProcessStep => NextProcessStep(c, v, v', msgOps)
+      case NominateSelfStep => NextHostNominateSelfStep(c, v, v', msgOps)
+      case SendVoteReqStep => NextHostSendVoteReqStep(c, v, v', msgOps)
+      case RecvVoteReqStep => NextHostRecvVoteReqStep(c, v, v', msgOps)
+      case SendVoteStep => NextHostSendVoteStep(c, v, v', msgOps)
+      case RecvVoteStep => NextHostRecvVoteStep(c, v, v', msgOps)
       case VictoryStep => NextVictoryStep(c, v, v', msgOps)
       case StutterStep => 
           && v == v'
-          && msgOps.send == msgOps.recv == None
+          && msgOps.send == None
+          && msgOps.recv == None
   }
 
-ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-    && msgOps.recv.Some?
+  ghost predicate NextHostNominateSelfStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
     && msgOps.send.None?
-    && match msgOps.recv.value
-        case StartElection =>
-          if v.nominee.None? then
-            // Nominate myself as leader
-            && v' == v.(nominee := Some(c.hostId))
-          else
-            // Stutter
-            && v' == v
-        case VoteReq(candidate) => 
-          if v.nominee.None? then
-            // Save candidate as nominee
-            && v' == v.(nominee := Some(candidate))
-          else
-            // Stutter
-            && v' == v
-        case Vote(voter, candidate) =>
-          if candidate == c.hostId then
-            // I received a vote
-            && v' == v.(receivedVotes := v.receivedVotes + {voter})
-          else
-            // Stutter
-            && v' == v
-        case Leader(_) =>
-            // Stutter
-            && v' == v
+    && v.nominee.None?
+    && v' == v.(
+        nominee := Some(c.hostId)
+      )
   }
 
-  ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextHostSendVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && v.nominee.Some?
-    // Vote for nominee
+    && v.nominee.value == c.hostId
+    && msgOps.send == Some(VoteReq(v.nominee.value))
+    && v' == v
+  }
+
+  ghost predicate NextHostRecvVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && msgOps.recv.value.VoteReq?
+    && msgOps.send.None?
+    && v.nominee.None?
+    && v' == v.(nominee := Some(msgOps.recv.value.candidate))
+  }
+
+  ghost predicate NextHostSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.None?
+    && v.nominee.Some?
     && msgOps.send == Some(Vote(c.hostId, v.nominee.value))
     && v' == v
   }
 
+  ghost predicate NextHostRecvVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.recv.Some?
+    && msgOps.recv.value.Vote?
+    && msgOps.send.None?
+    && msgOps.recv.value.candidate == c.hostId
+    && v' == v.(receivedVotes := v.receivedVotes + {msgOps.recv.value.voter})
+  }
+
   ghost predicate NextVictoryStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.send.None?
     && msgOps.recv.None?
     && SetIsQuorum(c.clusterSize, v.receivedVotes)
-    && msgOps.send == Some(Leader(c.hostId))
-    && v == v'
+    && v' == v.(isLeader := true)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
-} // end module Host
+} // end module Hosts
