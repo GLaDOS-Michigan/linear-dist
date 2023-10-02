@@ -420,6 +420,20 @@ lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')
   ensures OneValuePerBallot(c, v')
+{
+  InvNextOneValuePerBallotHelper(c, v, v');
+}
+
+lemma InvNextOneValuePerBallotHelper(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires OneValuePerBallot(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires AcceptorAcceptedImpliesProposed(c, v)
+  requires Next(c, v, v')
+  ensures OneValuePerBallotLeaderAndLearners(c, v')
+  ensures OneValuePerBallotLeaderAndAcceptors(c, v')
 {}
 
 lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)

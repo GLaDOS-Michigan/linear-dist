@@ -463,8 +463,8 @@ lemma InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
   assert LeaderHearedImpliesProposed(c, v');
 }
 
-lemma {:timeLimitMultiplier 3} InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
+lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
   requires OneValuePerBallot(c, v)
   requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
   requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
@@ -473,12 +473,21 @@ lemma {:timeLimitMultiplier 3} InvNextOneValuePerBallot(c: Constants, v: Variabl
   requires Next(c, v, v')
   ensures OneValuePerBallot(c, v')
 {
-  assert OneValuePerBallotAcceptors(c, v');
-  assert OneValuePerBallotLearners(c, v');
-  assert OneValuePerBallotAcceptorsAndLearners(c, v');
-  assert OneValuePerBallotLeaderAndLearners(c, v');
-  assert OneValuePerBallotLeaderAndAcceptors(c, v');
+  InvNextOneValuePerBallotHelper(c, v, v');
 }
+
+lemma InvNextOneValuePerBallotHelper(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires OneValuePerBallot(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires AcceptorAcceptedImpliesProposed(c, v)
+  requires Next(c, v, v')
+  ensures OneValuePerBallotAcceptorsAndLearners(c, v')
+  ensures OneValuePerBallotLeaderAndLearners(c, v')
+  ensures OneValuePerBallotLeaderAndAcceptors(c, v')
+{}
 
 lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables) 
   requires v.WF(c) && v'.WF(c)
