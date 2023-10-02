@@ -11,4 +11,4 @@
 * automate
   * Asynchronous monotonic version written to aid message invariant automation
 
-All the decentralized versions share the same hosts.dfy
+All the decentralized asynchronous versions share the same hosts.dfy
