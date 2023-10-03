@@ -1,4 +1,4 @@
-include "types.dfy"
+include "../types.dfy"
 
 module CoordinatorHost {
   import opened Types

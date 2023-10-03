@@ -1,4 +1,4 @@
-include "types.dfy"
+include "../types.dfy"
 
 module CoordinatorHost {
   import opened Types
@@ -52,17 +52,16 @@ module CoordinatorHost {
   ghost predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && match msgOps.recv.value
-        case VoteMsg(vote, src) =>
-          if vote == Yes then 
-            v' == v.(
-              yesVotes := v.yesVotes + {src}
-            )
-          else
-            v' == v.(
-              noVotes := v.noVotes + {src}
-            )
-        case _ => v' == v //stutter
+    && msgOps.recv.value.VoteMsg?
+    && var vote, src := msgOps.recv.value.v, msgOps.recv.value.src;
+    && if vote == Yes then 
+        v' == v.(
+          yesVotes := v.yesVotes + {src}
+        )
+      else
+        v' == v.(
+          noVotes := v.noVotes + {src}
+        )
   } 
 
   ghost predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
