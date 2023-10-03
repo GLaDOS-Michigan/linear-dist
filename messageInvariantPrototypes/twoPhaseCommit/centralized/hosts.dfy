@@ -117,27 +117,27 @@ module ParticipantHost {
     VoteReqLbl() | SendVoteLbl(vote: Vote) | DecideLbl(decision: Decision) | InternalLbl()
 
   datatype Step =
-    ReceiveStep() | SendVoteStep() | StutterStep()
+    ReceiveVoteReqStep() | ReceiveDecisionStep() | SendVoteStep() | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, lbl: TransitionLabel)
   {
     match step
-      case ReceiveStep => NextReceiveStep(c, v, v', lbl)
+      case ReceiveVoteReqStep => NextReceiveVoteReqStep(c, v, v', lbl)
+      case ReceiveDecisionStep => NextReceiveDecisionStep(c, v, v', lbl)
       case SendVoteStep => NextSendVoteStep(c, v, v', lbl)
       case StutterStep => 
           && v == v'
           && lbl.InternalLbl?
   }
 
-  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
-    && match lbl
-        case VoteReqLbl =>
-          && v == v'.(sendVote := true)
-        case DecideLbl(d) =>
-          && lbl.DecideLbl?
-          && v' == v.(decision := Some(d))
-        case _ => 
-          false
+  ghost predicate NextReceiveVoteReqStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.VoteReqLbl?
+    && v == v'.(sendVote := true)
+  }
+
+  ghost predicate NextReceiveDecisionStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && lbl.DecideLbl?
+    && v' == v.(decision := Some(lbl.decision))
   }
 
   ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
