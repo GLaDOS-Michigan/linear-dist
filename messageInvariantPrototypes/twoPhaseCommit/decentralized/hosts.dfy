@@ -36,24 +36,37 @@ module CoordinatorHost {
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
-      case VoteReqStep => NextVoteReqStep(v, v', msgOps)
-      case ReceiveStep => NextReceiveStep(v, v', msgOps)
+      case VoteReqStep => NextVoteReqStep(c, v, v', msgOps)
+      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
       case DecisionStep => NextDecisionStep(c, v, v', msgOps)
       case StutterStep => && v == v'
                           && msgOps.send == msgOps.recv == None
   }
 
-  ghost predicate NextVoteReqStep(v: Variables, v': Variables, msgOps: MessageOps) {
-    && v' == v  // coordinator local state unchanged
+  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    && msgOps.send == Some(VoteReqMsg)
+    && msgOps.send.Some?
+    && NextVoteReqStepSendFunc(c, v, msgOps.send.value)
+    && v' == v 
   }
 
-  ghost predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
-    && msgOps.recv.Some?
+  // Send predicate
+  ghost predicate NextVoteReqStepSendFunc(c: Constants, v: Variables, msg: Message) {
+    msg == VoteReqMsg
+  }
+
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
-    && msgOps.recv.value.VoteMsg?
-    && var vote, src := msgOps.recv.value.v, msgOps.recv.value.src;
+    && msgOps.recv.Some?
+    && NextReceiveStepRecvFunc(c, v, v', msgOps.recv.value)
+  }
+
+  // Receive predicate
+  ghost predicate NextReceiveStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && msg.VoteMsg?
+    && var vote, src := msg.v, msg.src;
+    // update v'
     && if vote == Yes then 
         v' == v.(
           yesVotes := v.yesVotes + {src}
@@ -62,20 +75,33 @@ module CoordinatorHost {
         v' == v.(
           noVotes := v.noVotes + {src}
         )
-  } 
+  }
 
   ghost predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    && v.decision.None?  // enabling condition
+    && msgOps.send.Some?
+    && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
+    && NextDecisionStepSendFunc(c, v, msgOps.send.value)
     && if |v.noVotes| > 0 then
-        && v' == v.(decision := Some(Abort))
-        && msgOps.send == Some(DecideMsg(Abort))
+        v' == v.(decision := Some(Abort))
       else if |v.yesVotes| == c.numParticipants then
-        && v' == v.(decision := Some(Commit))
-        && msgOps.send == Some(DecideMsg(Commit))
+        v' == v.(decision := Some(Commit))
       else
-        && v' == v
-        && msgOps.send.None?
+        false
+  }
+
+  // Send predicate
+  ghost predicate NextDecisionStepSendFunc(c: Constants, v: Variables, msg: Message) {
+    // enabling conditions
+    && v.decision.None?
+    && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
+    // send message
+    && if |v.noVotes| > 0 then
+        msg == DecideMsg(Abort)
+    else if |v.yesVotes| == c.numParticipants then
+        msg == DecideMsg(Commit)
+    else
+      false
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)

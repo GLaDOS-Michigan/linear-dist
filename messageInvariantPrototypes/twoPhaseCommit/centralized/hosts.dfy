@@ -74,7 +74,7 @@ module CoordinatorHost {
         && v' == v.(decision := Some(Commit))
         && lbl.decision == Commit
       else
-        && v' == v
+        false
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
