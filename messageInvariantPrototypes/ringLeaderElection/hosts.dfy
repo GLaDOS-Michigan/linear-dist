@@ -87,19 +87,19 @@ module Host {
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
     && msgOps.recv.Some?
-    && v.highestHeard < msgOps.recv.value.val // max of what I heard vs incoming
-    && v' == v.(
-        highestHeard := v'.highestHeard  // constrained by ReceiveMsg
-    )
-    && ReceiveMsg(c, v', msgOps.recv.value)
+    && ReceiveMsg(c, v, v', msgOps.recv.value)
   }
 
-  // Receive Invariant
-  // #[triggered on v.highestHeard > -1]
-  ghost predicate ReceiveMsg(c: Constants, v': Variables, msg: Message) {
+  // Receive predicate
+  ghost predicate ReceiveMsg(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && v.highestHeard < msg.val
     && msg.src < c.numParticipants
     && c.ringPos == Successor(c.numParticipants, msg.src)
-    && v'.highestHeard == msg.val
+    // update v'
+    && v' == v.(
+        highestHeard := msg.val
+    )
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)

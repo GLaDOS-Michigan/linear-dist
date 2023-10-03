@@ -23,3 +23,9 @@ cd decentralizedMonotonic
 ./verify
 cd - 
 echo ""
+
+echo "Verifying automate"
+cd automate
+./verify
+cd - 
+echo ""

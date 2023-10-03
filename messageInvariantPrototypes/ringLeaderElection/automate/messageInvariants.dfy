@@ -29,8 +29,7 @@ ghost predicate TransmissionValidity(c: Constants, v: Variables)
   )
 }
 
-// For each host, if its highestHeard is >-1, then it must have gotten it from a message
-// from its predecessor
+// Every host state on receive step is updated according to a fixed function
 ghost predicate ReceiveValidity(c: Constants, v: Variables) 
   requires v.WF(c)
   requires ValidHistory(c, v)
@@ -43,7 +42,7 @@ ghost predicate ReceiveValidity(c: Constants, v: Variables)
   :: 
     (exists msg :: 
         && msg in v.network.sentMsgs 
-        && Host.ReceiveMsg(c.hostConstants[idx], v.History(i).hosts[idx], msg)
+        && Host.ReceiveMsg(c.hostConstants[idx], v.History(i-1).hosts[idx], v.History(i).hosts[idx], msg)
     )
 }
 
