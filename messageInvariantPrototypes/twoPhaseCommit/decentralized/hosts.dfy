@@ -115,32 +115,36 @@ module ParticipantHost {
   }
 
   datatype Step =
-    ReceiveStep() | SendVoteStep() | StutterStep()
+    ReceiveVoteReqStep() | ReceiveDecisionStep() | SendVoteStep() | StutterStep()
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
-      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case ReceiveVoteReqStep => NextReceiveVoteReqStep(c, v, v', msgOps)
+      case ReceiveDecisionStep => NextReceiveDecisionStep(c, v, v', msgOps)
       case SendVoteStep => NextSendVoteStep(c, v, v', msgOps)
       case StutterStep => 
           && v == v'
           && msgOps.send == msgOps.recv == None
   }
 
-  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
-    && msgOps.recv.Some?
+  ghost predicate NextReceiveVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
-    && match msgOps.recv.value
-        case VoteReqMsg =>
-            v == v'.(sendVote := true)
-        case DecideMsg(d) =>
-            v' == v.(decision := Some(d))
-        case _ => 
-            v' == v
+    && msgOps.recv.Some?
+    && msgOps.recv.value.VoteReqMsg?
+    && v == v'.(sendVote := true)
+  }
+
+  ghost predicate NextReceiveDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.send.None?
+    && msgOps.recv.Some?
+    && msgOps.recv.value.DecideMsg?
+    && v' == v.(decision := Some(msgOps.recv.value.decision))
   }
 
   ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
+    && v.sendVote == true
     && v' == v.(sendVote := false)
     && msgOps.send == Some(VoteMsg(c.preference, c.hostId))
   }

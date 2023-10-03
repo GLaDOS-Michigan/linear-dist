@@ -10,7 +10,7 @@ module Types {
   datatype Decision = Commit | Abort
 
   datatype Message =
-    VoteReqMsg | VoteMsg(v: Vote, src: HostId) | DecideMsg(d: Decision)
+    VoteReqMsg | VoteMsg(v: Vote, src: HostId) | DecideMsg(decision: Decision)
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 }

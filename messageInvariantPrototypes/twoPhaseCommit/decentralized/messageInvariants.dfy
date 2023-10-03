@@ -32,7 +32,7 @@ ghost predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs && msg.DecideMsg? 
-  :: GetCoordinator(c, v).decision.Some? && msg.d == GetCoordinator(c, v).decision.value
+  :: GetCoordinator(c, v).decision.Some? && msg.decision == GetCoordinator(c, v).decision.value
 }
 
 // If a participant has decided, then there must be a corresponding DecideMsg
