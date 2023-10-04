@@ -157,22 +157,44 @@ module ParticipantHost {
   ghost predicate NextReceiveVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
     && msgOps.recv.Some?
-    && msgOps.recv.value.VoteReqMsg?
+    && NextReceiveVoteReqStepRecvFunc(c, v, v', msgOps.recv.value)
+  }
+
+  // Receive predicate
+  ghost predicate NextReceiveVoteReqStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && msg.VoteReqMsg?
+    // update v'
     && v == v'.(sendVote := true)
   }
 
   ghost predicate NextReceiveDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
     && msgOps.recv.Some?
-    && msgOps.recv.value.DecideMsg?
-    && v' == v.(decision := Some(msgOps.recv.value.decision))
+    && NextReceiveDecisionStepRecvFunc(c, v, v', msgOps.recv.value)
+  }
+
+  // Receive predicate
+  ghost predicate NextReceiveDecisionStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && msg.DecideMsg?
+    // update v'
+    && v' == v.(decision := Some(msg.decision))
   }
 
   ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
+    && msgOps.send.Some?
     && msgOps.recv.None?
-    && v.sendVote == true
     && v' == v.(sendVote := false)
-    && msgOps.send == Some(VoteMsg(c.preference, c.hostId))
+    && NextSendVoteStepSendFunc(c, v, msgOps.send.value)
+  }
+
+  // Send predicate
+  ghost predicate NextSendVoteStepSendFunc(c: Constants, v: Variables, msg: Message) {
+    // enabling conditions
+    && v.sendVote == true
+    // send message
+    && msg == VoteMsg(c.preference, c.hostId)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
