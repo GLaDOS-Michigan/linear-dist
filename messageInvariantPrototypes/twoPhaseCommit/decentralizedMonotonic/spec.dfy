@@ -14,11 +14,7 @@
 //       (best modeled with refinement)
 // AC-5: (liveness) All processes eventually decide.
 
-// Note that we include the model of exercise01, so you should write your 
-// spec accordingly. Of course, that also means double-checking that your
-// model performs all actions as described.
 include "distributedSystem.dfy"
-//#extract exercise01.template solution exercise01.dfy
 
 module Obligations {
   import opened Types
@@ -80,26 +76,6 @@ module Obligations {
   /***************************************************************************************
   *                                      Utils                                           *
   ***************************************************************************************/
-
-  // ghost function GetCoordinator(c: Constants, v: Variables) : CoordinatorHost.Variables
-  //   requires v.WF(c)
-  // {
-  //   Last(v.hosts).coordinator
-  // }
-
-  // ghost function GetParticipant(c: Constants, v: Variables, i: int) : ParticipantHost.Variables
-  //   requires v.WF(c)
-  //   requires 0 <= i < |v.hosts|-1
-  // {
-  //   v.hosts[i].participant
-  // }
-
-  // ghost function GetParticipantPreference(c: Constants, i: int) : Vote
-  //   requires c.WF()
-  //   requires 0 <= i < |c.hosts|-1
-  // {
-  //   c.hosts[i].participant.preference
-  // }
 
   ghost predicate HostHasDecided(h: Host.Variables) {
     match h
