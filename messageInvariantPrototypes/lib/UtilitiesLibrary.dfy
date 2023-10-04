@@ -76,6 +76,13 @@ module UtilitiesLibrary {
     }
   }
 
+  lemma SetContainmentCardinalityStrict<T>(s1: set<T>, s2: set<T>) 
+    requires s1 < s2
+    ensures |s1| < |s2|
+  {
+    assume false;
+  }
+
   lemma UnionIncreasesCardinality<T>(s1: set<T>, s2: set<T>) 
     ensures |s1 + s2| >= |s1|
     decreases s2

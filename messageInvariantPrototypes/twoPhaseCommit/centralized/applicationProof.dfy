@@ -126,22 +126,15 @@ lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
 }
 
 
-lemma {:axiom} SetLemma(S: set<HostId>, e: HostId, size: int) 
+lemma SetLemma(S: set<HostId>, e: HostId, size: int) 
   requires 0 <= e < size
   requires forall x | x in S :: 0 <= x < size
   requires e !in S
-  ensures |S| < size - 1
+  ensures |S| < size
 {
-  var fullSet := set x: HostId | 0 <= x < size :: x;
-  assume |fullSet| == size - 1;
-  SubsetCardinality(S, fullSet);
-}
-
-lemma {:axiom} SubsetCardinality<T>(small: set<T>, large: set<T>) 
-  requires small < large
-  ensures |small| < |large|
-{
-  assume false;
+  var fullSet := set x | 0 <= x < size;
+  SetComprehensionSize(size);
+  SetContainmentCardinalityStrict(S, fullSet);
 }
 }
 
