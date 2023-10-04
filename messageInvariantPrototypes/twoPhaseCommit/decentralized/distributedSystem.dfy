@@ -1,5 +1,5 @@
 
-include "hosts.dfy"
+include "../hosts.dfy"
 
 
 module Network {
