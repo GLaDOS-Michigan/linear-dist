@@ -40,12 +40,22 @@ module DistributedSystem {
       Host.GroupWFConstants(hosts)
     }
 
-    ghost predicate ValidHostId(id: HostId) {
-      id < |hosts|
+    ghost predicate ValidHostId(id: int) {
+      0 <= id < |hosts|
     }
 
     ghost predicate ValidParticipantId(id: int) {
       0 <= id < |hosts|-1
+    }
+
+    ghost predicate ValidCoordinatorId(id: int) {
+      id == |hosts|-1
+    }
+    
+    ghost function GetCoordinator() : CoordinatorHost.Constants
+      requires WF()
+    {
+      Last(hosts).coordinator
     }
   }
 
@@ -178,13 +188,13 @@ module DistributedSystem {
     Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
   }
 
-  ghost predicate IsReceiveStepByActor(c: Constants, v: Variables, i:int, actor: int)
+  ghost predicate IsReceiveStepByActor(c: Constants, v: Variables, i:int, actor: int, msg: Message)
     requires v.WF(c)
     requires 1 <= i < |v.history|
     requires Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
   {
     var step :| NextStep(c, v.Truncate(c, i).Last(), v.Truncate(c, i+1).Last(), v.network, v.network, step);
-    && step.msgOps.recv.Some?
+    && step.msgOps.recv == Some(msg)
     && step.actor == actor
   }
 
