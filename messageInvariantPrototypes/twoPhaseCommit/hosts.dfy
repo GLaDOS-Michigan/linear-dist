@@ -89,7 +89,7 @@ module CoordinatorHost {
     // enabling conditions
     && v.decision.None?
     && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
-    // send message
+    // send message and update v'
     && if |v.noVotes| > 0 then
         && v' == v.(decision := Some(Abort))
         && msg == DecideMsg(Abort)
@@ -182,16 +182,17 @@ module ParticipantHost {
   ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.Some?
     && msgOps.recv.None?
-    && v' == v.(sendVote := false)
-    && NextSendVoteStepSendFunc(c, v, msgOps.send.value)
+    && NextSendVoteStepSendFunc(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate NextSendVoteStepSendFunc(c: Constants, v: Variables, msg: Message) {
+  ghost predicate NextSendVoteStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.sendVote == true
     // send message
     && msg == VoteMsg(c.preference, c.hostId)
+    // update v'
+    && v' == v.(sendVote := false)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
