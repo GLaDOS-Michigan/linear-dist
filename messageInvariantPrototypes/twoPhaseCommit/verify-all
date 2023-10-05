@@ -6,26 +6,14 @@ cd centralized
 cd -
 echo ""
 
-# echo "Verifying centralizedMonotonic"
-# cd centralizedMonotonic
-# ./verify
-# cd - 
-# echo ""
-
 echo "Verifying decentralized"
 cd decentralized
 ./verify
 cd - 
 echo ""
 
-# echo "Verifying decentralizedMonotonic"
-# cd decentralizedMonotonic
-# ./verify
-# cd - 
-# echo ""
-
-# echo "Verifying automate"
-# cd automate
-# ./verify
-# cd - 
-# echo ""
+echo "Verifying decentralizedMonotonic"
+cd decentralizedMonotonic
+./verify
+cd - 
+echo ""
