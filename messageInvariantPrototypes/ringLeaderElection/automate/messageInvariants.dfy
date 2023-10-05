@@ -24,8 +24,8 @@ ghost predicate TransmissionValidity(c: Constants, v: Variables)
   forall msg | msg in v.network.sentMsgs
   :: 
   (exists i ::
-      && v.ValidHistoryIdx(i)
-      && Host.SendMsg(c.hostConstants[msg.src], v.History(i).hosts[msg.src], msg)
+      && v.ValidHistoryIdxStrict(i)
+      && Host.SendMsg(c.hostConstants[msg.src], v.History(i).hosts[msg.src], v.History(i+1).hosts[msg.src], msg)
   )
 }
 
@@ -82,7 +82,18 @@ lemma InvNextTransmissionValidity(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures TransmissionValidity(c, v')
 {
-  VariableNextProperties(c, v, v');
+  forall msg | msg in v'.network.sentMsgs
+  ensures
+  (exists i ::
+      && v'.ValidHistoryIdxStrict(i)
+      && Host.SendMsg(c.hostConstants[msg.src], v'.History(i).hosts[msg.src], v'.History(i+1).hosts[msg.src], msg)
+  ) {
+    if msg !in v.network.sentMsgs {
+      // witness and trigger
+      var i := |v.history|-1;
+      assert Host.SendMsg(c.hostConstants[msg.src], v'.History(i).hosts[msg.src], v'.History(i+1).hosts[msg.src], msg);
+    }
+  }
 }
 
 lemma InvNextReceiveValidity(c: Constants, v: Variables, v': Variables)

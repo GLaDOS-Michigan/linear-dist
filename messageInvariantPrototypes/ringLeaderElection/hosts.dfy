@@ -73,15 +73,15 @@ module Host {
   {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && SendMsg(c, v, msgOps.send.value)
-    && v == v'
+    && SendMsg(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate SendMsg(c: Constants, v: Variables, msg: Message)
+  ghost predicate SendMsg(c: Constants, v: Variables, v': Variables, msg: Message)
   {
     && msg.src == c.ringPos
     && msg.val == max(v.highestHeard, c.hostId) // max of what I heard vs my own hostId
+     && v == v'
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {

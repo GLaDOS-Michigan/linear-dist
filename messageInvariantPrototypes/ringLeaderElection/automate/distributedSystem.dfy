@@ -65,6 +65,10 @@ module DistributedSystem {
       0 <= i < |history|
     }
 
+    ghost predicate ValidHistoryIdxStrict(i: int) {
+      0 <= i < |history|-1
+    }
+
     ghost predicate WF(c: Constants) {
       && c.WF()
       && 0 < |history|
