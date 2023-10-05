@@ -160,8 +160,20 @@ lemma InvNextSendDecideMsgValidity(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures SendDecideMsgValidity(c, v')
 {
-  reveal_ValidHistory();
-  VariableNextProperties(c, v, v');
+  forall msg | 
+    && msg in v'.network.sentMsgs
+    && msg.DecideMsg?
+  ensures
+  (exists i ::
+      && 0 <= i < |v'.history|-1
+      && CoordinatorHost.NextDecisionStepSendFunc(c.GetCoordinator(), v'.History(i).GetCoordinator(c), v'.History(i+1).GetCoordinator(c), msg)
+  ) {
+    if msg !in v.network.sentMsgs {
+      // witness and trigger
+      var i := |v.history|-1;
+      assert CoordinatorHost.NextDecisionStepSendFunc(c.GetCoordinator(), v'.History(i).GetCoordinator(c), v'.History(i+1).GetCoordinator(c), msg);
+    }
+  }
 }
 
 lemma InvNextRecvDecideMsgValidity(c: Constants, v: Variables, v': Variables)
