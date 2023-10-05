@@ -35,15 +35,13 @@ ghost predicate ReceiveValidity(c: Constants, v: Variables)
   requires ValidHistory(c, v)
 {
   reveal_ValidHistory();
-  forall i, idx | 
+  forall i, idx, msg | 
     && 1 <= i < |v.history|
     && c.ValidIdx(idx)
-    && IsReceiveStepByActor(c, v, i, idx)
+    && IsReceiveStepByActor(c, v, i, idx, msg)
   :: 
-    (exists msg :: 
-        && msg in v.network.sentMsgs 
-        && Host.ReceiveMsg(c.hostConstants[idx], v.History(i-1).hosts[idx], v.History(i).hosts[idx], msg)
-    )
+    && msg in v.network.sentMsgs 
+    && Host.ReceiveMsg(c.hostConstants[idx], v.History(i-1).hosts[idx], v.History(i).hosts[idx], msg)
 }
 
 ghost predicate MessageInv(c: Constants, v: Variables)
