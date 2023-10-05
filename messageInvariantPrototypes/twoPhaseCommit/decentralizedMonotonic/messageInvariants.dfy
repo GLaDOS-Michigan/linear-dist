@@ -26,7 +26,7 @@ ghost predicate RecvVoteMsgValidity(c: Constants, v: Variables)
     && 1 <= i < |v.history|
     && c.ValidCoordinatorId(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)
-    && msg.VoteReqMsg?
+    && msg.VoteMsg?
   :: 
     && msg in v.network.sentMsgs
     && CoordinatorHost.NextReceiveStepRecvFunc(c.hosts[idx].coordinator, v.History(i-1).hosts[idx].coordinator, v.History(i).hosts[idx].coordinator, msg)
@@ -42,8 +42,8 @@ ghost predicate SendDecideMsgValidity(c: Constants, v: Variables)
     && msg.DecideMsg?
   :: 
   (exists i ::
-      && v.ValidHistoryIdx(i)
-      && CoordinatorHost.NextDecisionStepSendFunc(c.GetCoordinator(), v.History(i).GetCoordinator(c), msg)
+      && 0 <= i < |v.history|-1
+      && CoordinatorHost.NextDecisionStepSendFunc(c.GetCoordinator(), v.History(i).GetCoordinator(c), v.History(i+1).GetCoordinator(c), msg)
   )
 }
 
@@ -53,7 +53,7 @@ ghost predicate RecvVoteReqMsgValidity(c: Constants, v: Variables)
   requires ValidHistory(c, v)
 {
   reveal_ValidHistory();
-  forall i, idx, msg | 
+  forall i, idx, msg| 
     && 1 <= i < |v.history|
     && c.ValidParticipantId(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)

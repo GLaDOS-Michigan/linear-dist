@@ -81,25 +81,21 @@ module CoordinatorHost {
     && msgOps.recv.None?
     && msgOps.send.Some?
     && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
-    && NextDecisionStepSendFunc(c, v, msgOps.send.value)
-    && if |v.noVotes| > 0 then
-        v' == v.(decision := Some(Abort))
-      else if |v.yesVotes| == c.numParticipants then
-        v' == v.(decision := Some(Commit))
-      else
-        false
+    && NextDecisionStepSendFunc(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate NextDecisionStepSendFunc(c: Constants, v: Variables, msg: Message) {
+  ghost predicate NextDecisionStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.decision.None?
     && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
     // send message
     && if |v.noVotes| > 0 then
-        msg == DecideMsg(Abort)
+        && v' == v.(decision := Some(Abort))
+        && msg == DecideMsg(Abort)
     else if |v.yesVotes| == c.numParticipants then
-        msg == DecideMsg(Commit)
+        && v' == v.(decision := Some(Commit))
+        && msg == DecideMsg(Commit)
     else
       false
   }
@@ -178,6 +174,7 @@ module ParticipantHost {
   ghost predicate NextReceiveDecisionStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && msg.DecideMsg?
+    && v.decision.None?
     // update v'
     && v' == v.(decision := Some(msg.decision))
   }

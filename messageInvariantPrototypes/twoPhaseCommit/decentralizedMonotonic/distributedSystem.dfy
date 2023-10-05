@@ -57,6 +57,13 @@ module DistributedSystem {
     {
       Last(hosts).coordinator
     }
+
+    ghost function GetParticipant(idx: int) : ParticipantHost.Constants
+      requires WF()
+      requires ValidParticipantId(idx)
+    {
+      hosts[idx].participant
+    }
   }
 
   datatype Hosts = Hosts(
