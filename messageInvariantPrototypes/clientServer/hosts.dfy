@@ -61,7 +61,8 @@ module ServerHost {
     && NextProcessStepSendFunc(c, v, v', msgOps.send.value)
   }
 
-    // Send predicate
+
+  // Send predicate
   ghost predicate NextProcessStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.currentRequest.Some?
@@ -104,32 +105,46 @@ module ClientHost {
   }
 
   datatype Step =
-      RequestStep(reqId: nat)  // non-deterministic id for the new request
+      RequestStep()
     | ReceiveStep() 
     | StutterStep
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps) {
     match step
-      case RequestStep(reqId) => NextRequestStep(c, v, v', msgOps, reqId)
+      case RequestStep() => NextRequestStep(c, v, v', msgOps)
       case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
       case StutterStep => 
           && v == v'
           && msgOps.send == msgOps.recv == None
   }
 
-  ghost predicate NextRequestStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, reqId: nat) {
+  ghost predicate NextRequestStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    && reqId in v.requests
-    && msgOps.send == Some(RequestMsg(Req(c.clientId, reqId)))
+    && msgOps.send.Some?
+    && NextRequestStepSendFunc(c, v, v', msgOps.send.value)
+  }
+
+  // Send predicate
+  ghost predicate NextRequestStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // send message and update v'
+    && msg.RequestMsg?
+    && msg.r.clientId == c.clientId
+    && msg.r.reqId in v.requests
     && v' == v
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && msgOps.recv.value.ResponseMsg?
-    && var msg := msgOps.recv.value;
+    && NextReceiveRespStepRecvFunc(c, v, v', msgOps.recv.value)
+  }
+
+  // Receive predicate
+  ghost predicate NextReceiveRespStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && msg.ResponseMsg?
     && msg.r.clientId == c.clientId
+    // update v'
     && v' == v.(responses := v.responses + {msg.r.reqId})
   }
 
