@@ -1,0 +1,25 @@
+#!/bin/sh
+
+echo "Verifying centralized"
+cd centralized
+./verify
+cd - > /dev/null
+echo ""
+
+# echo "Verifying centralizedMonotonic"
+# cd centralizedMonotonic_globalHistory
+# ./verify
+# cd - > /dev/null
+# echo ""
+
+echo "Verifying decentralized"
+cd decentralized
+./verify
+cd - > /dev/null
+echo ""
+
+# echo "Verifying decentralizedMonotonic"
+# cd decentralizedMonotonic_globalHistory
+# ./verify
+# cd - > /dev/null
+# echo ""
