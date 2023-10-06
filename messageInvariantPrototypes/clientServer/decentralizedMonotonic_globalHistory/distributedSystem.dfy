@@ -134,9 +134,8 @@ module DistributedSystem {
   }
 
   ghost predicate HostAction(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+    requires h.WF(c) && h'.WF(c)
   {
-    && h.WF(c)
-    && h'.WF(c)
     && c.Validactor(actor)
     && Host.Next(c.hosts[actor], h.hosts[actor], h'.hosts[actor], msgOps)
     // all other hosts UNCHANGED
