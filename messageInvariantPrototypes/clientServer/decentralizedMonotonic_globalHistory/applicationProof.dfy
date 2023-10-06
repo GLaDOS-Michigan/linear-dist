@@ -38,9 +38,9 @@ ghost predicate ServerRequestsValid(c: Constants, v: Variables)
 {
   forall i| 
     && v.ValidHistoryIdx(i)
-    && v.History(i).GetServer(c).server.currentRequest.Some?
+    && v.History(i).GetServer(c).currentRequest.Some?
   ::
-    && var req := v.History(i).GetServer(c).server.currentRequest.value;
+    && var req := v.History(i).GetServer(c).currentRequest.value;
     && c.ValidClientIdx(req.clientId)
     && req.reqId in v.History(i).hosts[req.clientId].client.requests
 }
@@ -60,10 +60,6 @@ ghost predicate Inv(c: Constants, v: Variables)
   && Safety(c, v)
 }
 
-/***************************************************************************************
-*                                        Proof                                         *
-***************************************************************************************/
-
 lemma InvImpliesSafety(c: Constants, v: Variables)
   requires Inv(c, v)
   ensures Safety(c, v)
@@ -72,7 +68,9 @@ lemma InvImpliesSafety(c: Constants, v: Variables)
 lemma InitImpliesInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures Inv(c, v)
-{}
+{
+  InitImpliesMessageInv(c, v);
+}
 
 lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -81,7 +79,21 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 {
   VariableNextProperties(c, v, v');
   MessageInvInductive(c, v, v');
+  InvNextClientRequestsMonotonic(c, v, v');
   InvNextServerRequestsValid(c, v, v');
+}
+
+/***************************************************************************************
+*                                        Proof                                         *
+***************************************************************************************/
+
+lemma InvNextClientRequestsMonotonic(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires ClientRequestsMonotonic(c, v)
+  requires Next(c, v, v')
+  ensures ClientRequestsMonotonic(c, v')
+{
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextServerRequestsValid(c: Constants, v: Variables, v': Variables)
@@ -90,6 +102,14 @@ lemma InvNextServerRequestsValid(c: Constants, v: Variables, v': Variables)
   ensures ServerRequestsValid(c, v')
 {
   VariableNextProperties(c, v, v');
+  forall i| 
+    && v'.ValidHistoryIdx(i)
+    && v'.History(i).GetServer(c).currentRequest.Some?
+  ensures
+    && var req := v'.History(i).GetServer(c).currentRequest.value;
+    && c.ValidClientIdx(req.clientId)
+    && req.reqId in v'.History(i).hosts[req.clientId].client.requests
+  {}
 }
 
 }  // end module ClientServerProof
