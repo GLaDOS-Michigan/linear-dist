@@ -6,7 +6,7 @@ import opened UtilitiesLibrary
 import opened DistributedSystem
 import opened MessageInvariants
 import opened Obligations
-  
+
 
 /***************************************************************************************
 *                                Application Invariants                                *

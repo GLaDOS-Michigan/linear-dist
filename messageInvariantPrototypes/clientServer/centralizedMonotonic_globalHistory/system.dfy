@@ -1,4 +1,4 @@
-include "hosts.dfy"
+include "../centralizedHosts.dfy"
 
 module System {
 import opened UtilitiesLibrary
