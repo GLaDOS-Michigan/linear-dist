@@ -9,149 +9,177 @@ import opened Obligations
 
 // certified self inductive, modulo requires
 // Every request message in the network has a proper source
-ghost predicate ValidRequestMsgSource(c: Constants, v: Variables) 
+ghost predicate RequestMsgValidSrc(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall req | req in v.network.sentMsgs && req.RequestMsg?
   :: c.ValidClientIdx(req.r.clientId)
 }
 
-// certified self inductive, modulo requires
-// Every request message in the network comes from the source's request set
-// Property of Send
-ghost predicate ValidRequestMessage(c: Constants, v: Variables)
+// Send invariant
+ghost predicate ServerSendValidity(c: Constants, v: Variables)
   requires v.WF(c)
-  requires ValidRequestMsgSource(c, v)
+  requires RequestMsgValidSrc(c, v)
 {
-  forall reqMsg | reqMsg in v.network.sentMsgs && reqMsg.RequestMsg?
+  forall msg | 
+    && msg in v.network.sentMsgs
+    && msg.ResponseMsg?
   :: 
-    (exists i ::
-      && v.ValidHistoryIdx(i)
-      && reqMsg.r.reqId in v.History(i).hosts[reqMsg.r.clientId].client.requests
-    )
-}
-
-// certified self inductive, modulo requires
-// The server's requests must have come from the network
-// Property of Receive
-ghost predicate ServerValidRequest(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, idx:nat | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidServerIdx(idx)
-    && v.History(i).hosts[idx].server.currentRequest.Some?
-  :: 
-    RequestMsg(v.History(i).hosts[idx].server.currentRequest.value) in v.network.sentMsgs
-}
-
-
-// certified self inductive, modulo requires
-// Every response message in the network comes from the server's request
-// Property of Send
-ghost predicate ValidResponseMessage(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall resp | resp in v.network.sentMsgs && resp.ResponseMsg?
-  :: (exists i :: 
-        && v.ValidHistoryIdx(i)
-        && v.History(i).GetServer(c).server.currentRequest == Some(resp.r)
+  (exists i ::
+      && v.ValidHistoryIdxStrict(i)
+      && ServerHost.NextProcessStepSendFunc(c.GetServer(), v.History(i).GetServer(c), v.History(i+1).GetServer(c), msg)
   )
 }
 
-// certified self inductive, modulo requires
-// Every client's collected responses came from the network.
-// Property of Receive
-ghost predicate ClientResponsesValid(c: Constants, v: Variables)
+// Receive invariant
+ghost predicate ServerRecvValidity(c: Constants, v: Variables) 
   requires v.WF(c)
+  requires ValidHistory(c, v)
 {
-  forall i, idx:nat, respId | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidClientIdx(idx) 
-    && respId in v.History(i).hosts[idx].client.responses
+  reveal_ValidHistory();
+  forall i, idx, msg| 
+    && 1 <= i < |v.history|
+    && c.ValidServerIdx(idx)
+    && IsReceiveStepByActor(c, v, i, idx, msg)
+    && msg.RequestMsg?
   :: 
-    ResponseMsg(Req(idx, respId)) in v.network.sentMsgs
+    && msg in v.network.sentMsgs
+    && ServerHost.NextReceiveStepRecvFunc(c.hosts[idx].server, v.History(i-1).hosts[idx].server, v.History(i).hosts[idx].server, msg)
+}
+
+// Send invariant
+ghost predicate ClientSendValidity(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires RequestMsgValidSrc(c, v)
+{
+  forall msg | 
+    && msg in v.network.sentMsgs
+    && msg.RequestMsg?
+  :: 
+  (exists i ::
+      && var src := msg.r.clientId;
+      && v.ValidHistoryIdxStrict(i)
+      && ClientHost.NextRequestStepSendFunc(c.GetClient(src), v.History(i).GetClient(c, src), v.History(i+1).GetClient(c, src), msg)
+  )
+}
+
+// Receive invariant
+ghost predicate ClientRecvValidity(c: Constants, v: Variables) 
+  requires v.WF(c)
+  requires ValidHistory(c, v)
+{
+  reveal_ValidHistory();
+  forall i, idx, msg| 
+    && 1 <= i < |v.history|
+    && c.ValidClientIdx(idx)
+    && IsReceiveStepByActor(c, v, i, idx, msg)
+    && msg.ResponseMsg?
+  :: 
+    && msg in v.network.sentMsgs
+    && ClientHost.NextReceiveRespStepRecvFunc(c.hosts[idx].client, v.History(i-1).hosts[idx].client, v.History(i).hosts[idx].client, msg)
 }
 
 
 ghost predicate MessageInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
-  && ValidRequestMsgSource(c, v)
-  && ValidRequestMessage(c, v)
-  && ServerValidRequest(c, v)
-  && ValidResponseMessage(c, v)
-  && ClientResponsesValid(c, v)
+  && ValidHistory(c, v)
+  && RequestMsgValidSrc(c, v)
+  && ServerSendValidity(c, v)
+  && ServerRecvValidity(c, v)
+  && ClientSendValidity(c, v)
+  && ClientRecvValidity(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures MessageInv(c, v)
-{}
+{
+  InitImpliesValidHistory(c, v);
+}
 
 lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires MessageInv(c, v)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
 {
-  InvNextValidRequestMessage(c, v, v');
-  InvNextServerValidRequest(c, v, v');
-  InvNextValidResponseMessage(c, v, v');
-  InvNextClientResponsesValid(c, v, v');
+  InvNextValidHistory(c, v, v');
+  InvNextServerSendValidity(c, v, v');
+  InvNextServerRecvValidity(c, v, v');
+  InvNextClientSendValidity(c, v, v');
+  InvNextClientRecvValidity(c, v, v');
 }
 
 /***************************************************************************************
 *                                         Proofs                                       *
 ***************************************************************************************/
 
-lemma InvNextValidRequestMessage(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
+lemma InvNextServerSendValidity(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidHistory(c, v) && ValidHistory(c, v')
+  requires RequestMsgValidSrc(c, v)
+  requires ServerSendValidity(c, v)
   requires Next(c, v, v')
-  requires ValidRequestMsgSource(c, v)
-  requires ValidRequestMessage(c, v)
-  ensures ValidRequestMessage(c, v')
+  ensures ServerSendValidity(c, v')
 {
-  VariableNextProperties(c, v, v');
+  forall msg | 
+    && msg in v'.network.sentMsgs
+    && msg.ResponseMsg?
+  ensures
+  (exists i ::
+      && v'.ValidHistoryIdxStrict(i)
+      && ServerHost.NextProcessStepSendFunc(c.GetServer(), v'.History(i).GetServer(c), v'.History(i+1).GetServer(c), msg)
+  ) {
+    if msg !in v.network.sentMsgs {
+      // witness and trigger
+      var i := |v.history|-1;
+      assert ServerHost.NextProcessStepSendFunc(c.GetServer(), v'.History(i).GetServer(c), v'.History(i+1).GetServer(c), msg);
+    }
+  }
 }
 
-lemma InvNextServerValidRequest(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
+lemma InvNextServerRecvValidity(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidHistory(c, v) && ValidHistory(c, v')
+  requires ServerRecvValidity(c, v)
   requires Next(c, v, v')
-  requires ServerValidRequest(c, v)
-  ensures ServerValidRequest(c, v')
+  ensures ServerRecvValidity(c, v')
+{}
+
+lemma InvNextClientSendValidity(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidHistory(c, v) && ValidHistory(c, v')
+  requires RequestMsgValidSrc(c, v)
+  requires ClientSendValidity(c, v)
+  requires Next(c, v, v')
+  ensures ClientSendValidity(c, v')
 {
-  VariableNextProperties(c, v, v');
+  forall msg | 
+    && msg in v'.network.sentMsgs
+    && msg.RequestMsg?
+  ensures
+  (exists i ::
+      && var src := msg.r.clientId;
+      && v'.ValidHistoryIdxStrict(i)
+      && ClientHost.NextRequestStepSendFunc(c.GetClient(src), v'.History(i).GetClient(c, src), v'.History(i+1).GetClient(c, src), msg)
+  ) {
+    if msg !in v.network.sentMsgs {
+      // witness and trigger
+      var src := msg.r.clientId;
+      var i := |v.history|-1;
+      assert ClientHost.NextRequestStepSendFunc(c.GetClient(src), v'.History(i).GetClient(c, src), v'.History(i+1).GetClient(c, src), msg);
+    }
+  }
 }
 
-lemma InvNextValidResponseMessage(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
+lemma InvNextClientRecvValidity(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidHistory(c, v) && ValidHistory(c, v')
+  requires ClientRecvValidity(c, v)
   requires Next(c, v, v')
-  requires ValidResponseMessage(c, v)
-  ensures ValidResponseMessage(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
+  ensures ClientRecvValidity(c, v')
+{}
 
-lemma InvNextClientResponsesValid(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires Next(c, v, v')
-  requires ClientResponsesValid(c, v)
-  ensures ClientResponsesValid(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
-
-lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires Next(c, v, v')
-  ensures 1 < |v'.history|
-  ensures |v.history| == |v'.history| - 1
-  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)
-  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)
-{
-  assert 0 < |v.history|;
-  assert 1 < |v'.history|;
-}
 
 }  // end module MessageInvariants
 
