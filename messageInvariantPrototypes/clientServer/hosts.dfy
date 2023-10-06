@@ -61,7 +61,6 @@ module ServerHost {
     && NextProcessStepSendFunc(c, v, v', msgOps.send.value)
   }
 
-
   // Send predicate
   ghost predicate NextProcessStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
