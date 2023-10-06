@@ -34,25 +34,40 @@ module ServerHost {
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step, msgOps: MessageOps)
   {
     match step
-      case ReceiveStep => NextReceiveStep(v, v', msgOps)
-      case ProcessStep => NextProcessStep(v, v', msgOps)
+      case ReceiveStep => NextReceiveStep(c, v, v', msgOps)
+      case ProcessStep => NextProcessStep(c, v, v', msgOps)
       case StutterStep => && v == v'
                           && msgOps.send == msgOps.recv == None
   }
 
-  ghost predicate NextReceiveStep(v: Variables, v': Variables, msgOps: MessageOps) {
+  ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && v.currentRequest.None?
-    && msgOps.recv.value.RequestMsg?
-    && v' == v.(currentRequest := Some(msgOps.recv.value.r))
+    && NextReceiveStepRecvFunc(c, v, v', msgOps.recv.value)
   }
 
-  ghost predicate NextProcessStep(v: Variables, v': Variables, msgOps: MessageOps) {
+  // Receive predicate
+  ghost predicate NextReceiveStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && v.currentRequest.None?
+    && msg.RequestMsg?
+    // update v'
+    && v' == v.(currentRequest := Some(msg.r))
+  }
+
+  ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
+    && msgOps.send.Some?
+    && NextProcessStepSendFunc(c, v, v', msgOps.send.value)
+  }
+
+    // Send predicate
+  ghost predicate NextProcessStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
     && v.currentRequest.Some?
+    // send message and update v'
     && v' == v.(currentRequest := None)
-    && msgOps.send == Some(ResponseMsg(v.currentRequest.value))
+    && msg == ResponseMsg(v.currentRequest.value)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
