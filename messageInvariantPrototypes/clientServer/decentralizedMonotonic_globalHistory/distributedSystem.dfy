@@ -31,7 +31,7 @@ module DistributedSystem {
     ghost predicate WF() {
       Host.GroupWFConstants(hosts)
     }
-    ghost predicate ValidActorIdx(idx: int) {
+    ghost predicate Validactor(idx: int) {
       0 <= idx < |hosts|
     }
     ghost predicate ValidClientIdx(idx: int) {
@@ -112,11 +112,11 @@ module DistributedSystem {
 
     ghost function Truncate(c: Constants, i: int) : (v : Variables)
       requires WF(c)
-      requires 0 < i <= |history|
+      requires ValidHistoryIdx(i)
       ensures v.WF(c)
-      ensures v.Last() == History(i-1)
+      ensures v.Last() == History(i)
     {
-      Variables.Variables(history[..i], network)
+      Variables.Variables(history[..i+1], network)
     }
   }
 
@@ -133,23 +133,23 @@ module DistributedSystem {
     && Network.Init(v.network)
   }
 
-  ghost predicate HostAction(c: Constants, h: Hosts, h': Hosts, actorIdx: nat, msgOps: MessageOps)
+  ghost predicate HostAction(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
   {
     && h.WF(c)
     && h'.WF(c)
-    && c.ValidActorIdx(actorIdx)
-    && Host.Next(c.hosts[actorIdx], h.hosts[actorIdx], h'.hosts[actorIdx], msgOps)
+    && c.Validactor(actor)
+    && Host.Next(c.hosts[actor], h.hosts[actor], h'.hosts[actor], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherIdx:nat | c.ValidActorIdx(otherIdx) && otherIdx != actorIdx :: h'.hosts[otherIdx] == h.hosts[otherIdx])
+    && (forall otherIdx:nat | c.Validactor(otherIdx) && otherIdx != actor :: h'.hosts[otherIdx] == h.hosts[otherIdx])
   }
 
   datatype Step =
-    | HostActionStep(actorIdx: nat, msgOps: MessageOps)
+    | HostActionStep(actor: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
-    && HostAction(c, h, h', step.actorIdx, step.msgOps)
+    && HostAction(c, h, h', step.actor, step.msgOps)
     && Network.Next(n, n', step.msgOps)
   }
 
@@ -170,20 +170,19 @@ module DistributedSystem {
     requires v.WF(c)
   {
     && InitHosts(c, v.History(0))
-    && forall i | 
-      && 1 <= i < |v.history|
-    ::
-    Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
+    && forall i | v.ValidHistoryIdxStrict(i)
+      ::
+      Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
   }
 
   ghost predicate IsReceiveStepByActor(c: Constants, v: Variables, i:int, actor: int, msg: Message)
     requires v.WF(c)
-    requires 1 <= i < |v.history|
+    requires v.ValidHistoryIdxStrict(i)
     requires Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
   {
     var step :| NextStep(c, v.Truncate(c, i).Last(), v.Truncate(c, i+1).Last(), v.network, v.network, step);
     && step.msgOps.recv == Some(msg)
-    && step.actorIdx == actor
+    && step.actor == actor
   }
 
   lemma InitImpliesValidHistory(c: Constants, v: Variables)
@@ -193,6 +192,7 @@ module DistributedSystem {
     reveal_ValidHistory();
   }
 
+
   lemma InvNextValidHistory(c: Constants, v: Variables, v': Variables)
     requires v.WF(c)
     requires ValidHistory(c, v)
@@ -201,10 +201,10 @@ module DistributedSystem {
   {
     reveal_ValidHistory();
     VariableNextProperties(c, v, v');
-    forall i | 1 <= i < |v'.history|
+    forall i | v'.ValidHistoryIdxStrict(i)
     ensures Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1))
     {
-      if i == |v'.history| - 1 {
+      if i == |v'.history| - 2 {
         MessageContainmentPreservesNext(c, v, v', v'.Truncate(c, i), v'.Truncate(c, i+1));
         assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
       } else {

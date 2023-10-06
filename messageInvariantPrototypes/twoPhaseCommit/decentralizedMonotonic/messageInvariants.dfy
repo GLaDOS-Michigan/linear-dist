@@ -23,13 +23,13 @@ ghost predicate RecvVoteMsgValidity(c: Constants, v: Variables)
 {
   reveal_ValidHistory();
   forall i, idx, msg | 
-    && 1 <= i < |v.history|
+    && v.ValidHistoryIdxStrict(i)
     && c.ValidCoordinatorId(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)
     && msg.VoteMsg?
   :: 
     && msg in v.network.sentMsgs
-    && CoordinatorHost.NextReceiveStepRecvFunc(c.hosts[idx].coordinator, v.History(i-1).hosts[idx].coordinator, v.History(i).hosts[idx].coordinator, msg)
+    && CoordinatorHost.NextReceiveStepRecvFunc(c.hosts[idx].coordinator, v.History(i).hosts[idx].coordinator, v.History(i+1).hosts[idx].coordinator, msg)
 }
 
 // Every DecideMsg is sent according to a CoordinatorHost.NextDecisionStepSendFunc
@@ -54,13 +54,13 @@ ghost predicate RecvVoteReqMsgValidity(c: Constants, v: Variables)
 {
   reveal_ValidHistory();
   forall i, idx, msg| 
-    && 1 <= i < |v.history|
+    && v.ValidHistoryIdxStrict(i)
     && c.ValidParticipantId(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)
     && msg.VoteReqMsg?
   :: 
     && msg in v.network.sentMsgs
-    && ParticipantHost.NextReceiveVoteReqStepRecvFunc(c.hosts[idx].participant, v.History(i-1).hosts[idx].participant, v.History(i).hosts[idx].participant, msg)
+    && ParticipantHost.NextReceiveVoteReqStepRecvFunc(c.hosts[idx].participant, v.History(i).hosts[idx].participant, v.History(i+1).hosts[idx].participant, msg)
 }
 
 // Every DecideMsg is received according to ParticipantHost.NextReceiveDecisionStepRecvFunc
@@ -70,13 +70,13 @@ ghost predicate RecvDecideMsgValidity(c: Constants, v: Variables)
 {
   reveal_ValidHistory();
   forall i, idx, msg | 
-    && 1 <= i < |v.history|
+    && v.ValidHistoryIdxStrict(i)
     && c.ValidParticipantId(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)
     && msg.DecideMsg?
   :: 
     && msg in v.network.sentMsgs
-    && ParticipantHost.NextReceiveDecisionStepRecvFunc(c.hosts[idx].participant, v.History(i-1).hosts[idx].participant, v.History(i).hosts[idx].participant, msg)
+    && ParticipantHost.NextReceiveDecisionStepRecvFunc(c.hosts[idx].participant, v.History(i).hosts[idx].participant, v.History(i+1).hosts[idx].participant, msg)
 }
 
 // Every VoteMsg is sent according to ParticipantHost.NextSendVoteStepSendFunc

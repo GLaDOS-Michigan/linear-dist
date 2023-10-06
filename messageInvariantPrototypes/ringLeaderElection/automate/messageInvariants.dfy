@@ -36,12 +36,12 @@ ghost predicate ReceiveValidity(c: Constants, v: Variables)
 {
   reveal_ValidHistory();
   forall i, idx, msg | 
-    && 1 <= i < |v.history|
+    && v.ValidHistoryIdxStrict(i)
     && c.ValidIdx(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)
   :: 
     && msg in v.network.sentMsgs 
-    && Host.ReceiveMsg(c.hostConstants[idx], v.History(i-1).hosts[idx], v.History(i).hosts[idx], msg)
+    && Host.ReceiveMsg(c.hostConstants[idx], v.History(i).hosts[idx], v.History(i+1).hosts[idx], msg)
 }
 
 ghost predicate MessageInv(c: Constants, v: Variables)

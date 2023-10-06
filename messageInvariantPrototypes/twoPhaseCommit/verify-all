@@ -3,17 +3,17 @@
 echo "Verifying centralized"
 cd centralized
 ./verify
-cd -
+cd - > /dev/null
 echo ""
 
 echo "Verifying decentralized"
 cd decentralized
 ./verify
-cd - 
+cd - > /dev/null
 echo ""
 
 echo "Verifying decentralizedMonotonic"
 cd decentralizedMonotonic
 ./verify
-cd - 
+cd - > /dev/null
 echo ""

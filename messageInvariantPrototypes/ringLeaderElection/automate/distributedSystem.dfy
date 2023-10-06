@@ -89,13 +89,14 @@ module DistributedSystem {
       UtilitiesLibrary.Last(history)
     }
 
+    // Trucation is inclusive
     ghost function Truncate(c: Constants, i: int) : (v : Variables)
       requires WF(c)
-      requires 0 < i <= |history|
+      requires ValidHistoryIdx(i)
       ensures v.WF(c)
-      ensures v.Last() == History(i-1)
+      ensures v.Last() == History(i)
     {
-      Variables.Variables(history[..i], network)
+      Variables.Variables(history[..i+1], network)
     }
   } // end datatype Variables
 
@@ -147,15 +148,14 @@ module DistributedSystem {
     requires v.WF(c)
   {
     && InitHosts(c, v.History(0))
-    && forall i | 
-      && 1 <= i < |v.history|
-    ::
-    Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
+    && forall i | v.ValidHistoryIdxStrict(i)
+      ::
+      Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
   }
 
   ghost predicate IsReceiveStepByActor(c: Constants, v: Variables, i:int, actor: int, msg: Message)
     requires v.WF(c)
-    requires 1 <= i < |v.history|
+    requires v.ValidHistoryIdxStrict(i)
     requires Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
   {
     var step :| NextStep(c, v.Truncate(c, i).Last(), v.Truncate(c, i+1).Last(), v.network, v.network, step);
@@ -179,10 +179,10 @@ module DistributedSystem {
   {
     reveal_ValidHistory();
     VariableNextProperties(c, v, v');
-    forall i | 1 <= i < |v'.history|
+    forall i | v'.ValidHistoryIdxStrict(i)
     ensures Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1))
     {
-      if i == |v'.history| - 1 {
+      if i == |v'.history| - 2 {
         MessageContainmentPreservesNext(c, v, v', v'.Truncate(c, i), v'.Truncate(c, i+1));
         assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
       } else {

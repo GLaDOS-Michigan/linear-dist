@@ -38,13 +38,13 @@ ghost predicate ServerRecvValidity(c: Constants, v: Variables)
 {
   reveal_ValidHistory();
   forall i, idx, msg| 
-    && 1 <= i < |v.history|
+    && v.ValidHistoryIdxStrict(i)
     && c.ValidServerIdx(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)
     && msg.RequestMsg?
   :: 
     && msg in v.network.sentMsgs
-    && ServerHost.NextReceiveStepRecvFunc(c.hosts[idx].server, v.History(i-1).hosts[idx].server, v.History(i).hosts[idx].server, msg)
+    && ServerHost.NextReceiveStepRecvFunc(c.hosts[idx].server, v.History(i).hosts[idx].server, v.History(i+1).hosts[idx].server, msg)
 }
 
 // Send invariant
@@ -70,13 +70,13 @@ ghost predicate ClientRecvValidity(c: Constants, v: Variables)
 {
   reveal_ValidHistory();
   forall i, idx, msg| 
-    && 1 <= i < |v.history|
+    && v.ValidHistoryIdxStrict(i)
     && c.ValidClientIdx(idx)
     && IsReceiveStepByActor(c, v, i, idx, msg)
     && msg.ResponseMsg?
   :: 
     && msg in v.network.sentMsgs
-    && ClientHost.NextReceiveRespStepRecvFunc(c.hosts[idx].client, v.History(i-1).hosts[idx].client, v.History(i).hosts[idx].client, msg)
+    && ClientHost.NextReceiveRespStepRecvFunc(c.hosts[idx].client, v.History(i).hosts[idx].client, v.History(i+1).hosts[idx].client, msg)
 }
 
 
