@@ -79,7 +79,16 @@ module LeaderHost {
 
   ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
-    && msgOps.send == Some(Prepare(c.id))
+    && msgOps.send.Some?
+    && PrepareSendFunc(c, v, v', msgOps.send.value)
+  }
+
+  // Send predicate
+  ghost predicate PrepareSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && true
+    // send message and update v'
+    && msg == Prepare(c.id)
     && v' == v
   }
 
@@ -108,8 +117,16 @@ module LeaderHost {
 
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
+    && msgOps.send.Some?
+    && ProposeSendFunc(c, v, v', msgOps.send.value)
+  }
+
+  // Send predicate
+  ghost predicate ProposeSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
     && v.CanPropose(c)
-    && msgOps.send == Some(Propose(c.id, v.value))
+    // send message and update v'
+    && msg == Propose(c.id, v.value)
     && v' == v
   }
 
@@ -235,13 +252,25 @@ module AcceptorHost {
     && var bal := v.pendingPrepare.value.bal;
     && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
     && if doPromise then
-          && v' == v.(
-            promised := Some(bal),
-            pendingPrepare := None)
-          && msgOps.send == Some(Promise(bal, c.id, v.acceptedVB)) 
+          && msgOps.send.Some?
+          && PromiseSendFunc(c, v, v', msgOps.send.value)
         else
           && v' == v.(pendingPrepare := None)
           && msgOps.send == None
+  }
+
+  // Send predicate
+  ghost predicate PromiseSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
+    && v.pendingPrepare.Some?
+    && var bal := v.pendingPrepare.value.bal;
+    && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+    && doPromise
+    // send message and update v'
+    && v' == v.(
+            promised := Some(bal),
+            pendingPrepare := None)
+    && msg == Promise(bal, c.id, v.acceptedVB)
   }
 
   ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -263,10 +292,18 @@ module AcceptorHost {
   ghost predicate NextBroadcastAcceptedStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     && msgOps.recv == None
+    && msgOps.send.Some?
+    && AcceptSendFunc(c, v, v', msgOps.send.value)
+  }
+
+  // Send predicate
+  ghost predicate AcceptSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+    // enabling conditions
     && v.pendingPrepare.None?
     && v.acceptedVB.Some?
     && v.promised == Some(v.acceptedVB.value.b)
-    && msgOps.send == Some(Accept(v.acceptedVB.value, c.id))
+    // send message and update v'
+    && msg == Accept(v.acceptedVB.value, c.id)
     && v' == v
   }
 
@@ -287,8 +324,6 @@ module AcceptorHost {
     requires !step.MaybeAcceptStep?
     ensures v'.acceptedVB == v.acceptedVB
   {}
-
-
 }  // end module AcceptorHost
 
 
