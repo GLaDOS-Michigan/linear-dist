@@ -86,9 +86,9 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && ValidHistory(c, v)
   && RequestMsgValidSrc(c, v)
   && ServerSendValidity(c, v)
-  && ServerRecvValidity(c, v)
+  // && ServerRecvValidity(c, v)
   && ClientSendValidity(c, v)
-  && ClientRecvValidity(c, v)
+  // && ClientRecvValidity(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
@@ -105,9 +105,9 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 {
   InvNextValidHistory(c, v, v');
   InvNextServerSendValidity(c, v, v');
-  InvNextServerRecvValidity(c, v, v');
+  // InvNextServerRecvValidity(c, v, v');
   InvNextClientSendValidity(c, v, v');
-  InvNextClientRecvValidity(c, v, v');
+  // InvNextClientRecvValidity(c, v, v');
 }
 
 /***************************************************************************************

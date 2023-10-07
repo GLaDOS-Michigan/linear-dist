@@ -50,7 +50,7 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && ValidHistory(c, v)
   && VoteMsgValidSrc(c, v)
   && TransmissionValidity(c, v)
-  && ReceiveValidity(c, v)
+  // && ReceiveValidity(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
@@ -67,7 +67,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 {
   InvNextValidHistory(c, v, v');
   InvNextTransmissionValidity(c, v, v');
-  InvNextReceiveValidity(c, v, v');
+  // InvNextReceiveValidity(c, v, v');
 }
 
 

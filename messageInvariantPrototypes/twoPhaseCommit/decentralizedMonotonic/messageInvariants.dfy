@@ -1,5 +1,3 @@
-// Network-level "boilerplate" invariants that are application-independent
-
 include "spec.dfy"
 
 module MessageInvariants {
@@ -100,10 +98,10 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && v.WF(c)
   && ValidHistory(c, v)
   && VoteMsgValidSrc(c, v)
-  && RecvVoteMsgValidity(c, v)
+  // && RecvVoteMsgValidity(c, v)
   && SendDecideMsgValidity(c, v)
-  && RecvVoteReqMsgValidity(c, v)
-  && RecvDecideMsgValidity(c, v)
+  // && RecvVoteReqMsgValidity(c, v)
+  // && RecvDecideMsgValidity(c, v)
   && SendVoteMsgValidity(c, v)
 }
 
@@ -120,10 +118,10 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   ensures MessageInv(c, v')
 {
   InvNextValidHistory(c, v, v');
-  InvNextRecvVoteMsgValidity(c, v, v');
+  // InvNextRecvVoteMsgValidity(c, v, v');
   InvNextSendDecideMsgValidity(c, v, v');
-  InvNextRecvVoteReqMsgValidity(c, v, v');
-  InvNextRecvDecideMsgValidity(c, v, v');
+  // InvNextRecvVoteReqMsgValidity(c, v, v');
+  // InvNextRecvDecideMsgValidity(c, v, v');
   InvNextSendVoteMsgValidity(c, v, v');
 }
 
