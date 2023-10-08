@@ -17,3 +17,9 @@ cd decentralizedMonotonic
 ./verify
 cd - > /dev/null
 echo ""
+
+echo "Verifying decentralizedMonotonicTemplated"
+cd decentralizedMonotonicTemplated
+./verify
+cd - > /dev/null
+echo ""
