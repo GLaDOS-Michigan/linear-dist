@@ -236,7 +236,6 @@ module DistributedSystem {
     reveal_ValidHistory();
   }
 
-
   lemma InvNextValidHistory(c: Constants, v: Variables, v': Variables)
     requires v.WF(c)
     requires ValidHistory(c, v)

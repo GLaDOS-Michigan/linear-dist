@@ -410,16 +410,6 @@ ghost predicate LearnerReceivedAcceptsMonotonic(c: Constants, v: Variables)
     && v.History(i).learners[lnr].receivedAccepts[vb] <= v.History(j).learners[lnr].receivedAccepts[vb]
 }
 
-ghost predicate {:opaque} VariableNextPreserved(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  && InitHosts(c, v.History(0))
-  && forall i | 
-    && 1 <= i < |v.history|
-  ::
-  Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
-}
-
 // Monotonicity Bundle
 ghost predicate MonotonicityInv(c: Constants, v: Variables)
   requires v.WF(c)
@@ -429,7 +419,6 @@ ghost predicate MonotonicityInv(c: Constants, v: Variables)
   && AcceptorAcceptedMonotonic(c, v)
   && AcceptorPromisedMonotonic(c, v)
   && LearnerReceivedAcceptsMonotonic(c, v)
-  && VariableNextPreserved(c, v)
 }
 
 // Application bundle
@@ -480,9 +469,7 @@ lemma InitImpliesInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures Inv(c, v)
 {
-  assert VariableNextPreserved(c, v) by {
-    reveal_VariableNextPreserved();
-  }
+  InitImpliesMessageInv(c, v);
 }
 
 lemma InvInductive(c: Constants, v: Variables, v': Variables)
@@ -530,30 +517,6 @@ lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)
   ensures MonotonicityInv(c, v')
 {
   VariableNextProperties(c, v, v');
-  InvNextVariableNextPreserved(c, v, v');
-}
-
-lemma InvNextVariableNextPreserved(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires VariableNextPreserved(c, v)
-  requires Next(c, v, v')
-  ensures VariableNextPreserved(c, v')
-{
-  reveal_VariableNextPreserved();
-  VariableNextProperties(c, v, v');
-  forall i | 1 <= i < |v'.history|
-  ensures Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1))
-  {
-    if i == |v'.history| - 1 {
-      MessageContainmentPreservesNext(c, v, v', v'.Truncate(c, i), v'.Truncate(c, i+1));
-      assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
-    } else {
-      assert Next(c, v.Truncate(c, i), v.Truncate(c, i+1));
-      assert v.Truncate(c, i).network.sentMsgs <= v'.Truncate(c, i).network.sentMsgs;
-      MessageContainmentPreservesNext(c, v.Truncate(c, i), v.Truncate(c, i+1), v'.Truncate(c, i), v'.Truncate(c, i+1));
-      assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
-    }
-  }
 }
 
 lemma MessageContainmentPreservesNext(c: Constants, v: Variables, v': Variables, s: Variables, s': Variables)
@@ -942,7 +905,7 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
   requires ValidMessageSrc(c, v)
   requires ValidPromiseMessage(c, v)
   requires AcceptorPromisedMonotonic(c, v)
-  requires VariableNextPreserved(c, v)
+  requires ValidHistory(c, v)
   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires LeaderNotHeardImpliesNotPromised(c, v)
   requires Next(c, v, v')
@@ -975,7 +938,7 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
           assert IsPromiseMessage(v, msg);  // trigger
           var j: nat  :| PromiseMessageMatchesHistory(c, v, msg, j);    // witness
           assert 0 < j by {
-            reveal_VariableNextPreserved();
+            reveal_ValidHistory();
           }
           if v.History(j).acceptors[acc].HasAcceptedAtMostBal(b) {
             // Acceptor cannot accept between b and ldr
@@ -990,7 +953,7 @@ lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Va
 
 lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: AcceptorId, start: int, end: int, promised: LeaderId, acceptedAtMost: LeaderId)
   requires v.WF(c)
-  requires VariableNextPreserved(c, v)
+  requires ValidHistory(c, v)
   requires c.ValidAcceptorIdx(acc)
   requires v.ValidHistoryIdx(start)
   requires v.ValidHistoryIdx(end)
@@ -1006,8 +969,7 @@ lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: Ac
   :: 
     && v.History(i).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
 {
-  reveal_VariableNextPreserved();
-  if start < end-1 {
+  if start < end-1{
     NotHeardImpliesNotPromisedInHistorySeq(c, v, acc, start, end-1, promised, acceptedAtMost);
     forall i | 
       && start <= i <= end 
@@ -1016,9 +978,14 @@ lemma NotHeardImpliesNotPromisedInHistorySeq(c: Constants, v: Variables, acc: Ac
       && v.History(i).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost)
     {
       if i == end {
-        // trigger
-        assert v.History(end-1).acceptors[acc].HasAcceptedAtMostBal(acceptedAtMost); 
+        assert Next(c, v.Truncate(c, i-1), v.Truncate(c, i)) by {
+          reveal_ValidHistory();
+        }
       }
+    }
+  } else {
+    assert Next(c, v.Truncate(c, start), v.Truncate(c, end)) by {
+      reveal_ValidHistory();
     }
   }
 }
@@ -1085,7 +1052,7 @@ lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end:
   requires LeaderHighestHeardMonotonic(c, v)
   requires AcceptorAcceptedMonotonic(c, v)
   requires AcceptorPromisedMonotonic(c, v)
-  requires VariableNextPreserved(c, v)
+  requires ValidHistory(c, v)
   requires ValidMessageSrc(c, v)
   requires ValidPromiseMessage(c, v)
   
@@ -1125,10 +1092,8 @@ lemma AcceptedAndPromisedImpliesSeen(c: Constants, v: Variables, start:int, end:
       v.History(i).leaders[ldr].HeardAtLeast(acceptedVB.b)
     {
       if i == end {
-        if acc !in v.History(i-1).leaders[ldr].receivedPromises {
-          assert Next(c, v.Truncate(c, i), v.Truncate(c, i+1)) by {
-            reveal_VariableNextPreserved();
-          }
+        assert Next(c, v.Truncate(c, i-1), v.Truncate(c, i)) by {
+          reveal_ValidHistory();
         }
       }
     }

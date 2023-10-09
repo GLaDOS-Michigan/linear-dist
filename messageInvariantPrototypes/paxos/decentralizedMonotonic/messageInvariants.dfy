@@ -25,6 +25,7 @@ ghost predicate ValidMessageSrc(c: Constants, v: Variables)
 ghost predicate MessageInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
+  && ValidHistory(c, v)
   && ValidMessageSrc(c, v)
   // From Leader transitions
   && LeaderValidReceivedPromises(c, v)
@@ -43,6 +44,7 @@ lemma InitImpliesMessageInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures MessageInv(c, v)
 {
+  InitImpliesValidHistory(c, v);
 }
 
 lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
@@ -50,6 +52,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
 {
+  InvNextValidHistory(c, v, v');
   InvNextValidMessageSrc(c, v, v');
   InvNextLeaderValidReceivedPromises(c, v, v');
   InvNextLeaderValidHighestHeard(c, v, v');
@@ -341,18 +344,6 @@ ghost predicate IsProposeMessage(v: Variables, m: Message) {
 ghost predicate IsAcceptMessage(v: Variables, m: Message) {
   && m.Accept?
   && m in v.network.sentMsgs
-}
-
-lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires Next(c, v, v')
-  ensures 1 < |v'.history|
-  ensures |v.history| == |v'.history| - 1
-  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)
-  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)
-{
-  assert 0 < |v.history|;
-  assert 1 < |v'.history|;
 }
 
 lemma GetAcceptorSet(c: Constants, v: Variables)
