@@ -9,7 +9,7 @@ import opened Obligations
 
 // certified self-inductive
 // Every message in the network has a valid source
-ghost predicate ValidMessageSrc(c: Constants, v: Variables) 
+ghost predicate {:opaque} ValidMessageSrc(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs 
@@ -37,13 +37,14 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && ValidPromiseMessage(c, v)
   && ValidAcceptMessage(c, v)
   // From Learner transitions
-  && LearnerValidReceivedAccepts(c, v)
+  && LearnerValidReceivedAcceptMsgs(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures MessageInv(c, v)
 {
+  reveal_ValidMessageSrc();
   InitImpliesValidHistory(c, v);
 }
 
@@ -107,6 +108,7 @@ ghost predicate ValidProposeMesssage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
+  reveal_ValidMessageSrc();
   forall prop | IsProposeMessage(v, prop)
   ::
     (exists i ::
@@ -166,6 +168,7 @@ ghost predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: M
   requires ValidMessageSrc(c, v)
   requires IsPromiseMessage(v, prom)
 {
+  reveal_ValidMessageSrc();
   && v.ValidHistoryIdx(i)
   && v.History(i).acceptors[prom.acc].promised.Some?
   && prom.bal == v.History(i).acceptors[prom.acc].promised.value
@@ -179,6 +182,7 @@ ghost predicate ValidAcceptMessage(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
+  reveal_ValidMessageSrc();
   forall accept | IsAcceptMessage(v, accept)
   ::
   (exists i :: 
@@ -197,7 +201,7 @@ ghost predicate ValidAcceptMessage(c: Constants, v: Variables)
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
 // accepted ValBal pair
 // Property of Receive
-ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables) 
+ghost predicate LearnerValidReceivedAcceptMsgs(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, vb, acc, i | 
@@ -221,6 +225,7 @@ lemma InvNextValidMessageSrc(c: Constants, v: Variables, v': Variables)
   ensures ValidMessageSrc(c, v')
 {
   VariableNextProperties(c, v, v');
+  reveal_ValidMessageSrc();
 }
 
 lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
@@ -275,8 +280,10 @@ lemma InvNextValidPromiseMessage(c: Constants, v: Variables, v': Variables)
   requires ValidMessageSrc(c, v)
   requires ValidPromiseMessage(c, v)
   requires Next(c, v, v')
+  requires ValidMessageSrc(c, v')
   ensures ValidPromiseMessage(c, v')
 {
+  reveal_ValidMessageSrc();
   forall prom | IsPromiseMessage(v', prom)
   ensures
     exists i :: PromiseMessageMatchesHistory(c, v', prom, i)
@@ -315,9 +322,9 @@ lemma InvNextValidAcceptMessage(c: Constants, v: Variables, v': Variables)
 
 lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
-  requires LearnerValidReceivedAccepts(c, v)
+  requires LearnerValidReceivedAcceptMsgs(c, v)
   requires Next(c, v, v')
-  ensures LearnerValidReceivedAccepts(c, v')
+  ensures LearnerValidReceivedAcceptMsgs(c, v')
 {
   VariableNextProperties(c, v, v');
 }

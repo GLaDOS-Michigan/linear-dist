@@ -550,10 +550,8 @@ lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
 
 
 lemma InvNextOneValuePerBallotAcceptors(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires MessageInv(c, v) && MessageInv(c, v')
-  requires MonotonicityInv(c, v)
-  requires OneValuePerBallot(c, v)
+  requires Inv(c, v)
+  requires MessageInv(c, v')
   requires Next(c, v, v')
   ensures OneValuePerBallotAcceptors(c, v')
 {
@@ -581,8 +579,8 @@ lemma InvNextOneValuePerBallotAcceptors(c: Constants, v: Variables, v': Variable
 }
 
 lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c) && v'.WF(c)
   requires Inv(c, v)
-  requires MessageInv(c, v')
   requires Next(c, v, v')
   ensures OneValuePerBallotLearners(c, v')
 {
@@ -708,7 +706,6 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
   requires Next(c, v, v')
   ensures LearnedImpliesQuorumOfAccepts(c, v')
 {
-  VariableNextProperties(c, v, v');
   forall lnr:LearnerId, val:Value, i |
     && v'.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
@@ -718,7 +715,9 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
       && var vb := VB(val, b);
       && ChosenAtLearner(c, v'.History(i), vb, lnr)
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
+      reveal_ValidMessageSrc();
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       if  && dsStep.LearnerStep?
@@ -762,6 +761,7 @@ lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Va
   ensures AcceptorValidPromisedAndAccepted(c, v')
 {
   VariableNextProperties(c, v, v');
+  reveal_ValidMessageSrc();
 }
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
@@ -807,6 +807,7 @@ lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variabl
   ensures LeaderValidReceivedPromises(c, v')
 {
   VariableNextProperties(c, v, v');
+  reveal_ValidMessageSrc();
 }
 
 lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variables)
@@ -1280,6 +1281,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
       if acc !in choosingAccs {
         // In this case, by quorum intersection, acc must already be in ldr.receivePromises
         // Because, choosingAccs !! v.leaders[ldr].receivedPromises
+        reveal_ValidMessageSrc();
         var allAccs := GetAcceptorSet(c, v);
         var e := QuorumIntersection(allAccs, choosingAccs, h.leaders[ldr].receivedPromises + {acc});
         assert false;
