@@ -81,7 +81,7 @@ module Host {
   {
     && msg.src == c.ringPos
     && msg.val == max(v.highestHeard, c.hostId) // max of what I heard vs my own hostId
-     && v == v'
+    && v == v'
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
