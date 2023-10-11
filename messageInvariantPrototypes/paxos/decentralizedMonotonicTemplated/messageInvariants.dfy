@@ -9,7 +9,7 @@ import opened Obligations
 
 // certified self-inductive
 // Every message in the network has a valid source
-ghost predicate ValidMessageSrc(c: Constants, v: Variables) 
+ghost predicate {:opaque} ValidMessageSrc(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs 
@@ -39,6 +39,7 @@ lemma InitImpliesMessageInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures MessageInv(c, v)
 {
+  reveal_ValidMessageSrc();
   InitImpliesValidHistory(c, v);
 }
 
@@ -64,6 +65,7 @@ ghost predicate SendPrepareValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
+  reveal_ValidMessageSrc();
   forall msg | IsPrepareMessage(v, msg)
   :: 
   (exists i ::
@@ -77,6 +79,7 @@ ghost predicate SendProposeValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
+  reveal_ValidMessageSrc();
   forall msg | IsProposeMessage(v, msg)
   :: 
   (exists i ::
@@ -94,6 +97,7 @@ ghost predicate SendPromiseValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
+  reveal_ValidMessageSrc();
   forall msg | IsPromiseMessage(v, msg)
   :: 
   (exists i ::
@@ -107,6 +111,7 @@ ghost predicate SendAcceptValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
+  reveal_ValidMessageSrc();
   forall msg | IsAcceptMessage(v, msg)
   :: 
   (exists i ::
@@ -126,16 +131,18 @@ lemma InvNextValidMessageSrc(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures ValidMessageSrc(c, v')
 {
+  reveal_ValidMessageSrc();
   VariableNextProperties(c, v, v');
 }
 
 lemma InvNextSendPrepareValidity(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
   requires SendPrepareValidity(c, v)
   requires Next(c, v, v')
   ensures SendPrepareValidity(c, v')
 {
+  reveal_ValidMessageSrc();
   forall msg | IsPrepareMessage(v', msg)
   ensures
   (exists i ::
@@ -152,12 +159,13 @@ lemma InvNextSendPrepareValidity(c: Constants, v: Variables, v': Variables)
 }
 
 lemma InvNextSendProposeValidity(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
   requires SendProposeValidity(c, v)
   requires Next(c, v, v')
   ensures SendProposeValidity(c, v')
 {
+  reveal_ValidMessageSrc();
   forall msg | IsProposeMessage(v', msg)
   ensures
   (exists i ::
@@ -174,12 +182,13 @@ lemma InvNextSendProposeValidity(c: Constants, v: Variables, v': Variables)
 }
 
 lemma InvNextSendPromiseValidity(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
+  requires v.WF(c) && v'.WF(c)
+  requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
   requires SendPromiseValidity(c, v)
   requires Next(c, v, v')
   ensures SendPromiseValidity(c, v')
 {
+  reveal_ValidMessageSrc();
   forall msg | IsPromiseMessage(v', msg)
   ensures
   (exists i ::
@@ -202,6 +211,7 @@ lemma InvNextSendAcceptValidity(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures SendAcceptValidity(c, v')
 {
+  reveal_ValidMessageSrc();
   forall msg | IsAcceptMessage(v', msg)
   ensures
   (exists i ::
