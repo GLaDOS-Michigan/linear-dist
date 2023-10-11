@@ -622,9 +622,8 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
 }
 
 lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires v'.WF(c)
-  requires MessageInv(c, v')
+  requires Inv(c, v) && v'.WF(c)
+  requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
   requires LeaderCanProposeMonotonic(c, v')
   requires Next(c, v, v')
   ensures OneValuePerBallotLeaderAndLearners(c, v')
@@ -907,8 +906,8 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
 
   // v' requirements
   requires Next(c, v, v')
-  // requires LearnerValidReceivedAcceptMsgs(c, v')
-  // requires LeaderValidReceivedPromiseMsgs(c, v')
+  requires LearnerValidReceivedAcceptMsgs(c, v')  // custom receive invariant
+  requires LeaderValidReceivedPromiseMsgs(c, v')  // custom receive invariant
   requires SendAcceptValidity(c, v')
   requires SendPromiseValidity(c, v')
   requires AcceptorAcceptedMonotonic(c, v')
@@ -929,37 +928,24 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
     acc !in v'.History(i).learners[lnr].receivedAccepts[vb]
   {
     if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
-
-      // This is a receive invariant, from vb in v'.History(i).learners[lnr].receivedAccepts
-      assume Accept(vb, acc) in v'.network.sentMsgs;
-      
+      assert Accept(vb, acc) in v'.network.sentMsgs by {
+        reveal_LearnerValidReceivedAcceptMsgs();
+      }
       var j :|  && v'.ValidHistoryIdxStrict(j)    // via SendAcceptValidity
                 && v'.History(j).acceptors[acc].HasAccepted(vb)
                 && v'.History(j).acceptors[acc].HasPromised(vb.b);
       VariableNextProperties(c, v, v');
       assert v.ValidHistoryIdx(j);
       assert j < i;
-
-      assume exists prom ::   // from acc in v'.History(i).leaders[ldr].receivedPromises
-              && IsPromiseMessage(v', prom)
-              && prom.bal == ldr
-              && prom.acc == acc
-              && (prom.vbOpt.Some?
-                  ==> 
-                  && v'.History(i).leaders[ldr].highestHeardBallot.Some?
-                  && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
-              );
-
-      var prom :|    // from acc in v'.History(i).leaders[ldr].receivedPromises
-              && IsPromiseMessage(v', prom)
-              && prom.bal == ldr
-              && prom.acc == acc
-              && (prom.vbOpt.Some?
-                  ==> 
-                  && v'.History(i).leaders[ldr].highestHeardBallot.Some?
-                  && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
-      );
-
+      reveal_LeaderValidReceivedPromiseMsgs();
+      var prom :|   && IsPromiseMessage(v', prom)  // via LeaderValidReceivedPromiseMsgs
+                    && prom.bal == ldr
+                    && prom.acc == acc
+                    && (prom.vbOpt.Some?
+                        ==> 
+                        && v'.History(i).leaders[ldr].highestHeardBallot.Some?
+                        && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
+                    );
       var h :|  // from SendPromiseValidity
         && v'.ValidHistoryIdxStrict(h)
         && AcceptorHost.PromiseSendFunc(c.acceptorConstants[acc], v'.History(h).acceptors[acc], v'.History(h+1).acceptors[acc], prom);
