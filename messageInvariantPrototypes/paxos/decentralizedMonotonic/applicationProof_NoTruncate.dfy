@@ -261,24 +261,6 @@ ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Vari
     v.History(i).acceptors[acc].HasPromisedAtLeast(ldr)
 }
 
-// If an acceptor A accepted ballot b, and a leader L has highestHeardBallot < b, then 
-// L cannot have received a promise from A
-ghost predicate LeaderNotHeardImpliesNotPromised(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall ldr:LeaderId, acc:AcceptorId, b:LeaderId, i | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && c.ValidAcceptorIdx(acc)
-    && b < ldr
-    && v.History(i).acceptors[acc].HasAcceptedAtLeastBal(b)
-    // Tony: Did not have this line below, which this invariant false
-    && v.History(i).acceptors[acc].HasAcceptedAtMostBal(ldr)
-    && v.History(i).leaders[ldr].HeardAtMost(b)
-  ::
-    && acc !in v.History(i).leaders[ldr].receivedPromises
-}
-
 // For any leader L, if an acceptor A is in L.promises, then A cannot have accepted any
 // ballot b such that L.highestHeard < b < L
 ghost predicate LeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables)
@@ -438,7 +420,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LeaderHighestHeardUpperBound(c, v)
   && LeaderHearedImpliesProposed(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
-  && LeaderNotHeardImpliesNotPromised(c, v)
   && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -493,7 +474,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextLeaderHighestHeardUpperBound(c, v, v');
   InvNextLeaderHearedImpliesProposed(c, v, v');
   InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
-  InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
 
   InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
@@ -901,16 +881,6 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   }
 }
 
-lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures LeaderNotHeardImpliesNotPromised(c, v')
-{
-  // VariableNextProperties(c, v, v');
-  // reveal_ValidMessageSrc();
-  assume false;
-}
-
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
   // v requirements
@@ -959,8 +929,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
                   ==> 
                   && v'.History(i).leaders[ldr].highestHeardBallot.Some?
                   && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
-              );
-
+      );
       var h :| PromiseMessageMatchesHistory(c, v', prom, h);
       // if h <= j, violates AcceptorPromisedMonotonic. Else, violates AcceptorAcceptedMonotonic
       assert false;

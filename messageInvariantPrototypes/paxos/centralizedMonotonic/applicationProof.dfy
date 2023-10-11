@@ -260,24 +260,6 @@ ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Vari
     v.history[i].acceptors[acc].HasPromisedAtLeast(ldr)
 }
 
-// If an acceptor A accepted ballot b, and a leader L has highestHeardBallot < b, then 
-// L cannot have received a promise from A
-ghost predicate LeaderNotHeardImpliesNotPromised(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall ldr:LeaderId, acc:AcceptorId, b:LeaderId, i | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && c.ValidAcceptorIdx(acc)
-    && b < ldr
-    && v.history[i].acceptors[acc].HasAcceptedAtLeastBal(b)
-    // Tony: Did not have this line below, which this invariant false
-    && v.history[i].acceptors[acc].HasAcceptedAtMostBal(ldr)
-    && v.history[i].leaders[ldr].HeardAtMost(b)
-  ::
-    && acc !in v.history[i].leaders[ldr].receivedPromises
-}
-
 // For any leader L, if an acceptor A is in L.promises, then A cannot have accepted any
 // ballot b such that L.highestHeard < b < L
 ghost predicate LeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables)
@@ -355,7 +337,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LeaderHighestHeardUpperBound(c, v)
   && LeaderHearedImpliesProposed(c, v)
   && LeaderReceivedPromisesImpliesAcceptorState(c, v)
-  && LeaderNotHeardImpliesNotPromised(c, v)
   && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -393,11 +374,11 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextOneValuePerBallot(c, v, v');
   InvInductiveHelper1(c, v, v');
   InvInductiveHelper2(c, v, v');
+  InvInductiveHelper3(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
   InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
-  InvNextLeaderNotHeardImpliesNotPromised(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
   InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
@@ -426,41 +407,38 @@ ghost predicate HelperBundle1(c: Constants, v: Variables)
   && AcceptorAcceptedImpliesProposed(c, v)
 }
 
-lemma {:timeLimitMultiplier 2} InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires HelperBundle1(c, v)
+lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
   requires Next(c, v, v')
-  ensures HelperBundle1(c, v')
+  ensures LearnerValidReceivedAccepts(c, v')
+  ensures LearnerValidReceivedAcceptsKeys(c, v')
+  ensures LearnerReceivedAcceptImpliesProposed(c, v')
+  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
+  ensures AcceptorValidPromisedAndAccepted(c, v')
 {
-  assert LearnerValidReceivedAccepts(c, v');
-  assert LearnerValidReceivedAcceptsKeys(c, v');
-  assert LearnerReceivedAcceptImpliesProposed(c, v');
   assert AcceptorValidPromisedAndAccepted(c, v');
-  assert AcceptorAcceptedImpliesProposed(c, v');
 }
 
-// Bundle for simple-to-prove invariants that needs no dafny proof
-ghost predicate HelperBundle2(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  && LeaderValidReceivedPromises(c, v)
-  && LeaderHighestHeardUpperBound(c, v)
-  && LeaderHearedImpliesProposed(c, v)
-}
-
-// Bundle for simple-to-prove invariants that needs no dafny proof, as bundle1 is overloaded
-lemma InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires AcceptorValidPromisedAndAccepted(c, v)
-  requires AcceptorAcceptedImpliesProposed(c, v)
-  requires AcceptorPromisedLargerThanAccepted(c, v)
-  requires HelperBundle2(c, v)
+lemma  InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
   requires Next(c, v, v')
-  ensures HelperBundle2(c, v')
+  ensures AcceptorAcceptedImpliesProposed(c, v')
+  ensures AcceptorPromisedLargerThanAccepted(c, v')
+  ensures LeaderValidReceivedPromises(c, v')
+  ensures LeaderHighestHeardUpperBound(c, v')
+{}
+
+lemma InvInductiveHelper3(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')
+  requires AcceptorAcceptedImpliesProposed(c, v')
+  requires AcceptorPromisedLargerThanAccepted(c, v')
+  ensures LeaderHearedImpliesProposed(c, v')
+  ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
 {
-  assert LeaderValidReceivedPromises(c, v');
-  assert LeaderHighestHeardUpperBound(c, v');
   assert LeaderHearedImpliesProposed(c, v');
+  assert LeaderReceivedPromisesImpliesAcceptorState(c, v');
 }
 
 lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
@@ -550,21 +528,8 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   // This needs its own lemma to avoid timeout
 }
 
-lemma InvNextLeaderNotHeardImpliesNotPromised(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires LeaderNotHeardImpliesNotPromised(c, v)
-  requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
-  requires Next(c, v, v')
-  ensures LeaderNotHeardImpliesNotPromised(c, v')
-{
-  // This needs its own lemma to avoid timeout
-}
-
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires LearnerReceivedAcceptImpliesAccepted(c, v)
-  requires LeaderNotHeardImpliesNotPromised(c, v)
-  requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
+  requires Inv(c, v)
   requires Next(c, v, v')
   ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
 {}
