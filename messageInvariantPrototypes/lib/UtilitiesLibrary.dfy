@@ -157,6 +157,16 @@ module UtilitiesLibrary {
     assume {:axiom} false;  // TODO
     e :| e in S1 && e in S2;
   }
+  
+  lemma QuorumIntersectionFlexible<T>(cluster: set<T>, S1: set<T>, S2: set<T>) returns (e: T) 
+    requires |S1| + |S2| > |cluster|
+    requires S1 <= cluster
+    requires S2 <= cluster
+    ensures e in S1 && e in S2
+  {
+    assume {:axiom} false;  // TODO
+    e :| e in S1 && e in S2;
+  }
 
   ghost function {:opaque} MapRemoveOne<K,V>(m:map<K,V>, key:K) : (m':map<K,V>)
     ensures forall k :: k in m && k != key ==> k in m'
