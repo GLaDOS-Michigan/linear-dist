@@ -29,21 +29,6 @@ ghost predicate TransmissionValidity(c: Constants, v: Variables)
   )
 }
 
-// Every host state on receive step is updated according to a fixed function
-ghost predicate ReceiveValidity(c: Constants, v: Variables) 
-  requires v.WF(c)
-  requires ValidHistory(c, v)
-{
-  reveal_ValidHistory();
-  forall i, idx, msg | 
-    && v.ValidHistoryIdxStrict(i)
-    && c.ValidIdx(idx)
-    && IsReceiveStepByActor(c, v, i, idx, msg)
-  :: 
-    && msg in v.network.sentMsgs 
-    && Host.ReceiveMsg(c.hostConstants[idx], v.History(i).hosts[idx], v.History(i+1).hosts[idx], msg)
-}
-
 ghost predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
@@ -67,7 +52,6 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 {
   InvNextValidHistory(c, v, v');
   InvNextTransmissionValidity(c, v, v');
-  // InvNextReceiveValidity(c, v, v');
 }
 
 
@@ -94,16 +78,6 @@ lemma InvNextTransmissionValidity(c: Constants, v: Variables, v': Variables)
       assert Host.SendMsg(c.hostConstants[msg.src], v'.History(i).hosts[msg.src], v'.History(i+1).hosts[msg.src], msg);
     }
   }
-}
-
-lemma InvNextReceiveValidity(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires ValidHistory(c, v) && ValidHistory(c, v')
-  requires ReceiveValidity(c, v)
-  requires Next(c, v, v')
-  ensures ReceiveValidity(c, v')
-{
-  VariableNextProperties(c, v, v');
 }
 } // end module MessageInvariants
 
