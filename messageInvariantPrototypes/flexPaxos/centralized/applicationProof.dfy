@@ -504,7 +504,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP1bStep(c: Constants, 
             }
           }
           var allAccs := GetAcceptorSet(c, v);
-          var e := QuorumIntersectionFlexible(allAccs, choosingAccs, v.leaders[ldr].receivedPromises + {acc});
+          var e := QuorumIntersection(allAccs, choosingAccs, v.leaders[ldr].receivedPromises + {acc});
           assert false;
         }        
       }
@@ -541,7 +541,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotP2bStep(c: Constants, 
     if !v.leaders[ldr].HeardAtLeast(vb.b) {
       // Contradiction via quorum intersection, and LeaderHighestHeardToPromisedRangeHasNoAccepts
       var allAccs := GetAcceptorSet(c, v);
-      var e := QuorumIntersectionFlexible(allAccs, choosingAccs, v.leaders[ldr].receivedPromises);
+      var e := QuorumIntersection(allAccs, choosingAccs, v.leaders[ldr].receivedPromises);
       assert false;
     }
   }

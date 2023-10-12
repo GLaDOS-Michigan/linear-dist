@@ -146,26 +146,29 @@ module UtilitiesLibrary {
   ghost predicate SetIsQuorum<T>(clusterSize: nat, S: set<T>) {
     |S| > clusterSize / 2
   }
-
-  lemma QuorumIntersection<T>(cluster: set<T>, S1: set<T>, S2: set<T>) returns (e: T) 
-    requires SetIsQuorum(|cluster|, S1)
-    requires SetIsQuorum(|cluster|, S2)
-    requires S1 <= cluster
-    requires S2 <= cluster
-    ensures e in S1 && e in S2
-  {
-    assume {:axiom} false;  // TODO
-    e :| e in S1 && e in S2;
-  }
   
-  lemma QuorumIntersectionFlexible<T>(cluster: set<T>, S1: set<T>, S2: set<T>) returns (e: T) 
+  lemma QuorumIntersection<T>(cluster: set<T>, S1: set<T>, S2: set<T>) returns (e: T) 
     requires |S1| + |S2| > |cluster|
     requires S1 <= cluster
     requires S2 <= cluster
     ensures e in S1 && e in S2
   {
-    assume {:axiom} false;  // TODO
-    e :| e in S1 && e in S2;
+    var overlap := S1 * S2;
+    assert overlap != {} by {
+      // Pigeonhole principle: since |S1| + |S2| > |cluster| then at least 1 T element is in both S1 & S2 i.e., a non-empty overlap.
+      if overlap == {} {
+        DisjointSetUnionCardinality(S1, S2);
+        SetContainmentCardinality(S1+S2, cluster);
+      }
+    }
+    e :| e in overlap; // Picks one arbitrary element from overlap set.
+  }
+
+  lemma DisjointSetUnionCardinality<T>(S1: set<T>, S2: set<T>) 
+    requires S1 * S2 == {}
+    ensures |S1| + |S2| == |S1 + S2|
+  {
+    assume false;
   }
 
   ghost function {:opaque} MapRemoveOne<K,V>(m:map<K,V>, key:K) : (m':map<K,V>)
