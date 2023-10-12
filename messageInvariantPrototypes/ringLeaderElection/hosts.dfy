@@ -5,7 +5,11 @@ module Types {
 
   type HostId = nat
 
-  datatype Message = Msg(val: nat, src: nat)  // A host can receive if its ringPos == succ(src)
+  datatype Message = Msg(val: nat, src: nat) {
+    ghost function Src() : nat {
+      src
+    }
+  }
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 } // end module Types

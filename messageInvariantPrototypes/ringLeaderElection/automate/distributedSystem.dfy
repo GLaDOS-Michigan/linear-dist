@@ -134,13 +134,28 @@ module DistributedSystem {
 *                                 History properties                                   *
 ***************************************************************************************/
 
+  // All msg have a valid source
+  ghost predicate ValidMessages(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    forall msg | msg in v.network.sentMsgs
+    :: c.ValidIdx(msg.Src())
+  }
+
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && InitHosts(c, v.History(0))
+    InitHosts(c, v.History(0))
+  }
+  
+  ghost predicate ValidVariables(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    && ValidMessages(c, v)
+    && ValidHistory(c, v)
   }
 
-  lemma InitImpliesValidHistory(c: Constants, v: Variables)
+  lemma InitImpliesValidVariables(c: Constants, v: Variables)
     requires Init(c, v)
     ensures ValidHistory(c, v)
   {
@@ -148,7 +163,7 @@ module DistributedSystem {
   }
 
 
-  lemma InvNextValidHistory(c: Constants, v: Variables, v': Variables)
+  lemma InvNextValidVariables(c: Constants, v: Variables, v': Variables)
     requires v.WF(c)
     requires ValidHistory(c, v)
     requires Next(c, v, v')

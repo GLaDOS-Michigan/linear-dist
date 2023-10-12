@@ -104,7 +104,7 @@ namespace Microsoft.Dafny
       res += VariableNextProperties + "\n";
       res += "} // end module MessageInvariants\n"; // close MessageInvariants module
       return res;
-    }
+    }  // end function ToString
   } // end class MessageInvariantsFile
 
 
