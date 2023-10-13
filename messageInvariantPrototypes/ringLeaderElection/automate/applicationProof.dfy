@@ -1,4 +1,4 @@
-include "messageInvariants.dfy"
+include "messageInvariantsAutogen.dfy"
 
 module RingLeaderElectionProof {
 import opened Types
