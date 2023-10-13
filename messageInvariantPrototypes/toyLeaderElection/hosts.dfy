@@ -6,7 +6,15 @@ module Types {
   type HostId = nat
 
   datatype Message =
-    VoteReq(candidate: HostId) | Vote(voter: HostId, candidate: HostId)
+    VoteReq(candidate: HostId) | Vote(voter: HostId, candidate: HostId) 
+  {
+    ghost function Src() : nat {
+      match this {
+        case VoteReq(candidate) => candidate
+        case Vote(voter, _) => voter
+      }
+    }
+  }
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 }
@@ -99,11 +107,13 @@ module Host {
   ghost predicate NextHostSendVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && VoteReqSendFunc(c, v, v', msgOps.send.value)
+    && SendVoteReq(c, v, v', msgOps.send.value)
   }
 
-  // Send predicate
-  ghost predicate VoteReqSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  /***
+      sendPredicate: hosts, VoteReq
+  ***/
+  ghost predicate SendVoteReq(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.nominee.Some?
     && v.nominee.value == c.hostId
@@ -130,11 +140,13 @@ module Host {
   ghost predicate NextHostSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && VoteSendFunc(c, v, v', msgOps.send.value)
+    && SendVote(c, v, v', msgOps.send.value)
   }
 
-  // Send predicate
-  ghost predicate VoteSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  /***
+      sendPredicate: hosts, Vote
+  ***/
+  ghost predicate SendVote(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.nominee.Some?
     // send message and update v'
