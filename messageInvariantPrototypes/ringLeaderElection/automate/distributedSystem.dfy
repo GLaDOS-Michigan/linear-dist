@@ -32,18 +32,18 @@ module DistributedSystem {
   import Host
 
   datatype Constants = Constants(
-    hostConstants: seq<Host.Constants>)
+    hosts: seq<Host.Constants>)
   {
     ghost predicate ValidIdx(id: int) {
-      0 <= id < |hostConstants|
+      0 <= id < |hosts|
     }
 
     ghost predicate UniqueIds() {
-      forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i].hostId == hostConstants[j].hostId :: i == j
+      forall i, j | ValidIdx(i) && ValidIdx(j) && hosts[i].hostId == hosts[j].hostId :: i == j
     }
 
     ghost predicate WF() {
-      && 0 < |hostConstants|
+      && 0 < |hosts|
       && UniqueIds()
     }
   }
@@ -53,7 +53,7 @@ module DistributedSystem {
   ) {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hostConstants, hosts)
+      && Host.GroupWF(c.hosts, hosts)
     }
   }
 
@@ -92,7 +92,7 @@ module DistributedSystem {
 
   ghost predicate InitHosts(c: Constants, h: Hosts)
   {
-    Host.GroupInit(c.hostConstants, h.hosts)
+    Host.GroupInit(c.hosts, h.hosts)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -107,7 +107,7 @@ module DistributedSystem {
     requires h.WF(c) && h'.WF(c)
   {
     && c.ValidIdx(actorIdx)
-    && Host.Next(c.hostConstants[actorIdx], h.hosts[actorIdx], h'.hosts[actorIdx], msgOps)
+    && Host.Next(c.hosts[actorIdx], h.hosts[actorIdx], h'.hosts[actorIdx], msgOps)
     // all other hosts UNCHANGED
     && (forall otherHostIdx | c.ValidIdx(otherHostIdx) && otherHostIdx != actorIdx :: h'.hosts[otherHostIdx] == h.hosts[otherHostIdx])
   }

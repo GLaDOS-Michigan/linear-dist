@@ -52,10 +52,10 @@ ghost predicate ChordDominates(c: Constants, v: Variables)
       && c.ValidIdx(src)
       && c.ValidIdx(dst)
       && c.ValidIdx(mid)
-      && v.History(i).hosts[dst].highestHeard == c.hostConstants[src].hostId
+      && v.History(i).hosts[dst].highestHeard == c.hosts[src].hostId
       && Between(src, mid, dst)
     :: 
-      c.hostConstants[mid].hostId < c.hostConstants[src].hostId
+      c.hosts[mid].hostId < c.hosts[src].hostId
 }
 
 
@@ -101,10 +101,10 @@ lemma ChordDominatesInductive(c: Constants, v: Variables, v': Variables)
       && c.ValidIdx(src)
       && c.ValidIdx(dst)
       && c.ValidIdx(mid)
-      && v'.History(i).hosts[dst].highestHeard == c.hostConstants[src].hostId
+      && v'.History(i).hosts[dst].highestHeard == c.hosts[src].hostId
       && Between(src, mid, dst)
   ensures
-      c.hostConstants[mid].hostId < c.hostConstants[src].hostId
+      c.hosts[mid].hostId < c.hosts[src].hostId
   {
     VariableNextProperties(c, v, v');
   }

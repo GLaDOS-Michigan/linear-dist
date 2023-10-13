@@ -9,7 +9,7 @@ ghost predicate IsLeader(c: Constants, h: Hosts, idx: nat)
   requires h.WF(c)
   requires c.ValidIdx(idx)
 {
-  h.hosts[idx].highestHeard == c.hostConstants[idx].hostId
+  h.hosts[idx].highestHeard == c.hosts[idx].hostId
 }
 
 ghost predicate Safety(c: Constants, v: Variables) 

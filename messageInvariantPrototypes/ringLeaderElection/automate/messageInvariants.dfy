@@ -1,5 +1,3 @@
-// Network-level "boilerplate" invariants that are application-independent
-
 include "spec.dfy"
 
 module MessageInvariants {
@@ -17,7 +15,7 @@ ghost predicate SendMsgValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && Host.SendMsg(c.hostConstants[msg.src], v.History(i).hosts[msg.src], v.History(i+1).hosts[msg.src], msg)
+      && Host.SendMsg(c.hosts[msg.src], v.History(i).hosts[msg.src], v.History(i+1).hosts[msg.src], msg)
   )
 }
 
@@ -60,12 +58,12 @@ lemma InvNextSendMsgValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && Host.SendMsg(c.hostConstants[msg.src], v'.History(i).hosts[msg.src], v'.History(i+1).hosts[msg.src], msg)
+      && Host.SendMsg(c.hosts[msg.src], v'.History(i).hosts[msg.src], v'.History(i+1).hosts[msg.src], msg)
   ) {
     if msg !in v.network.sentMsgs {
       // witness and trigger
       var i := |v.history|-1;
-      assert Host.SendMsg(c.hostConstants[msg.src], v'.History(i).hosts[msg.src], v'.History(i+1).hosts[msg.src], msg);
+      assert Host.SendMsg(c.hosts[msg.src], v'.History(i).hosts[msg.src], v'.History(i+1).hosts[msg.src], msg);
     }
   }
 }

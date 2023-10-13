@@ -81,7 +81,7 @@ module Host {
   }
 
   /***
-      sendPredicate: hosts,
+      sendPredicate: hosts, Msg
   ***/
   ghost predicate SendMsg(c: Constants, v: Variables, v': Variables, msg: Message)
   {
