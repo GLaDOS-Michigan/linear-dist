@@ -80,7 +80,9 @@ module Host {
     && SendMsg(c, v, v', msgOps.send.value)
   }
 
-  // Send predicate
+  /***
+      sendPredicate: hosts,
+  ***/
   ghost predicate SendMsg(c: Constants, v: Variables, v': Variables, msg: Message)
   {
     && msg.src == c.ringPos
