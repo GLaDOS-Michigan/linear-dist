@@ -87,15 +87,6 @@ module DistributedSystem {
     {
       UtilitiesLibrary.Last(history)
     }
-
-    ghost function Truncate(c: Constants, i: int) : (v : Variables)
-      requires WF(c)
-      requires ValidHistoryIdx(i)
-      ensures v.WF(c)
-      ensures v.Last() == History(i)
-    {
-      Variables.Variables(history[..i+1], network)
-    }
   } // end datatype Variables
 
   ghost predicate InitHosts(c: Constants, h: Hosts)
@@ -146,19 +137,6 @@ module DistributedSystem {
     requires v.WF(c)
   {
     && InitHosts(c, v.History(0))
-    && forall i | v.ValidHistoryIdxStrict(i)
-      ::
-      Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
-  }
-
-  ghost predicate IsReceiveStepByActor(c: Constants, v: Variables, i:int, actor: int, msg: Message)
-    requires v.WF(c)
-    requires v.ValidHistoryIdxStrict(i)
-    requires Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
-  {
-    var step :| NextStep(c, v.Truncate(c, i).Last(), v.Truncate(c, i+1).Last(), v.network, v.network, step);
-    && step.msgOps.recv == Some(msg)
-    && step.actor == actor
   }
 
   lemma InitImpliesValidHistory(c: Constants, v: Variables)
@@ -177,33 +155,6 @@ module DistributedSystem {
   {
     reveal_ValidHistory();
     VariableNextProperties(c, v, v');
-    forall i | v'.ValidHistoryIdxStrict(i)
-    ensures Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1))
-    {
-      if i == |v'.history| - 2 {
-        MessageContainmentPreservesNext(c, v, v', v'.Truncate(c, i), v'.Truncate(c, i+1));
-        assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
-      } else {
-        assert Next(c, v.Truncate(c, i), v.Truncate(c, i+1));
-        assert v.Truncate(c, i).network.sentMsgs <= v'.Truncate(c, i).network.sentMsgs;
-        MessageContainmentPreservesNext(c, v.Truncate(c, i), v.Truncate(c, i+1), v'.Truncate(c, i), v'.Truncate(c, i+1));
-        assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
-      }
-    }
-  }
-
-  lemma MessageContainmentPreservesNext(c: Constants, v: Variables, v': Variables, s: Variables, s': Variables)
-    requires v.WF(c)
-    requires s.WF(c)
-    requires Next(c, v, v')
-    requires v.history == s.history
-    requires v'.history == s'.history
-    requires v'.network.sentMsgs <= s'.network.sentMsgs
-    requires s.network.sentMsgs == s'.network.sentMsgs
-    ensures Next(c, s, s')
-  {
-    var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-    assert NextStep(c, s.Last(), s'.Last(), s.network, s'.network, dsStep); // trigger
   }
 
   lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)
