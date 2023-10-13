@@ -27,7 +27,7 @@ def parse(hosts_file):
     return res
 
 """Returns Module"""
-def parse_module(module_lines):
+def parse_module(module_lines: [str]):
     module = msgInv.Module("".join(module_lines))
 
     # Scan for Send Predicates

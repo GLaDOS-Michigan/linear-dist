@@ -20,29 +20,6 @@ includes = ["spec.dfy"]
 imports = ["Types", "UtilitiesLibrary", "DistributedSystem", "Obligations"]
 
 
-class Module:
-    def __init__(self, raw, name="mod_name"):
-        self.raw_string = raw
-        self.name = name
-        self.send_predicates = []
-    
-    def add_predicate(self, new_pred):
-        self.send_predicates.append(new_pred)
-
-    def get_send_predicates(self):
-        return self.send_predicates
-
-    def __str__(self):
-        res = []
-        res.append("module " + self.name + ":")
-        if len(self.send_predicates) == 0:
-            res.append("   " + "no send predicates")
-        
-        for sp in self.send_predicates:
-            res.append("   " + sp.__str__())
-        res.append("")
-        return "\n".join(res)
-
 class SendPredicate:
     def __init__(self, module_name: str, name = "sp_name", hosts_field = "hosts", msg_cons ="Msg"):
         self.name = name
@@ -89,9 +66,34 @@ class SendPredicate:
     def __str__(self):
         return self.name + ": " + self.host_field + ", " + self.msg_cons
 
+
+class Module:
+    def __init__(self, raw: str, name="mod_name"):
+        self.raw_string = raw
+        self.name = name
+        self.send_predicates = []
+    
+    def add_predicate(self, new_pred: SendPredicate):
+        self.send_predicates.append(new_pred)
+
+    def get_send_predicates(self):
+        return self.send_predicates
+
+    def __str__(self):
+        res = []
+        res.append("module " + self.name + ":")
+        if len(self.send_predicates) == 0:
+            res.append("   " + "no send predicates")
+        
+        for sp in self.send_predicates:
+            res.append("   " + sp.__str__())
+        res.append("")
+        return "\n".join(res)
+
+
 class MessageInvariantsFile:
 
-    def __init__(self, modules):
+    def __init__(self, modules: [Module]):
         self.modules = modules
 
     def to_dafny_string(self):
