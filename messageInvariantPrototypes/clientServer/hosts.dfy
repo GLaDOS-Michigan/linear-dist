@@ -58,11 +58,11 @@ module ServerHost {
   ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && NextProcessStepSendFunc(c, v, v', msgOps.send.value)
+    && SendResponseMsg(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate NextProcessStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendResponseMsg(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.currentRequest.Some?
     // send message and update v'
@@ -120,11 +120,11 @@ module ClientHost {
   ghost predicate NextRequestStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && NextRequestStepSendFunc(c, v, v', msgOps.send.value)
+    && SendRequestMsg(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate NextRequestStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendRequestMsg(c: Constants, v: Variables, v': Variables, msg: Message) {
     // send message and update v'
     && msg.RequestMsg?
     && msg.r.clientId == c.clientId

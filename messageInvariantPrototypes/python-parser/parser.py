@@ -52,6 +52,7 @@ def parse_module(module_lines: [str]):
     return module
 
 def main():
+    # Takes a hosts.dfy file as argument
     args = sys.argv[1:]
     host_file = args[0]
     with open(host_file, "r+") as host_file:
