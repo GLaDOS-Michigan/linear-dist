@@ -50,7 +50,6 @@ ghost predicate ReceivedVotesValid(c: Constants, v: Variables)
     v.History(i).hosts[h].receivedVotes <= (set x | 0 <= x < |c.hosts|)
 }
 
-// Note that this becomes a message invariant in the async networked version
 ghost predicate IsLeaderImpliesHasQuorum(c: Constants, v: Variables)
   requires v.WF(c)
 {
