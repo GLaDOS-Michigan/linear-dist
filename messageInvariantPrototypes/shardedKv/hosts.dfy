@@ -94,7 +94,7 @@ module Host {
     // Update v'
     && v'.myKeys == (map k | k in v.myKeys && k != v.nextKeyToSend :: v.myKeys[k])
     && v'.nextDst in c.hostIds
-    && v'.nextKeyToSend in v'.myKeys.Keys
+    && v'.HasKey(v'.nextKeyToSend)
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -102,7 +102,7 @@ module Host {
     && msgOps.recv.Some?
     && var msg := msgOps.recv.value;
     && msg.dst == c.myId
-    && (msg.key.key in v.myKeys ==> msg.key.version > v.myKeys[msg.key.key])
+    && (v.HasKey(msg.key.key) ==> msg.key.version > v.myKeys[msg.key.key])
     && v' == v.(
       myKeys := v.myKeys[msg.key.key := msg.key.version]
     )
