@@ -13,8 +13,8 @@ module Host {
   }
 
   datatype Variables = Variables(
-    myKeys: map<Key, nat>,
-    nextKeyToSend: Key,   // set of keys to transfer to dest
+    myKeys: map<Key, Entry>,   // is the key live, and the version number
+    nextKeyToSend: Key,        // next key to transfer to dest
     nextDst: HostId
   )
   {
@@ -23,7 +23,12 @@ module Host {
     }
 
     ghost predicate HasKey(k: Key) {
-      k in myKeys
+      && k in myKeys
+    }
+
+    ghost predicate HasLiveKey(k: Key) {
+      && k in myKeys
+      && myKeys[k].live
     }
   }
 
@@ -45,20 +50,23 @@ module Host {
   ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>) {
     && GroupWF(grp_c, grp_v)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
-    // Hosts have disjoint keys
+    // Hosts have disjoint live keys
     && (forall k: Key, i, j | 
           && 0 <= i < |grp_c|
           && 0 <= j < |grp_c|
-          && grp_v[i].HasKey(k) 
-          && grp_v[j].HasKey(k) 
+          && grp_v[i].HasLiveKey(k) 
+          && grp_v[j].HasLiveKey(k) 
         :: i == j)
+    // Each host have every key
+    && (forall k: Key, i: HostId | 0 <= i < |grp_c| ::
+          grp_v[i].HasKey(k))
   }
 
   ghost predicate Init(c: Constants, v: Variables)
   {
     && 0 < |v.myKeys|
-    && (forall k | k in v.myKeys :: v.myKeys[k] == 0)
-    && v.nextKeyToSend in v.myKeys.Keys
+    && (forall k | k in v.myKeys :: v.myKeys[k].version == 0)
+    && v.HasLiveKey(v.nextKeyToSend)
     && v.nextDst in c.hostIds
   }
 
@@ -86,15 +94,16 @@ module Host {
   {
     // Enabling conditions
     && 0 < |v.myKeys| 
-    && v.nextKeyToSend in v.myKeys.Keys
+    && v.HasLiveKey(v.nextKeyToSend)
     && v.nextDst in c.hostIds
     // Construct message
-    && var entry := Entry(v.nextKeyToSend, v.myKeys[v.nextKeyToSend]+1);  // increment version
-    && msg == Reconf(c.myId, v.nextDst, entry)
+    && msg == Reconf(c.myId, v.nextDst, v.nextKeyToSend, v.myKeys[v.nextKeyToSend].version+1) // increment version
     // Update v'
-    && v'.myKeys == (map k | k in v.myKeys && k != v.nextKeyToSend :: v.myKeys[k])
+    && v'.myKeys == 
+        (map k | k in v.myKeys
+          :: if k != v.nextKeyToSend then v.myKeys[k] else Entry(false, v.myKeys[k].version))
     && v'.nextDst in c.hostIds
-    && v'.HasKey(v'.nextKeyToSend)
+    && v'.HasLiveKey(v'.nextKeyToSend)
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -102,9 +111,9 @@ module Host {
     && msgOps.recv.Some?
     && var msg := msgOps.recv.value;
     && msg.dst == c.myId
-    && (v.HasKey(msg.key.key) ==> msg.key.version > v.myKeys[msg.key.key])
+    && (v.HasKey(msg.key) ==> msg.version > v.myKeys[msg.key].version)
     && v' == v.(
-      myKeys := v.myKeys[msg.key.key := msg.key.version]
+      myKeys := v.myKeys[msg.key := Entry(true, msg.version)]
     )
   }
 

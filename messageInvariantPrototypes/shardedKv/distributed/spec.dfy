@@ -12,8 +12,8 @@ module Obligations {
   forall idx1, idx2, k: Key | 
     && c.ValidIdx(idx1) 
     && c.ValidIdx(idx2) 
-    && v.hosts[idx1].HasKey(k)
-    && v.hosts[idx2].HasKey(k)
+    && v.hosts[idx1].HasLiveKey(k)
+    && v.hosts[idx2].HasLiveKey(k)
     :: idx1 == idx2
   }
 }
