@@ -25,18 +25,18 @@ module DistributedSystem {
   import Host
 
   datatype Constants = Constants(
-    hostConstants: seq<Host.Constants>)
+    hosts: seq<Host.Constants>)
   {
     ghost predicate ValidIdx(id: int) {
-      0 <= id < |hostConstants|
+      0 <= id < |hosts|
     }
 
     ghost predicate UniqueIds() {
-      forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i].myId == hostConstants[j].myId :: i == j
+      forall i, j | ValidIdx(i) && ValidIdx(j) && hosts[i].myId == hosts[j].myId :: i == j
     }
 
     ghost predicate WF() {
-      && 0 < |hostConstants|
+      && 0 < |hosts|
       && UniqueIds()
     }
   }
@@ -47,32 +47,32 @@ module DistributedSystem {
   {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hostConstants, hosts)
+      && Host.GroupWF(c.hosts, hosts)
     }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && Host.GroupInit(c.hostConstants, v.hosts)
+    && Host.GroupInit(c.hosts, v.hosts)
     && Network.Init(v.network)
   }
 
-  ghost predicate HostAction(c: Constants, v: Variables, v': Variables, actorIdx: int, msgOps: MessageOps)
+  ghost predicate HostAction(c: Constants, v: Variables, v': Variables, actor: int, msgOps: MessageOps)
   {
     && v.WF(c)
     && v'.WF(c)
-    && c.ValidIdx(actorIdx)
-    && Host.Next(c.hostConstants[actorIdx], v.hosts[actorIdx], v'.hosts[actorIdx], msgOps)
+    && c.ValidIdx(actor)
+    && Host.Next(c.hosts[actor], v.hosts[actor], v'.hosts[actor], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherHostIdx | c.ValidIdx(otherHostIdx) && otherHostIdx != actorIdx :: v'.hosts[otherHostIdx] == v.hosts[otherHostIdx])
+    && (forall otherHostIdx | c.ValidIdx(otherHostIdx) && otherHostIdx != actor :: v'.hosts[otherHostIdx] == v.hosts[otherHostIdx])
   }
 
-  datatype Step = HostActionStep(actorIdx: int, msgOps: MessageOps)
+  datatype Step = HostActionStep(actor: int, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   {
-    && HostAction(c, v, v', step.actorIdx, step.msgOps)
+    && HostAction(c, v, v', step.actor, step.msgOps)
     && Network.Next(v.network, v'.network, step.msgOps)
   }
 
