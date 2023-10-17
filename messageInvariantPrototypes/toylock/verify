@@ -1,9 +1,0 @@
-#!/bin/sh
-
-dafny="/Users/nudzhang/installations/dafny-4.2.0/dafny /timeLimit:20 /compile:0  /noNLarith /autoTriggers:1 /vcsCores:8"
-
-files="../lib/UtilitiesLibrary.dfy protocol.dfy spec.dfy networkInvs.dfy conventionalProof.dfy"
-
-echo "Verifying $files"
-
-time $dafny $files

@@ -42,11 +42,17 @@ module ConventionalToylockProof {
   }
 
   
+  ghost predicate ApplicationInv(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    && AtMostOneInFlight(c, v)
+    && HasLockImpliesNoneInFlight(c, v)
+  }
+
   ghost predicate Inv(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && AtMostOneInFlight(c, v)
-    && HasLockImpliesNoneInFlight(c, v)
+    && ApplicationInv(c, v)
     && Safety(c, v)
   }
 
