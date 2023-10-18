@@ -34,6 +34,7 @@ module ShardedKVProof {
   {
       && msg in v.network.sentMsgs
       && msg.key == k
+      && c.ValidIdx(msg.dst)
       && v.hosts[msg.dst].HasKey(k)
       && v.hosts[msg.dst].myKeys[k].version < msg.version
   }
