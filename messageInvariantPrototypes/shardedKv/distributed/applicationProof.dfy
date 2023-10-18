@@ -41,11 +41,8 @@ module ShardedKVProof {
   ghost predicate AtMostOneInFlight(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall k |  KeyInFlight(c, v, k)
-    ::
-      (forall m1, m2 | 
-          KeyInFlightByMessage(c, v, m2, k) && KeyInFlightByMessage(c, v, m1, k) 
-          :: m1 == m2)
+    forall k, m1, m2 | KeyInFlightByMessage(c, v, m1, k) && KeyInFlightByMessage(c, v, m2, k) 
+    :: m1 == m2
   }
 
   ghost predicate NoneHasLiveKey(c: Constants, v: Variables, k: Key) 
@@ -130,7 +127,31 @@ lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures AtMostOneInFlight(c, v')
 {
-  assume false;
+  forall k, m1, m2 | KeyInFlightByMessage(c, v', m1, k) && KeyInFlightByMessage(c, v', m2, k) 
+  ensures m1 == m2
+  {
+    if m1 != m2 {
+      if KeyInFlightByMessage(c, v, m1, k) {
+        InvNextAtMostOneInFlightHelper(c, v, v', m1, m2, k);
+      } else {
+        InvNextAtMostOneInFlightHelper(c, v, v', m2, m1, k);
+      }
+    }
+  }
+}
+
+lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: Key)
+  requires v'.WF(c)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  // input constraints
+  requires m1 != m2
+  requires KeyInFlightByMessage(c, v, m1, k)
+  requires !KeyInFlightByMessage(c, v, m2, k)
+  // postcondition
+  ensures !KeyInFlightByMessage(c, v', m2, k)
+{
+  assert KeyInFlight(c, v, k);
 }
 
 lemma InvNextLiveKeyImpliesNoneInFlight(c: Constants, v: Variables, v': Variables)
