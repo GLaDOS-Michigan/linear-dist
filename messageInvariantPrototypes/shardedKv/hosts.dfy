@@ -111,7 +111,8 @@ module Host {
     && msgOps.recv.Some?
     && var msg := msgOps.recv.value;
     && msg.dst == c.myId
-    && (v.HasKey(msg.key) ==> msg.version > v.myKeys[msg.key].version)
+    && v.HasKey(msg.key)
+    && msg.version > v.myKeys[msg.key].version
     && v' == v.(
       myKeys := v.myKeys[msg.key := Entry(true, msg.version)]
     )

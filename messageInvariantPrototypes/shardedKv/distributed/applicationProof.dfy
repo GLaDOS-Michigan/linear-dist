@@ -33,9 +33,9 @@ module ShardedKVProof {
     requires v.WF(c)
   {
       && msg in v.network.sentMsgs
-      && c.ValidIdx(msg.dst)
       && msg.key == k
-      && (v.hosts[msg.dst].HasKey(k) ==> v.hosts[msg.dst].myKeys[k].version < msg.version)
+      && v.hosts[msg.dst].HasKey(k)
+      && v.hosts[msg.dst].myKeys[k].version < msg.version
   }
 
   ghost predicate AtMostOneInFlight(c: Constants, v: Variables)
