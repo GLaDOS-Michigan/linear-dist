@@ -46,12 +46,12 @@ module CoordinatorHost {
   ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && NextVoteReqStepSendFunc(c, v, msgOps.send.value)
+    && SendVoteReqMsg(c, v, msgOps.send.value)
     && v' == v 
   }
 
   // Send predicate
-  ghost predicate NextVoteReqStepSendFunc(c: Constants, v: Variables, msg: Message) {
+  ghost predicate SendVoteReqMsg(c: Constants, v: Variables, msg: Message) {
     msg == VoteReqMsg
   }
 
@@ -81,11 +81,11 @@ module CoordinatorHost {
     && msgOps.recv.None?
     && msgOps.send.Some?
     && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
-    && NextDecisionStepSendFunc(c, v, v', msgOps.send.value)
+    && SendDecideMsg(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate NextDecisionStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendDecideMsg(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.decision.None?
     && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
@@ -182,11 +182,11 @@ module ParticipantHost {
   ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.Some?
     && msgOps.recv.None?
-    && NextSendVoteStepSendFunc(c, v, v', msgOps.send.value)
+    && SendVoteMsg(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate NextSendVoteStepSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendVoteMsg(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.sendVote == true
     // send message

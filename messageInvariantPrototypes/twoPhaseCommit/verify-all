@@ -17,3 +17,9 @@ cd decentralizedMonotonic
 ./verify
 cd - > /dev/null
 echo ""
+
+echo "Verifying automate"
+cd automate
+./verify
+cd - > /dev/null
+echo ""
