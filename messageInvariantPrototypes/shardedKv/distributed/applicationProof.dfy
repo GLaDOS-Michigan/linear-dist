@@ -8,13 +8,20 @@ module ShardedKVProof {
   import opened DistributedSystem
   import opened Obligations
 
+  ghost predicate MessagesValid(c: Constants, v: Variables)
+   requires v.WF(c)
+  {
+    forall m | m in v.network.sentMsgs
+    :: && c.ValidIdx(m.src)
+       && c.ValidIdx(m.dst)
+  }
+
   ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
    requires v.WF(c)
   {
     forall i, k: Key | c.ValidIdx(i)
     :: v.hosts[i].HasKey(k)
   }
-
 
   ghost predicate KeyInFlight(c: Constants, v: Variables, k: Key) 
     requires v.WF(c)
@@ -28,7 +35,7 @@ module ShardedKVProof {
       && msg in v.network.sentMsgs
       && c.ValidIdx(msg.dst)
       && msg.key == k
-      && (v.hosts[msg.dst].HasKey(k) ==> msg.version > v.hosts[msg.dst].myKeys[k].version)
+      && (v.hosts[msg.dst].HasKey(k) ==> v.hosts[msg.dst].myKeys[k].version < msg.version)
   }
 
   ghost predicate AtMostOneInFlight(c: Constants, v: Variables)
@@ -41,17 +48,17 @@ module ShardedKVProof {
           :: m1 == m2)
   }
 
-  ghost predicate NoneHasKey(c: Constants, v: Variables, k: Key) 
+  ghost predicate NoneHasLiveKey(c: Constants, v: Variables, k: Key) 
     requires v.WF(c)
   {
-    forall idx | c.ValidIdx(idx) :: !v.hosts[idx].HasKey(k)
+    forall idx | c.ValidIdx(idx) :: !v.hosts[idx].HasLiveKey(k)
   }
   
 
-  ghost predicate HasKeyImpliesNoneInFlight(c: Constants, v: Variables)
+  ghost predicate LiveKeyImpliesNoneInFlight(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall k | !NoneHasKey(c, v, k)
+    forall k | !NoneHasLiveKey(c, v, k)
     ::
     !KeyInFlight(c, v, k)
   }
@@ -60,9 +67,10 @@ module ShardedKVProof {
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
+    && MessagesValid(c, v)
     && HostsCompleteKeys (c, v)
     && AtMostOneInFlight(c, v)
-    && HasKeyImpliesNoneInFlight(c, v)
+    && LiveKeyImpliesNoneInFlight(c, v)
   }
 
   ghost predicate Inv(c: Constants, v: Variables)
@@ -90,7 +98,7 @@ module ShardedKVProof {
     assert v'.WF(c);
     InvNextHostsCompleteKeys(c, v, v');
     InvNextAtMostOneInFlight(c, v, v');
-    InvNextHasKeyImpliesNoneInFlight(c, v, v');
+    InvNextLiveKeyImpliesNoneInFlight(c, v, v');
     InvNextSafety(c, v, v');
   }
 
@@ -125,13 +133,36 @@ lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
   assume false;
 }
 
-lemma InvNextHasKeyImpliesNoneInFlight(c: Constants, v: Variables, v': Variables)
+lemma InvNextLiveKeyImpliesNoneInFlight(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
+  requires HostsCompleteKeys(c, v')
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures HasKeyImpliesNoneInFlight(c, v')
+  ensures LiveKeyImpliesNoneInFlight(c, v')
 {
-  assume false;
+  forall k | !NoneHasLiveKey(c, v', k)
+  ensures !KeyInFlight(c, v', k)
+  {
+    forall msg | msg in v'.network.sentMsgs && msg.key == k
+    ensures !KeyInFlightByMessage(c, v', msg, k) {
+      var idx :| c.ValidIdx(idx) && v'.hosts[idx].HasLiveKey(k);
+      if v.hosts[idx].HasLiveKey(k) {
+        // triggers
+        assert !KeyInFlight(c, v, k);
+        assert !KeyInFlightByMessage(c, v, msg, k);
+      } else {
+        if msg in v.network.sentMsgs {
+          if KeyInFlightByMessage(c, v, msg, k) {
+            var dsStep :| NextStep(c, v, v', dsStep);
+            var actor, msgOps := dsStep.actor, dsStep.msgOps;
+            // triggers
+            assert KeyInFlightByMessage(c, v, msgOps.recv.value, k);
+            assert KeyInFlight(c, v, k);
+          }
+        }
+      }
+    }
+  }
 }
 
 lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
