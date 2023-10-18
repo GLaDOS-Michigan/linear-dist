@@ -184,7 +184,7 @@ module DistributedSystem {
     requires v.WF(c)
   {
     forall msg | msg in v.network.sentMsgs && msg.VoteMsg? 
-    :: c.ValidParticipantId( msg.src)
+    :: c.ValidParticipantId(msg.src)
   }
 
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)
