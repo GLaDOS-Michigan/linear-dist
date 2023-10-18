@@ -18,11 +18,11 @@ ghost predicate ServerRequestsValid(c: Constants, v: Variables)
 {
   forall i| 
     && v.ValidHistoryIdx(i)
-    && v.History(i).GetServer(c).server.currentRequest.Some?
+    && v.History(i).GetServer(c).currentRequest.Some?
   ::
-    && var req := v.History(i).GetServer(c).server.currentRequest.value;
+    && var req := v.History(i).GetServer(c).currentRequest.value;
     && c.ValidClientIdx(req.clientId)
-    && req.reqId in v.History(i).hosts[req.clientId].client.requests
+    && req.reqId in v.History(i).clients[req.clientId].requests
 }
 
 

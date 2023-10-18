@@ -11,7 +11,7 @@ module Obligations {
     requires v.WF(c)
   {
     forall cidx:nat | c.ValidClientIdx(cidx)
-      :: SafetySingleClient(v.Last().hosts[cidx].client)
+      :: SafetySingleClient(v.Last().clients[cidx])
   }
 
   ghost predicate SafetySingleClient(v: ClientHost.Variables) {

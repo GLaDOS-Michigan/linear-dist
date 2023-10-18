@@ -3,51 +3,51 @@ include "../centralizedHosts.dfy"
 module System {
 import opened UtilitiesLibrary
 import opened Types
-import Host
 import ServerHost
 import ClientHost
 
-datatype Constants = Constants(hosts: seq<Host.Constants>)
+datatype Constants = Constants(
+  clients: seq<ClientHost.Constants>,
+  servers: seq<ServerHost.Constants>)
 {
   ghost predicate WF() {
-    Host.GroupWFConstants(hosts)
+    && ClientHost.GroupWFConstants(clients)
+    && ServerHost.GroupWFConstants(servers)
   }
-  ghost predicate ValidActorIdx(idx: nat) {
-    idx < |hosts|
-  }
+  
   ghost predicate ValidClientIdx(idx: nat) {
-    idx < |hosts|-1
+    idx < |clients|
   }
 
-  ghost predicate ValidServerIdx(idx: nat) {
-    idx == |hosts|-1
-  }
-
-  ghost function GetServer() : Host.Constants
+  ghost function GetServer() : ServerHost.Constants 
     requires WF()
   {
-    Last(hosts)
+    servers[0]
   }
 }
 
-datatype Variables = Variables(hosts: seq<Host.Variables>)
+datatype Variables = Variables(
+  clients: seq<ClientHost.Variables>,
+  servers: seq<ServerHost.Variables>)
 {
   ghost predicate WF(c: Constants) {
     && c.WF()
-    && Host.GroupWF(c.hosts, hosts)
+    && ClientHost.GroupWF(c.clients, clients)
+    && ServerHost.GroupWF(c.servers, servers)
   }
 
-  ghost function GetServer(c: Constants) : Host.Variables
+  ghost function GetServer(c: Constants) : ServerHost.Variables 
     requires WF(c)
   {
-    Last(hosts)
+    servers[0]
   }
 }
 
 ghost predicate Init(c: Constants, v: Variables)
 {
   && v.WF(c)
-  && Host.GroupInit(c.hosts, v.hosts)
+  && ClientHost.GroupInit(c.clients, v.clients)
+  && ServerHost.GroupInit(c.servers, v.servers)
 }
 
 ghost predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx: nat, req: Request)
@@ -56,9 +56,9 @@ ghost predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables,
   var clientLbl := ClientHost.RequestLbl(req);
   var serverLbl := ServerHost.ReceiveLbl(req);
   && c.ValidClientIdx(cidx)
-  && Host.Next(c.hosts[cidx], v.hosts[cidx], v'.hosts[cidx], Host.CL(clientLbl))    // step client
-  && Host.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), Host.SL(serverLbl))  // step server
-  && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != cidx :: v'.hosts[otherIdx] == v.hosts[otherIdx])
+  && ClientHost.Next(c.clients[cidx], v.clients[cidx], v'.clients[cidx], clientLbl)    // step client
+  && ServerHost.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), serverLbl)  // step server
+  && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != cidx :: v'.clients[otherIdx] == v.clients[otherIdx])
 }
 
 ghost predicate NextServerProcessStep(c: Constants, v: Variables, v': Variables, req: Request)
@@ -68,9 +68,9 @@ ghost predicate NextServerProcessStep(c: Constants, v: Variables, v': Variables,
   && var clientLbl := ClientHost.ReceiveLbl(req);
   && var cidx := req.clientId;
   && c.ValidClientIdx(cidx)
-  && Host.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), Host.SL(serverLbl))  // step server
-  && Host.Next(c.hosts[cidx], v.hosts[cidx], v'.hosts[cidx], Host.CL(clientLbl))    // step client
-  && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != cidx :: v'.hosts[otherIdx] == v.hosts[otherIdx])
+  && ServerHost.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), serverLbl)  // step server
+  && ClientHost.Next(c.clients[cidx], v.clients[cidx], v'.clients[cidx], clientLbl)    // step client
+  && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != cidx :: v'.clients[otherIdx] == v.clients[otherIdx])
 }
 
 datatype Step =

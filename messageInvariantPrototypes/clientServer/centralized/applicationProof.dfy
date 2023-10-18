@@ -16,11 +16,11 @@ import opened Obligations
 ghost predicate ServerRequestsValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  v.GetServer(c).server.currentRequest.Some?
+  v.GetServer(c).currentRequest.Some?
   ==> 
-  && var req := v.GetServer(c).server.currentRequest.value;
+  && var req := v.GetServer(c).currentRequest.value;
   && c.ValidClientIdx(req.clientId)
-  && req.reqId in v.hosts[req.clientId].client.requests
+  && req.reqId in v.clients[req.clientId].requests
 }
 
 
