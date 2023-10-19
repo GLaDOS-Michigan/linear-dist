@@ -22,59 +22,57 @@ module DistributedSystem {
   import opened UtilitiesLibrary
   import opened Types
   import Network
-  import Host
   import ServerHost
   import ClientHost
 
-  datatype Constants = Constants(hosts: seq<Host.Constants>)
+  datatype Constants = Constants(
+    clients: seq<ClientHost.Constants>,
+    servers: seq<ServerHost.Constants>)
   {
     ghost predicate WF() {
-      Host.GroupWFConstants(hosts)
+      && ClientHost.GroupWFConstants(clients)
+      && ServerHost.GroupWFConstants(servers)
     }
-    ghost predicate Validactor(idx: int) {
-      0 <= idx < |hosts|
-    }
+    
     ghost predicate ValidClientIdx(idx: int) {
-      0 <= idx < |hosts|-1
+      0 <= idx < |clients|
     }
 
-    ghost predicate ValidServerIdx(idx: int) {
-      idx == |hosts|-1
+    ghost function GetServer() : ServerHost.Constants 
+      requires WF()
+    {
+      servers[0]
     }
 
     ghost function GetClient(idx: int) : ClientHost.Constants
       requires WF()
       requires ValidClientIdx(idx)
     {
-      hosts[idx].client
-    }
-
-    ghost function GetServer() : ServerHost.Constants
-      requires WF()
-    {
-      Last(hosts).server
+      clients[idx]
     }
   }
 
   datatype Hosts = Hosts(
-    hosts: seq<Host.Variables>
+    clients: seq<ClientHost.Variables>,
+    servers: seq<ServerHost.Variables>
   ) {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hosts, hosts)
+      && ClientHost.GroupWF(c.clients, clients)
+      && ServerHost.GroupWF(c.servers, servers)
+    }
+
+    ghost function GetServer(c: Constants) : ServerHost.Variables 
+      requires WF(c)
+    {
+      servers[0]
     }
 
     ghost function GetClient(c: Constants, idx: int) : ClientHost.Variables
       requires WF(c)
       requires c.ValidClientIdx(idx)
     {
-      hosts[idx].client
-    }
-
-    ghost function GetServer(c: Constants) : ServerHost.Variables
-      requires WF(c)
-    {
-      Last(hosts).server
+      clients[idx]
     }
   }
 
@@ -113,7 +111,8 @@ module DistributedSystem {
 
   ghost predicate InitHosts(c: Constants, h: Hosts)
   {
-    Host.GroupInit(c.hosts, h.hosts)
+    && ClientHost.GroupInit(c.clients, h.clients)
+    && ServerHost.GroupInit(c.servers, h.servers)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -124,23 +123,35 @@ module DistributedSystem {
     && Network.Init(v.network)
   }
 
-  ghost predicate HostAction(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+  ghost predicate ClientAction(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && c.Validactor(actor)
-    && Host.Next(c.hosts[actor], h.hosts[actor], h'.hosts[actor], msgOps)
+    && c.ValidClientIdx(actor)
+    && ClientHost.Next(c.clients[actor], h.clients[actor], h'.clients[actor], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherIdx:nat | c.Validactor(otherIdx) && otherIdx != actor :: h'.hosts[otherIdx] == h.hosts[otherIdx])
+    && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != actor :: h'.clients[otherIdx] == h.clients[otherIdx])
+    && h.servers == h'.servers
+  }
+
+  ghost predicate ServerAction(c: Constants, h: Hosts, h': Hosts, msgOps: MessageOps)
+    requires h.WF(c) && h'.WF(c)
+  {
+    && ServerHost.Next(c.GetServer(), h.GetServer(c), h'.GetServer(c), msgOps)
+    // all other hosts UNCHANGED
+    && h.clients == h'.clients
   }
 
   datatype Step =
-    | HostActionStep(actor: nat, msgOps: MessageOps)
+    | ClientStep(actorIdx: nat, msgOps: MessageOps)
+    | ServerStep(msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
-    && HostAction(c, h, h', step.actor, step.msgOps)
     && Network.Next(n, n', step.msgOps)
+    && match step
+      case ClientStep(actor, msgOps) => ClientAction(c, h, h', actor, msgOps)
+      case ServerStep(msgOps) => ServerAction(c, h, h', msgOps)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)

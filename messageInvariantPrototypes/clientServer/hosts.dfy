@@ -24,6 +24,25 @@ module ServerHost {
     }
   }
 
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>)
+  {
+    // There is exactly one server
+    |grp_c| == 1
+  }
+
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  {
+    && GroupWFConstants(grp_c)
+    && |grp_v| == |grp_c|
+    && (forall idx:nat | idx < |grp_c| :: grp_v[idx].WF(grp_c[idx]))
+  }
+
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  {
+    && GroupWF(grp_c, grp_v)
+    && Init(grp_c[0], grp_v[0])
+  }
+
   ghost predicate Init(c: Constants, v: Variables) {
     v.currentRequest == None
   }
@@ -98,6 +117,28 @@ module ClientHost {
     }
   }
 
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>)
+  {
+    // The client's constants must match their group positions.
+    forall clientId:ClientId | clientId < |grp_c|
+      :: ConstantsValidForGroup(grp_c[clientId], clientId)
+  }
+
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  {
+    && GroupWFConstants(grp_c)
+    && |grp_v| == |grp_c|
+    && (forall idx:nat | idx < |grp_c| :: grp_v[idx].WF(grp_c[idx]))
+  }
+
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  {
+    && GroupWF(grp_c, grp_v)
+    && (forall clientId:ClientId | clientId < |grp_c| ::
+        Init(grp_c[clientId], grp_v[clientId])
+      )
+  }
+
   ghost predicate Init(c: Constants, v: Variables) {
     && 0 < |v.requests|  // non-deterministic set
     && v.responses == {}
@@ -152,71 +193,3 @@ module ClientHost {
     exists step :: NextStep(c, v, v', step, msgOps)
   }
 }  // end module ClientHost
-
-
-/***************************************************************************************
-*                                     Generic Host                                     *
-***************************************************************************************/
-
-module Host {
-  import opened UtilitiesLibrary
-  import opened Types
-  import ServerHost
-  import ClientHost
-
-  datatype Constants =
-    | ServerConstants(server: ServerHost.Constants)
-    | ClientConstants(client: ClientHost.Constants)
-
-  datatype Variables =
-    | ServerVariables(server: ServerHost.Variables)
-    | ClientVariables(client: ClientHost.Variables)
-  {
-    ghost predicate WF(c: Constants) {
-      && (ServerVariables? <==> c.ServerConstants?) // types of c & v agree
-      && (match c
-            case ServerConstants(_) => server.WF(c.server)
-            case ClientConstants(_) => client.WF(c.client)
-          )
-    }
-  }
-
-  ghost predicate GroupWFConstants(grp_c: seq<Constants>)
-  {
-    // There must at least be a server
-    && 0 < |grp_c|
-    // Last host is a server
-    && Last(grp_c).ServerConstants?
-    // All the others are clients
-    && (forall clientId:ClientId | clientId < |grp_c|-1 :: grp_c[clientId].ClientConstants?)
-    // The client's constants must match their group positions.
-    && (forall clientId:ClientId | clientId < |grp_c|-1
-        :: ClientHost.ConstantsValidForGroup(grp_c[clientId].client, clientId))
-  }
-
-  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
-  {
-    && GroupWFConstants(grp_c)
-    && |grp_v| == |grp_c|
-    && (forall idx:nat | idx < |grp_c| :: grp_v[idx].WF(grp_c[idx]))
-  }
-
-  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
-  {
-    && GroupWF(grp_c, grp_v)
-    && ServerHost.Init(Last(grp_c).server, Last(grp_v).server)
-    && (forall clientId:ClientId | clientId < |grp_c|-1 ::
-        ClientHost.Init(grp_c[clientId].client, grp_v[clientId].client)
-      )
-  }
-
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
-  {
-    && v.WF(c)
-    && v'.WF(c)
-    && (match c
-      case ServerConstants(_) => ServerHost.Next(c.server, v.server, v'.server, msgOps)
-      case ClientConstants(_) => ClientHost.Next(c.client, v.client, v'.client, msgOps)
-      )
-  }
-}  // end module Host

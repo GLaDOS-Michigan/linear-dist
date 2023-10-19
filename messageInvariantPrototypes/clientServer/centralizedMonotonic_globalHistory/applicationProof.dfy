@@ -25,7 +25,6 @@ ghost predicate ServerRequestsValid(c: Constants, v: Variables)
     && req.reqId in v.History(i).clients[req.clientId].requests
 }
 
-
 ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)

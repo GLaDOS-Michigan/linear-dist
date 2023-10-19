@@ -24,7 +24,7 @@ ghost predicate RequestMsgsValid(c: Constants, v: Variables)
   requires RequestMsgsValidSource(c, v)
 {
   forall req | req in v.network.sentMsgs && req.RequestMsg?
-  :: req.r.reqId in v.hosts[req.r.clientId].client.requests
+  :: req.r.reqId in v.clients[req.r.clientId].requests
 }
 
 // certified self inductive, modulo requires
@@ -33,8 +33,8 @@ ghost predicate RequestMsgsValid(c: Constants, v: Variables)
 ghost predicate ServerCurrentRequestValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall idx:nat | c.ValidServerIdx(idx) && v.hosts[idx].server.currentRequest.Some?
-  :: RequestMsg(v.hosts[idx].server.currentRequest.value) in v.network.sentMsgs
+  v.GetServer(c).currentRequest.Some?
+  ==> RequestMsg(v.GetServer(c).currentRequest.value) in v.network.sentMsgs
 }
 
 // certified self inductive, modulo requires
@@ -43,7 +43,7 @@ ghost predicate ServerCurrentRequestValid(c: Constants, v: Variables)
 ghost predicate ClientResponsesValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall idx:nat, respId | c.ValidClientIdx(idx) && respId in v.hosts[idx].client.responses
+  forall idx:nat, respId | c.ValidClientIdx(idx) && respId in v.clients[idx].responses
   :: ResponseMsg(Req(idx, respId)) in v.network.sentMsgs
 }
 
