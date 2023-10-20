@@ -50,8 +50,18 @@ namespace Microsoft.Dafny {
       if (err != null) {
         return err;
       }
+      var res = Resolve(program);
 
-      return Resolve(program);
+      if (options.msgInvs) {
+        // Don't verify or compile when generating msgInvs
+        options.DafnyVerify = false;
+        options.Compile = false;
+
+        var msgInvDriver = new MessageInvariantsDriver(program);
+        msgInvDriver.Resolve();
+        msgInvDriver.WriteToFile();
+      }
+      return res;
     }
 
     public static string Parse(IReadOnlyList<DafnyFile> files, string programName, DafnyOptions options,
@@ -93,20 +103,6 @@ namespace Microsoft.Dafny {
         return string.Format("{0} resolution/type errors detected in {1}", program.Reporter.Count(ErrorLevel.Error),
           program.Name);
       }
-
-      Console.WriteLine("HELLO THERE TRAVELLER!");
-      Console.WriteLine(String.Format("deriving message invariants for file", program.FullName));
-      Console.WriteLine();
-      Console.WriteLine(program.get_Compilation());
-
-
-
-
-
-      // Try to find a predicate with name "Send<xxx>"
-
-
-
       return null; // success
     }
 

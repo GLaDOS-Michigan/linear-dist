@@ -794,13 +794,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
           return true;
 
         case "msgInvs":
-          // Console. WriteLine("msgInvs option is ON");
           msgInvs = true;
-
-          var test = new MessageInvariantsFile();
-          
-          Console. WriteLine(test.ToString());
-
           return true;
       }
 
