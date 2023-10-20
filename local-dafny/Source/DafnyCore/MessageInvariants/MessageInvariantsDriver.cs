@@ -18,14 +18,13 @@ public class MessageInvariantsDriver {
   }
 
   public void Resolve() {
-    Console.WriteLine(String.Format("Deriving message invariants for file {0}\n", program.FullName));
+    Console.WriteLine(String.Format("Resolving message invariants for {0}\n", program.FullName));
 
     // Find distributedSystem.Hosts
     DatatypeDecl dsHosts = null;
     foreach (var kvp in program.ModuleSigs) {
       foreach (var topLevelDecl in ModuleDefinition.AllTypesWithMembers(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
         if (topLevelDecl.FullDafnyName.Equals("DistributedSystem.Hosts")) {
-          Console.WriteLine(topLevelDecl.FullDafnyName);
           dsHosts = (DatatypeDecl) topLevelDecl;
           break;
         }
@@ -50,8 +49,10 @@ public class MessageInvariantsDriver {
             }
           }
           Debug.Assert(variableField != null, "variableField should not be null");
-
           Console.WriteLine(string.Format("Found send predicate [{0}] in module [{1}] for msg type [{2}], in DistributedSystem.[Hosts.{3}]\n", topLevelDecl.Name, module, msgType, variableField));
+        
+          var sendInv = new SendInvariant(topLevelDecl.Name, msgType, module, variableField);
+          msgInvFile.AddSendInvariant(sendInv);
         }
       }
     }

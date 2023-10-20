@@ -6,7 +6,7 @@ namespace Microsoft.Dafny
   public class MessageInvariantsFile {
 
     // List of invariants
-    public List<SendInvariant> sendInvariants;
+    private List<SendInvariant> sendInvariants;
 
     // Constructor
     public MessageInvariantsFile()
@@ -18,6 +18,9 @@ namespace Microsoft.Dafny
       sendInvariants.Add(si);
     }
 
+    public List<SendInvariant> GetSendInvariants() {
+      return this.sendInvariants;
+    }
 
   } // end class MessageInvariantsFile
 }
