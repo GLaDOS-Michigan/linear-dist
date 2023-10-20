@@ -22,6 +22,31 @@ module CoordinatorHost {
     }
   }
 
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>, participantCount: nat)
+  {
+    // There must be exactly one coordinator
+    && |grp_c| == 1
+    // The coordinator's constants must correctly account for the number of participants
+    && ConstantsValidForGroup(grp_c[0], participantCount)
+  }
+
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, participantCount: nat)
+  {
+    && GroupWFConstants(grp_c, participantCount)
+    // Variables size matches group size defined by grp_c
+    && |grp_v| == |grp_c|
+    // Each host is well-formed
+    && (forall hostid:HostId | hostid < |grp_c| :: grp_v[hostid].WF(grp_c[hostid]))
+  }
+
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  {
+    // Coordinator is initialized to know about the N-1 participants.
+    && |grp_c| == 1
+    && |grp_v| == |grp_c|
+    && Init(grp_c[0], grp_v[0])
+  }
+
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
@@ -88,8 +113,8 @@ module ParticipantHost {
   import opened Types
   import opened UtilitiesLibrary
 
-  datatype Constants = Constants(hostId: HostId, preference: Vote)
-
+  datatype Constants = Constants(hostId: HostId, preference: Vote) 
+  
   ghost predicate ConstantsValidForGroup(c: Constants, hostId: HostId)
   {
     c.hostId == hostId
@@ -105,6 +130,36 @@ module ParticipantHost {
     ghost predicate WF(c: Constants) {
       true
     }
+  }
+
+  ghost predicate GroupWFConstants(grp_c: seq<Constants>)
+  {
+    // There must at least be a participant
+    && 0 < |grp_c|
+    // The participants's constants must match their group positions.
+    // (Actually, they just need to be distinct from one another so we get
+    // non-conflicting votes, but this is an easy way to express that property.)
+    && (forall hostid:HostId | hostid < |grp_c|
+        :: ConstantsValidForGroup(grp_c[hostid], hostid))
+  }
+
+  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  {
+    && GroupWFConstants(grp_c)
+    // Variables size matches group size defined by grp_c
+    && |grp_v| == |grp_c|
+    // Each host is well-formed
+    && (forall hostid:HostId | hostid < |grp_c| :: grp_v[hostid].WF(grp_c[hostid]))
+  }
+
+  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
+  {
+    // constants & variables are well-formed (same number of host slots as constants expect)
+    && GroupWF(grp_c, grp_v)
+    // Participants initted with their ids.
+    && (forall hostid:HostId | hostid < |grp_c| ::
+        Init(grp_c[hostid], grp_v[hostid])
+      )
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -131,6 +186,7 @@ module ParticipantHost {
   }
 
   ghost predicate NextReceiveVoteReqStep(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel) {
+    && !v.sendVote
     && lbl.VoteReqLbl?
     && v == v'.(sendVote := true)
   }
@@ -144,7 +200,7 @@ module ParticipantHost {
     && v.sendVote == true
     && lbl.SendVoteLbl?
     && lbl.vote == c.preference
-    && v' == v.(sendVote := false)
+    && v' == v
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
@@ -152,86 +208,3 @@ module ParticipantHost {
     exists step :: NextStep(c, v, v', step, lbl)
   }
 } // end module ParticipantHost
-
-
-
-module Host {
-  import opened UtilitiesLibrary
-  import opened Types
-  import CoordinatorHost
-  import ParticipantHost
-
-  datatype Constants =
-    | CoordinatorConstants(coordinator: CoordinatorHost.Constants)
-    | ParticipantConstants(participant: ParticipantHost.Constants)
-
-  datatype Variables =
-    | CoordinatorVariables(coordinator: CoordinatorHost.Variables)
-    | ParticipantVariables(participant: ParticipantHost.Variables)
-  {
-    ghost predicate WF(c: Constants) {
-      && (CoordinatorVariables? <==> c.CoordinatorConstants?) // types of c & v agree
-      && (match c
-            case CoordinatorConstants(_) => coordinator.WF(c.coordinator)
-            case ParticipantConstants(_) => participant.WF(c.participant)
-          )
-    }
-  }
-
-  ghost predicate GroupWFConstants(grp_c: seq<Constants>)
-  {
-    // There must at least be a coordinator
-    && 0 < |grp_c|
-    // Last host is a coordinator
-    && Last(grp_c).CoordinatorConstants?
-    // All the others are participants
-    && (forall hostid:HostId | hostid < |grp_c|-1 :: grp_c[hostid].ParticipantConstants?)
-    // The coordinator's constants must correctly account for the number of participants
-    && CoordinatorHost.ConstantsValidForGroup(Last(grp_c).coordinator, |grp_c|-1)
-    // The participants's constants must match their group positions.
-    // (Actually, they just need to be distinct from one another so we get
-    // non-conflicting votes, but this is an easy way to express that property.)
-    && (forall hostid:HostId | hostid < |grp_c|-1
-        :: ParticipantHost.ConstantsValidForGroup(grp_c[hostid].participant, hostid))
-  }
-
-  ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>)
-  {
-    && GroupWFConstants(grp_c)
-    // Variables size matches group size defined by grp_c
-    && |grp_v| == |grp_c|
-    // Each host is well-formed
-    && (forall hostid:HostId | hostid < |grp_c| :: grp_v[hostid].WF(grp_c[hostid]))
-  }
-
-  ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>)
-  {
-    // constants & variables are well-formed (same number of host slots as constants expect)
-    && GroupWF(grp_c, grp_v)
-    // Coordinator is initialized to know about the N-1 participants.
-    && CoordinatorHost.Init(Last(grp_c).coordinator, Last(grp_v).coordinator)
-    // Participants initted with their ids.
-    && (forall hostid:HostId | hostid < |grp_c|-1 ::
-        ParticipantHost.Init(grp_c[hostid].participant, grp_v[hostid].participant)
-      )
-  }
-
-  datatype TransitionLabel = 
-    | CL(c: CoordinatorHost.TransitionLabel)
-    | PL(p: ParticipantHost.TransitionLabel)
-
-  // Dispatch Next to appropriate underlying implementation.
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, lbl: TransitionLabel)
-  {
-    && v.WF(c)
-    && v'.WF(c)
-    && (match c
-      case CoordinatorConstants(_) => 
-          && lbl.CL?
-          && CoordinatorHost.Next(c.coordinator, v.coordinator, v'.coordinator, lbl.c)
-      case ParticipantConstants(_) => 
-          && lbl.PL?
-          && ParticipantHost.Next(c.participant, v.participant, v'.participant, lbl.p)
-      )
-  }
-} // end module Host

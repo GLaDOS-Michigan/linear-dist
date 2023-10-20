@@ -17,43 +17,39 @@ module Obligations {
   import opened UtilitiesLibrary
   import opened System
 
-  // AC-1: All processes that reach a decision reach the same one.
+  // AC-1: All processes that reach a decision reach the same decision as the coordinator.
   ghost predicate SafetyAC1(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    var n := |v.hosts|;
-    forall i, j | 0 <= i < n && 0 <= j < n && HostHasDecided(v.hosts[i]) && HostHasDecided(v.hosts[j])
-    :: HostsReachSameDecision(v.hosts[i], v.hosts[j])
+    forall i: HostId | c.ValidParticipantId(i) && PartipantHasDecided(c, v, i)
+    :: v.GetCoordinator(c).decision == v.participants[i].decision
   }
 
   // AC-3: The Commit decision can only be reached if all processes prefer Yes.
   ghost predicate SafetyAC3(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    var n := |v.hosts|;
-    (exists i :: 0 <= i < n && HostDecidedCommit(v.hosts[i]))
+    CoordinatorDecidedCommit(c, v)
     ==>
-    AllPreferYes(c, v)
+    AllPreferYes(c)
   }
 
   // This one is easier to prove
   ghost predicate AC3Contrapos(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    var n := |v.hosts|;
-    (! AllPreferYes(c, v)) 
-    ==> forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) 
-        :: HostDecidedAbort(v.hosts[i])
+    (!AllPreferYes(c) && CoordinatorHasDecided(c, v))
+    ==>
+    CoordinatorDecidedAbort(c, v)
   }
 
   // AC-4: If all processes prefer Yes, then the decision must be Commit.
   ghost predicate SafetyAC4(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    var n := |v.hosts|;
-    AllPreferYes(c, v)
+    (AllPreferYes(c) && CoordinatorHasDecided(c, v))
     ==> 
-    forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) :: HostDecidedCommit(v.hosts[i])
+    CoordinatorDecidedCommit(c, v)
   }
 
   ghost predicate Safety(c: Constants, v: Variables)
@@ -71,55 +67,56 @@ module Obligations {
   *                                      Utils                                           *
   ***************************************************************************************/
 
-  ghost function GetCoordinator(c: Constants, v: Variables) : CoordinatorHost.Variables
+
+  ghost predicate PartipantHasDecided(c: Constants, v: Variables, pidx: HostId) 
     requires v.WF(c)
+    requires c.ValidParticipantId(pidx)
   {
-    Last(v.hosts).coordinator
+    v.participants[pidx].decision.Some?
   }
 
-  ghost function GetParticipant(c: Constants, v: Variables, i: int) : ParticipantHost.Variables
+  ghost predicate ParticipantDecidedCommit(c: Constants, v: Variables, pidx: HostId) 
     requires v.WF(c)
-    requires 0 <= i < |v.hosts|-1
+    requires c.ValidParticipantId(pidx)
   {
-    v.hosts[i].participant
+    v.participants[pidx].decision == Some(Commit)
+  }
+
+  ghost predicate ParticipantDecidedAbort(c: Constants, v: Variables, pidx: HostId) 
+    requires v.WF(c)
+    requires c.ValidParticipantId(pidx)
+  {
+    v.participants[pidx].decision == Some(Abort)
+  }
+
+  ghost predicate CoordinatorHasDecided(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    v.GetCoordinator(c).decision.Some?
+  }
+
+  ghost predicate CoordinatorDecidedCommit(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    v.GetCoordinator(c).decision == Some(Commit)
+  }
+
+  ghost predicate CoordinatorDecidedAbort(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    v.GetCoordinator(c).decision == Some(Abort)
   }
 
   ghost function GetParticipantPreference(c: Constants, i: int) : Vote
     requires c.WF()
-    requires 0 <= i < |c.hosts|-1
+    requires 0 <= i < |c.participants|
   {
-    c.hosts[i].participant.preference
+    c.participants[i].preference
   }
 
-  ghost predicate HostHasDecided(h: Host.Variables) {
-    match h
-      case CoordinatorVariables(c) => c.decision.Some?
-      case ParticipantVariables(p) => p.decision.Some?
-  }
-
-  ghost predicate HostDecidedCommit(h: Host.Variables) {
-    match h
-      case CoordinatorVariables(c) => c.decision == Some(Commit)
-      case ParticipantVariables(p) => p.decision == Some(Commit)
-  }
-
-  ghost predicate HostDecidedAbort(h: Host.Variables) {
-    match h
-      case CoordinatorVariables(c) => c.decision == Some(Abort)
-      case ParticipantVariables(p) => p.decision == Some(Abort)
-  }
-
-  ghost predicate HostsReachSameDecision(h1: Host.Variables, h2: Host.Variables) 
-    requires HostHasDecided(h1)
-    requires HostHasDecided(h2)
+  ghost predicate AllPreferYes(c: Constants) 
+    requires c.WF()
   {
-    (HostDecidedCommit(h1) && HostDecidedCommit(h2)) || (HostDecidedAbort(h1) && HostDecidedAbort(h2))
-  }
-
-  ghost predicate AllPreferYes(c: Constants, v: Variables) 
-    requires v.WF(c)
-  {
-    var n := |c.hosts|;
-    forall j | 0 <= j < n-1 :: c.hosts[j].participant.preference == Yes
+    forall j: HostId | c.ValidParticipantId(j) :: c.participants[j].preference == Yes
   }
 }
