@@ -13,5 +13,11 @@ namespace Microsoft.Dafny
     {
       this.sendInvariants = new List<SendInvariant>{};
     }
+
+    public void AddSendInvariant(SendInvariant si) {
+      sendInvariants.Add(si);
+    }
+
+
   } // end class MessageInvariantsFile
 }
