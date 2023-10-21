@@ -13,7 +13,7 @@ ghost predicate VoteMsgValidSrc(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs && msg.VoteMsg? 
-  :: 0 <= msg.src < |c.hosts|-1
+  :: c.ValidParticipantId(msg.src)
 }
 
 // VoteMsg reflects the preference of the voter 
@@ -32,17 +32,16 @@ ghost predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs && msg.DecideMsg? 
-  :: GetCoordinator(c, v).decision.Some? && msg.decision == GetCoordinator(c, v).decision.value
+  :: v.GetCoordinator(c).decision.Some? && msg.decision == v.GetCoordinator(c).decision.value
 }
 
 // If a participant has decided, then there must be a corresponding DecideMsg
 ghost predicate ParticipantsDecisionImpliesDecideMsg(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  var n := |v.hosts|;
-  forall i | 0 <= i < n && HostHasDecided(v.hosts[i]) :: 
-    && (HostDecidedCommit(v.hosts[i]) ==> DecideMsg(Commit) in v.network.sentMsgs)
-    && (HostDecidedAbort(v.hosts[i]) ==> DecideMsg(Abort) in v.network.sentMsgs)
+  forall i | c.ValidParticipantId(i) && PartipantHasDecided(c, v, i) :: 
+    && (ParticipantDecidedCommit(c, v, i) ==> DecideMsg(Commit) in v.network.sentMsgs)
+    && (ParticipantDecidedAbort(c, v, i) ==> DecideMsg(Abort) in v.network.sentMsgs)
 }
 
 ghost predicate MessageInv(c: Constants, v: Variables)

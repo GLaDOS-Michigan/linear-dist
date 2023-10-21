@@ -26,11 +26,11 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
 ghost predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  var n := |c.hosts|;
-  && (forall hostId | hostId in GetCoordinator(c, v).yesVotes ::
-        0 <= hostId < n-1 && GetParticipantPreference(c, hostId) == Yes )
-  && (forall hostId | hostId in GetCoordinator(c, v).noVotes ::
-        0 <= hostId < n-1 && GetParticipantPreference(c, hostId) == No )
+  var n := |c.participants|;
+  && (forall hostId | hostId in v.GetCoordinator(c).yesVotes ::
+        0 <= hostId < n && GetParticipantPreference(c, hostId) == Yes )
+  && (forall hostId | hostId in v.GetCoordinator(c).noVotes ::
+        0 <= hostId < n && GetParticipantPreference(c, hostId) == No )
 }
 
 // User-level invariant
@@ -70,40 +70,36 @@ lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Va
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LeaderTallyReflectsPreferences(c, v')
-{
-  var step :| NextStep(c, v, v', step);
-  var h, h' := v.hosts[step.hostid], v'.hosts[step.hostid];
-  if h.CoordinatorVariables? {
-    var l, l' := GetCoordinator(c, v), GetCoordinator(c, v');  // trigger
-  } else {
-    assert GetCoordinator(c, v) == GetCoordinator(c, v');  // trigger
-  }
-}
+{}
 
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AC3Contrapos(c, v')
 {
-  var n := |c.hosts|;
-  if ! AllPreferYes(c, v) {
-    var noVoter :| 0 <= noVoter < n-1 && c.hosts[noVoter].participant.preference == No;
-    var step :| NextStep(c, v, v', step);
-    var h, h' := v.hosts[step.hostid], v'.hosts[step.hostid];
-    if h.CoordinatorVariables? {
+  AC3ContraposLemma(c, v);
+  if ! AllPreferYes(c) && CoordinatorHasDecided(c, v') {
+    var noVoter: HostId :| c.ValidParticipantId(noVoter) && c.participants[noVoter].preference == No;
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.CoordinatorStep? {
         /* Proof by contradiction. Suppose coordinator decided Commit. Then it must have
         a Yes vote from all participants, including noVoter. This is a contradiction */
-        var l, l' := h.coordinator, h'.coordinator;
+        var l, l' := v.GetCoordinator(c), v'.GetCoordinator(c);
         if l.decision.None? && l'.decision == Some(Commit) {
           YesVotesContainsAllParticipantsWhenFull(c, v);
           assert GetParticipantPreference(c, noVoter) == Yes;  // witness
           assert false;
         }
-    } else {
-        /* Proof by contradiction. Suppose participant decided Commit. Then it must have
-        received a Commit message from the coordinator. This implies that the coordinator
-        had committed in state v, which contradicts AC3Contrapos(c, v). */
     }
+  }
+}
+
+lemma AC3ContraposLemma(c: Constants, v: Variables)
+  requires Inv(c, v)
+  ensures AC3Contrapos(c, v)
+{
+  if  (!AllPreferYes(c) && CoordinatorHasDecided(c, v)) {
+    assert v.GetCoordinator(c).decision.value != Commit;  // trigger
   }
 }
 
@@ -113,41 +109,22 @@ lemma AC4Proof(c: Constants, v: Variables, v': Variables)
   requires MessageInv(c, v')
   requires LeaderTallyReflectsPreferences(c, v')
   ensures SafetyAC4(c, v')
-{
-  if AllPreferYes(c, v') {
-    var n := |v.hosts|;
-    forall i | 0 <= i < n && HostHasDecided(v'.hosts[i]) 
-    ensures HostDecidedCommit(v'.hosts[i]) {
-      var step :| NextStep(c, v, v', step);
-      if i == step.hostid {
-        if v.hosts[step.hostid].CoordinatorVariables? {
-          /* Proof by contradiction: suppose coord decide no. Then leader's noVotes is
-          not empty. By LeaderTallyReflectsPreferences, this member preferred No, which 
-          contradicts with AllPreferYes(c, v) */
-          if HostDecidedAbort(v'.hosts[i]) {
-            assert false;
-          }
-        }
-      }
-    }
-  }
-}
+{}
 
 lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
   requires Inv(c, v)
-  requires |Last(v.hosts).coordinator.yesVotes| == |c.hosts|-1
-  ensures forall id | 0 <= id < |c.hosts|-1 :: id in GetCoordinator(c, v).yesVotes
+  requires |v.GetCoordinator(c).yesVotes| == |c.participants|
+  ensures forall id | 0 <= id < |c.participants| :: id in v.GetCoordinator(c).yesVotes
 {
-  var l := GetCoordinator(c, v);
-  forall id | 0 <= id < |c.hosts|-1 
+  var l := v.GetCoordinator(c);
+  forall id | 0 <= id < |c.participants|
   ensures id in l.yesVotes {
     if id !in l.yesVotes {
-      SetLemma(l.yesVotes, id, |c.hosts|-1);
+      SetLemma(l.yesVotes, id, |c.participants|);
       assert false;
     }
   }
 }
-
 
 lemma SetLemma(S: set<HostId>, e: HostId, size: int) 
   requires 0 <= e < size
@@ -160,4 +137,3 @@ lemma SetLemma(S: set<HostId>, e: HostId, size: int)
   SetContainmentCardinalityStrict(S, fullSet);
 }
 }
-

@@ -1,11 +1,7 @@
-
 include "../hosts.dfy"
-
 
 module Network {
   import opened Types
-
-  datatype Constants = Constants  // no constants for network
 
   datatype Variables = Variables(sentMsgs:set<Message>)
 
@@ -14,7 +10,7 @@ module Network {
     && v.sentMsgs == {}
   }
 
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
   {
     // Only allow receipt of a message if we've seen it has been sent.
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
@@ -28,72 +24,44 @@ module DistributedSystem {
   import opened UtilitiesLibrary
   import opened Types
   import Network
-  import Host
   import CoordinatorHost
   import ParticipantHost
 
   datatype Constants = Constants(
-    hosts: seq<Host.Constants>,
-    network: Network.Constants)
+    coordinator: seq<CoordinatorHost.Constants>,
+    participants: seq<ParticipantHost.Constants>)
   {
     ghost predicate WF() {
-      Host.GroupWFConstants(hosts)
+      && CoordinatorHost.GroupWFConstants(coordinator, |participants|)
+      && ParticipantHost.GroupWFConstants(participants)
     }
 
-    ghost predicate ValidHostId(id: int) {
-      0 <= id < |hosts|
+    ghost predicate ValidParticipantId(id: HostId) {
+      id < |participants|
     }
 
-    ghost predicate ValidParticipantId(id: int) {
-      0 <= id < |hosts|-1
-    }
-
-    ghost predicate ValidCoordinatorId(id: int) {
-      id == |hosts|-1
-    }
-    
-    ghost function GetCoordinator() : CoordinatorHost.Constants
+    ghost function GetCoordinator() : CoordinatorHost.Constants 
       requires WF()
     {
-      Last(hosts).coordinator
-    }
-
-    ghost function GetParticipant(idx: int) : ParticipantHost.Constants
-      requires WF()
-      requires ValidParticipantId(idx)
-    {
-      hosts[idx].participant
+      coordinator[0]
     }
   }
 
   datatype Hosts = Hosts(
-    hosts: seq<Host.Variables>
+    coordinator: seq<CoordinatorHost.Variables>,
+    participants: seq<ParticipantHost.Variables>
   ) {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hosts, hosts)
+      && CoordinatorHost.GroupWF(c.coordinator, coordinator, |c.participants|)
+      && ParticipantHost.GroupWF(c.participants, participants)
     }
 
-    ghost function GetCoordinator(c: Constants) : CoordinatorHost.Variables
+    ghost function GetCoordinator(c: Constants) : CoordinatorHost.Variables 
       requires WF(c)
     {
-      Last(hosts).coordinator
+      coordinator[0]
     }
-
-    ghost function GetParticipant(c: Constants, i: int) : ParticipantHost.Variables
-      requires WF(c)
-      requires c.ValidParticipantId(i)
-    {
-      hosts[i].participant
-    }
-
-    ghost function GetParticipantPreference(c: Constants, i: int) : Vote
-      requires c.WF()
-      requires c.ValidParticipantId(i)
-    {
-      c.hosts[i].participant.preference
-    }
-
   }
 
   datatype Variables = Variables(
@@ -127,20 +95,12 @@ module DistributedSystem {
     {
       UtilitiesLibrary.Last(history)
     }
-
-    ghost function Truncate(c: Constants, i: int) : (v : Variables)
-      requires WF(c)
-      requires ValidHistoryIdx(i)
-      ensures v.WF(c)
-      ensures v.Last() == History(i)
-    {
-      Variables.Variables(history[..i+1], network)
-    }
   } // end datatype Variables
 
   ghost predicate InitHosts(c: Constants, h: Hosts)
   {
-    Host.GroupInit(c.hosts, h.hosts)
+    && CoordinatorHost.GroupInit(c.coordinator, h.coordinator)
+    && ParticipantHost.GroupInit(c.participants, h.participants)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -151,23 +111,35 @@ module DistributedSystem {
     && Network.Init(v.network)
   }
 
-  ghost predicate HostAction(c: Constants, h: Hosts, h': Hosts, hostid: HostId, msgOps: MessageOps)
+  ghost predicate CoordinatorAction(c: Constants, h: Hosts, h': Hosts, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && c.ValidHostId(hostid)
-    && Host.Next(c.hosts[hostid], h.hosts[hostid], h'.hosts[hostid], msgOps)
+    && CoordinatorHost.Next(c.coordinator[0], h.coordinator[0], h'.coordinator[0], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherHost:nat | c.ValidHostId(otherHost) && otherHost != hostid :: h'.hosts[otherHost] == h.hosts[otherHost])
+    && h'.participants == h.participants
+  }
+
+  ghost predicate ParticipantAction(c: Constants, h: Hosts, h': Hosts, hostid: HostId, msgOps: MessageOps)
+    requires h.WF(c) && h'.WF(c)
+  {
+    && c.ValidParticipantId(hostid)
+    && ParticipantHost.Next(c.participants[hostid], h.participants[hostid], h'.participants[hostid], msgOps)
+    // all other hosts UNCHANGED
+    && h'.coordinator == h.coordinator
+    && (forall other:nat | c.ValidParticipantId(other) && other != hostid :: h'.participants[other] == h.participants[other])
   }
 
   datatype Step =
-    | HostActionStep(actor: HostId, msgOps: MessageOps)
+    | CoordinatorStep(msgOps: MessageOps)
+    | ParticipantStep(actorIdx: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
-    && HostAction(c, h, h', step.actor, step.msgOps)
-    && Network.Next(c.network, n, n', step.msgOps)
+    && Network.Next(n, n', step.msgOps)
+    && match step
+      case CoordinatorStep(msgOps) => CoordinatorAction(c, h, h', msgOps)
+      case ParticipantStep(actor, msgOps) => ParticipantAction(c, h, h', actor, msgOps)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)
@@ -178,12 +150,6 @@ module DistributedSystem {
     && exists step :: NextStep(c, v.Last(), v'.Last(), v.network, v'.network, step)
   }
 
-  ghost function GetDecisionForHost(hv: Host.Variables) : Option<Decision>
-  {
-    match hv
-      case CoordinatorVariables(coordinator) => coordinator.decision
-      case ParticipantVariables(participant) => participant.decision
-  }
 
 /***************************************************************************************
 *                                 History properties                                   *
@@ -193,19 +159,6 @@ module DistributedSystem {
     requires v.WF(c)
   {
     && InitHosts(c, v.History(0))
-    && forall i | v.ValidHistoryIdxStrict(i)
-      ::
-      Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
-  }
-
-  ghost predicate IsReceiveStepByActor(c: Constants, v: Variables, i:int, actor: int, msg: Message)
-    requires v.WF(c)
-    requires v.ValidHistoryIdxStrict(i)
-    requires Next(c, v.Truncate(c, i), v.Truncate(c, i+1))
-  {
-    var step :| NextStep(c, v.Truncate(c, i).Last(), v.Truncate(c, i+1).Last(), v.network, v.network, step);
-    && step.msgOps.recv == Some(msg)
-    && step.actor == actor
   }
 
   lemma InitImpliesValidHistory(c: Constants, v: Variables)
@@ -215,42 +168,13 @@ module DistributedSystem {
     reveal_ValidHistory();
   }
 
-
   lemma InvNextValidHistory(c: Constants, v: Variables, v': Variables)
-    requires v.WF(c)
+    requires v.WF(c) && v'.WF(c)
     requires ValidHistory(c, v)
     requires Next(c, v, v')
     ensures ValidHistory(c, v')
   {
     reveal_ValidHistory();
-    VariableNextProperties(c, v, v');
-    forall i | v'.ValidHistoryIdxStrict(i)
-    ensures Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1))
-    {
-      if i == |v'.history| - 2 {
-        MessageContainmentPreservesNext(c, v, v', v'.Truncate(c, i), v'.Truncate(c, i+1));
-        assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
-      } else {
-        assert Next(c, v.Truncate(c, i), v.Truncate(c, i+1));
-        assert v.Truncate(c, i).network.sentMsgs <= v'.Truncate(c, i).network.sentMsgs;
-        MessageContainmentPreservesNext(c, v.Truncate(c, i), v.Truncate(c, i+1), v'.Truncate(c, i), v'.Truncate(c, i+1));
-        assert Next(c, v'.Truncate(c, i), v'.Truncate(c, i+1));
-      }
-    }
-  }
-
-  lemma MessageContainmentPreservesNext(c: Constants, v: Variables, v': Variables, s: Variables, s': Variables)
-    requires v.WF(c)
-    requires s.WF(c)
-    requires Next(c, v, v')
-    requires v.history == s.history
-    requires v'.history == s'.history
-    requires v'.network.sentMsgs <= s'.network.sentMsgs
-    requires s.network.sentMsgs == s'.network.sentMsgs
-    ensures Next(c, s, s')
-  {
-    var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-    assert NextStep(c, s.Last(), s'.Last(), s.network, s'.network, dsStep); // trigger
   }
 
   lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)

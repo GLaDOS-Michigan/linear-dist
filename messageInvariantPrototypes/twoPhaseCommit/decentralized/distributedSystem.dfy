@@ -1,20 +1,16 @@
-
 include "../hosts.dfy"
-
 
 module Network {
   import opened Types
 
-  datatype Constants = Constants  // no constants for network
-
   datatype Variables = Variables(sentMsgs:set<Message>)
 
-  ghost predicate Init(c: Constants, v: Variables)
+  ghost predicate Init(v: Variables)
   {
     && v.sentMsgs == {}
   }
 
-  ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  ghost predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
   {
     // Only allow receipt of a message if we've seen it has been sent.
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
@@ -28,68 +24,91 @@ module DistributedSystem {
   import opened UtilitiesLibrary
   import opened Types
   import Network
-  import Host
   import CoordinatorHost
   import ParticipantHost
 
   datatype Constants = Constants(
-    hosts: seq<Host.Constants>,
-    network: Network.Constants)
+    coordinator: seq<CoordinatorHost.Constants>,
+    participants: seq<ParticipantHost.Constants>)
   {
     ghost predicate WF() {
-      Host.GroupWFConstants(hosts)
+      && CoordinatorHost.GroupWFConstants(coordinator, |participants|)
+      && ParticipantHost.GroupWFConstants(participants)
     }
-    ghost predicate ValidHostId(id: HostId) {
-      id < |hosts|
+
+    ghost predicate ValidParticipantId(id: HostId) {
+      id < |participants|
+    }
+
+    ghost function GetCoordinator() : CoordinatorHost.Constants 
+      requires WF()
+    {
+      coordinator[0]
     }
   }
 
   datatype Variables = Variables(
-    hosts: seq<Host.Variables>,
-    network: Network.Variables)
+    coordinator: seq<CoordinatorHost.Variables>,
+    participants: seq<ParticipantHost.Variables>,
+    network: Network.Variables
+  )
   {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hosts, hosts)
+      && CoordinatorHost.GroupWF(c.coordinator, coordinator, |c.participants|)
+      && ParticipantHost.GroupWF(c.participants, participants)
+    }
+
+    ghost function GetCoordinator(c: Constants) : CoordinatorHost.Variables 
+      requires WF(c)
+    {
+      coordinator[0]
     }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && Host.GroupInit(c.hosts, v.hosts)
-    && Network.Init(c.network, v.network)
+    && Network.Init(v.network)
+    && CoordinatorHost.GroupInit(c.coordinator, v.coordinator)
+    && ParticipantHost.GroupInit(c.participants, v.participants)
   }
 
-  ghost predicate HostAction(c: Constants, v: Variables, v': Variables, hostid: HostId, msgOps: MessageOps)
+  ghost predicate CoordinatorAction(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     && v.WF(c)
     && v'.WF(c)
-    && c.ValidHostId(hostid)
-    && Host.Next(c.hosts[hostid], v.hosts[hostid], v'.hosts[hostid], msgOps)
+    && CoordinatorHost.Next(c.coordinator[0], v.coordinator[0], v'.coordinator[0], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherHost:nat | c.ValidHostId(otherHost) && otherHost != hostid :: v'.hosts[otherHost] == v.hosts[otherHost])
+    && v'.participants == v.participants
+  }
+
+  ghost predicate ParticipantAction(c: Constants, v: Variables, v': Variables, hostid: HostId, msgOps: MessageOps)
+  {
+    && v.WF(c)
+    && v'.WF(c)
+    && c.ValidParticipantId(hostid)
+    && ParticipantHost.Next(c.participants[hostid], v.participants[hostid], v'.participants[hostid], msgOps)
+    // all other hosts UNCHANGED
+    && v'.coordinator == v.coordinator
+    && (forall other:nat | c.ValidParticipantId(other) && other != hostid :: v'.participants[other] == v.participants[other])
   }
 
   datatype Step =
-    | HostActionStep(hostid: HostId, msgOps: MessageOps)
+    | CoordinatorStep(msgOps: MessageOps)
+    | ParticipantStep(actorIdx: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   {
-    && HostAction(c, v, v', step.hostid, step.msgOps)
-    && Network.Next(c.network, v.network, v'.network, step.msgOps)
+    && Network.Next(v.network, v'.network, step.msgOps)
+    && match step
+      case CoordinatorStep(msgOps) => CoordinatorAction(c, v, v', msgOps)
+      case ParticipantStep(actor, msgOps) => ParticipantAction(c, v, v', actor, msgOps)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)
   {
     exists step :: NextStep(c, v, v', step)
-  }
-
-  ghost function GetDecisionForHost(hv: Host.Variables) : Option<Decision>
-  {
-    match hv
-      case CoordinatorVariables(coordinator) => coordinator.decision
-      case ParticipantVariables(participant) => participant.decision
   }
 }
 

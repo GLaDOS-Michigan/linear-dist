@@ -14,22 +14,6 @@ ghost predicate VoteMsgValidSrc(c: Constants, v: Variables)
   :: c.ValidParticipantId( msg.src)
 }
 
-// Every VoteMsg is received according to CoordinatorHost.NextReceiveStepRecvFunc
-ghost predicate RecvVoteMsgValidity(c: Constants, v: Variables) 
-  requires v.WF(c)
-  requires ValidHistory(c, v)
-{
-  reveal_ValidHistory();
-  forall i, idx, msg | 
-    && v.ValidHistoryIdxStrict(i)
-    && c.ValidCoordinatorId(idx)
-    && IsReceiveStepByActor(c, v, i, idx, msg)
-    && msg.VoteMsg?
-  :: 
-    && msg in v.network.sentMsgs
-    && CoordinatorHost.NextReceiveStepRecvFunc(c.hosts[idx].coordinator, v.History(i).hosts[idx].coordinator, v.History(i+1).hosts[idx].coordinator, msg)
-}
-
 // Every DecideMsg is sent according to a CoordinatorHost.NextDecisionStepSendFunc
 ghost predicate SendDecideMsgValidity(c: Constants, v: Variables)
   requires v.WF(c)
@@ -45,38 +29,6 @@ ghost predicate SendDecideMsgValidity(c: Constants, v: Variables)
   )
 }
 
-// Every VoteReqMsg is received according to ParticipantHost.NextReceiveVoteReqStepRecvFunc
-ghost predicate RecvVoteReqMsgValidity(c: Constants, v: Variables) 
-  requires v.WF(c)
-  requires ValidHistory(c, v)
-{
-  reveal_ValidHistory();
-  forall i, idx, msg| 
-    && v.ValidHistoryIdxStrict(i)
-    && c.ValidParticipantId(idx)
-    && IsReceiveStepByActor(c, v, i, idx, msg)
-    && msg.VoteReqMsg?
-  :: 
-    && msg in v.network.sentMsgs
-    && ParticipantHost.NextReceiveVoteReqStepRecvFunc(c.hosts[idx].participant, v.History(i).hosts[idx].participant, v.History(i+1).hosts[idx].participant, msg)
-}
-
-// Every DecideMsg is received according to ParticipantHost.NextReceiveDecisionStepRecvFunc
-ghost predicate RecvDecideMsgValidity(c: Constants, v: Variables) 
-  requires v.WF(c)
-  requires ValidHistory(c, v)
-{
-  reveal_ValidHistory();
-  forall i, idx, msg | 
-    && v.ValidHistoryIdxStrict(i)
-    && c.ValidParticipantId(idx)
-    && IsReceiveStepByActor(c, v, i, idx, msg)
-    && msg.DecideMsg?
-  :: 
-    && msg in v.network.sentMsgs
-    && ParticipantHost.SendVoteMsg(c.hosts[idx].participant, v.History(i).hosts[idx].participant, v.History(i+1).hosts[idx].participant, msg)
-}
-
 // Every VoteMsg is sent according to ParticipantHost.SendVote
 ghost predicate SendVoteMsgValidity(c: Constants, v: Variables)
   requires v.WF(c)
@@ -88,7 +40,7 @@ ghost predicate SendVoteMsgValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && ParticipantHost.SendVoteMsg(c.hosts[msg.src].participant, v.History(i).hosts[msg.src].participant, v.History(i+1).hosts[msg.src].participant, msg)
+      && ParticipantHost.SendVoteMsg(c.participants[msg.src], v.History(i).participants[msg.src], v.History(i+1).participants[msg.src], msg)
   )
 }
 
@@ -165,12 +117,12 @@ lemma InvNextSendVoteMsgValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && ParticipantHost.SendVoteMsg(c.GetParticipant(msg.src), v'.History(i).GetParticipant(c, msg.src), v'.History(i+1).GetParticipant(c, msg.src), msg)
+      && ParticipantHost.SendVoteMsg(c.participants[msg.src], v'.History(i).participants[msg.src], v'.History(i+1).participants[msg.src], msg)
   ) {
     if msg !in v.network.sentMsgs {
       // witness and trigger
       var i := |v.history|-1;
-      assert ParticipantHost.SendVoteMsg(c.GetParticipant(msg.src), v'.History(i).GetParticipant(c, msg.src), v'.History(i+1).GetParticipant(c, msg.src), msg);
+      assert ParticipantHost.SendVoteMsg(c.participants[msg.src], v'.History(i).participants[msg.src], v'.History(i+1).participants[msg.src], msg);
     }
   }
 }
