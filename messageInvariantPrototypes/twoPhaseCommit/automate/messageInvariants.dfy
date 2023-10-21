@@ -32,10 +32,9 @@ ghost predicate SendVoteMsgValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && ParticipantHost.SendVoteMsg(c.hosts[msg.src].participant, v.History(i).hosts[msg.src].participant, v.History(i+1).hosts[msg.src].participant, msg)
+      && ParticipantHost.SendVoteMsg(c.participants[msg.src], v.History(i).participants[msg.src], v.History(i+1).participants[msg.src], msg)
   )
 }
-
 
 ghost predicate MessageInv(c: Constants, v: Variables)
 {
@@ -104,12 +103,12 @@ lemma InvNextSendVoteMsgValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && ParticipantHost.SendVoteMsg(c.GetParticipant(msg.src), v'.History(i).GetParticipant(c, msg.src), v'.History(i+1).GetParticipant(c, msg.src), msg)
+      && ParticipantHost.SendVoteMsg(c.participants[msg.src], v'.History(i).participants[msg.src], v'.History(i+1).participants[msg.src], msg)
   ) {
     if msg !in v.network.sentMsgs {
       // witness and trigger
       var i := |v.history|-1;
-      assert ParticipantHost.SendVoteMsg(c.GetParticipant(msg.src), v'.History(i).GetParticipant(c, msg.src), v'.History(i+1).GetParticipant(c, msg.src), msg);
+      assert ParticipantHost.SendVoteMsg(c.participants[msg.src], v'.History(i).participants[msg.src], v'.History(i+1).participants[msg.src], msg);
     }
   }
 }

@@ -71,13 +71,13 @@ module CoordinatorHost {
   ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && SendVoteReqMsg(c, v, msgOps.send.value)
-    && v' == v 
+    && SendVoteReqMsg(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate SendVoteReqMsg(c: Constants, v: Variables, msg: Message) {
-    msg == VoteReqMsg
+  ghost predicate SendVoteReqMsg(c: Constants, v: Variables, v': Variables, msg: Message) {
+    && msg == VoteReqMsg
+    && v' == v 
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {

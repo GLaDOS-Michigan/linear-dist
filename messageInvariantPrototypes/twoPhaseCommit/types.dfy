@@ -11,6 +11,11 @@ module Types {
 
   datatype Message =
     VoteReqMsg | VoteMsg(v: Vote, src: HostId) | DecideMsg(decision: Decision)
+  {
+    ghost function Src() : nat {
+      if this.VoteMsg? then src else 0
+    }
+  }
 
   datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 }
