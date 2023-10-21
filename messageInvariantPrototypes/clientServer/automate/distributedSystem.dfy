@@ -3,57 +3,76 @@ include "../hosts.dfy"
 module Network {
   import opened Types
 
-  // Network state is the set of messages ever sent. Once sent, we'll
-  // allow it to be delivered over and over.
-  // (We don't have packet headers, so duplication, besides being realistic,
-  // also doubles as how multiple parties can hear the message.)
   datatype Variables = Variables(sentMsgs:set<Message>)
 
-  ghost predicate Init(v: Variables)
-  {
+  ghost predicate Init(v: Variables) {
     && v.sentMsgs == {}
   }
 
   ghost predicate Next(v: Variables, v': Variables, msgOps: MessageOps)
   {
-    // Only allow receipt of a message if we've seen it has been sent.
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
-    // Record the sent message, if there was one.
     && v'.sentMsgs ==
       v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }
   }
-} // end module Network
+}  // end module Network
 
 
 module DistributedSystem {
   import opened UtilitiesLibrary
   import opened Types
   import Network
-  import Host
+  import ServerHost
+  import ClientHost
 
   datatype Constants = Constants(
-    hosts: seq<Host.Constants>)
+    clients: seq<ClientHost.Constants>,
+    servers: seq<ServerHost.Constants>)
   {
-    ghost predicate ValidIdx(id: int) {
-      0 <= id < |hosts|
-    }
-
-    ghost predicate UniqueIds() {
-      forall i, j | ValidIdx(i) && ValidIdx(j) && hosts[i].hostId == hosts[j].hostId :: i == j
-    }
-
     ghost predicate WF() {
-      && 0 < |hosts|
-      && UniqueIds()
+      && ClientHost.GroupWFConstants(clients)
+      && ServerHost.GroupWFConstants(servers)
+    }
+    
+    ghost predicate ValidClientIdx(idx: int) {
+      0 <= idx < |clients|
+    }
+
+    ghost function GetServer() : ServerHost.Constants 
+      requires WF()
+    {
+      servers[0]
+    }
+
+    ghost function GetClient(idx: int) : ClientHost.Constants
+      requires WF()
+      requires ValidClientIdx(idx)
+    {
+      clients[idx]
     }
   }
-  
+
   datatype Hosts = Hosts(
-    hosts: seq<Host.Variables>
+    clients: seq<ClientHost.Variables>,
+    servers: seq<ServerHost.Variables>
   ) {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hosts, hosts)
+      && ClientHost.GroupWF(c.clients, clients)
+      && ServerHost.GroupWF(c.servers, servers)
+    }
+
+    ghost function GetServer(c: Constants) : ServerHost.Variables 
+      requires WF(c)
+    {
+      servers[0]
+    }
+
+    ghost function GetClient(c: Constants, idx: int) : ClientHost.Variables
+      requires WF(c)
+      requires c.ValidClientIdx(idx)
+    {
+      clients[idx]
     }
   }
 
@@ -88,11 +107,12 @@ module DistributedSystem {
     {
       UtilitiesLibrary.Last(history)
     }
-  } // end datatype Variables
+  }
 
   ghost predicate InitHosts(c: Constants, h: Hosts)
   {
-    Host.GroupInit(c.hosts, h.hosts)
+    && ClientHost.GroupInit(c.clients, h.clients)
+    && ServerHost.GroupInit(c.servers, h.servers)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -103,22 +123,35 @@ module DistributedSystem {
     && Network.Init(v.network)
   }
 
-  ghost predicate HostAction(c: Constants, h: Hosts, h': Hosts, actorIdx: int, msgOps: MessageOps)
+  ghost predicate ClientAction(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && c.ValidIdx(actorIdx)
-    && Host.Next(c.hosts[actorIdx], h.hosts[actorIdx], h'.hosts[actorIdx], msgOps)
+    && c.ValidClientIdx(actor)
+    && ClientHost.Next(c.clients[actor], h.clients[actor], h'.clients[actor], msgOps)
     // all other hosts UNCHANGED
-    && (forall otherHostIdx | c.ValidIdx(otherHostIdx) && otherHostIdx != actorIdx :: h'.hosts[otherHostIdx] == h.hosts[otherHostIdx])
+    && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != actor :: h'.clients[otherIdx] == h.clients[otherIdx])
+    && h.servers == h'.servers
   }
 
-  datatype Step = HostActionStep(actorIdx: int, msgOps: MessageOps)
+  ghost predicate ServerAction(c: Constants, h: Hosts, h': Hosts, msgOps: MessageOps)
+    requires h.WF(c) && h'.WF(c)
+  {
+    && ServerHost.Next(c.GetServer(), h.GetServer(c), h'.GetServer(c), msgOps)
+    // all other hosts UNCHANGED
+    && h.clients == h'.clients
+  }
+
+  datatype Step =
+    | ClientStep(actorIdx: nat, msgOps: MessageOps)
+    | ServerStep(msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
-    && HostAction(c, h, h', step.actorIdx, step.msgOps)
     && Network.Next(n, n', step.msgOps)
+    && match step
+      case ClientStep(actor, msgOps) => ClientAction(c, h, h', actor, msgOps)
+      case ServerStep(msgOps) => ServerAction(c, h, h', msgOps)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)
@@ -138,8 +171,8 @@ module DistributedSystem {
   ghost predicate ValidMessages(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall msg | msg in v.network.sentMsgs
-    :: c.ValidIdx(msg.Src())
+    forall req | req in v.network.sentMsgs && req.RequestMsg?
+  :: c.ValidClientIdx(req.r.clientId)
   }
 
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)
@@ -185,5 +218,3 @@ module DistributedSystem {
     assert 1 < |v'.history|;
   }
 }  // end module DistributedSystem
-
-
