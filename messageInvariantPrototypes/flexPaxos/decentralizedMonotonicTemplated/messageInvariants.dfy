@@ -94,7 +94,7 @@ ghost predicate SendProposeValidity(c: Constants, v: Variables)
   )
 }
 
-// Every Propose is sent according to AcceptorHost.PromiseSendFunc
+// Every Propose is sent according to AcceptorHost.SendPromise
 ghost predicate SendPromiseValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -104,11 +104,11 @@ ghost predicate SendPromiseValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && AcceptorHost.PromiseSendFunc(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendPromise(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
   )
 }
 
-// Every Accept is sent according to AcceptorHost.AcceptSendFunc
+// Every Accept is sent according to AcceptorHost.SendAccept
 ghost predicate SendAcceptValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -118,7 +118,7 @@ ghost predicate SendAcceptValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && AcceptorHost.AcceptSendFunc(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendAccept(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
   )
 }
 
@@ -236,13 +236,13 @@ lemma InvNextSendPromiseValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && AcceptorHost.PromiseSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendPromise(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsPromiseMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert AcceptorHost.PromiseSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
+      assert AcceptorHost.SendPromise(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
     }
   }
 }
@@ -259,13 +259,13 @@ lemma InvNextSendAcceptValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && AcceptorHost.AcceptSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendAccept(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsAcceptMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert AcceptorHost.AcceptSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
+      assert AcceptorHost.SendAccept(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
     }
   }
 }

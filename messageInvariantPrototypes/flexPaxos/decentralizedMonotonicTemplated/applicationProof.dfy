@@ -959,7 +959,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
                     );
       var h :|  // from SendPromiseValidity
         && v'.ValidHistoryIdxStrict(h)
-        && AcceptorHost.PromiseSendFunc(c.acceptorConstants[acc], v'.History(h).acceptors[acc], v'.History(h+1).acceptors[acc], prom);
+        && AcceptorHost.SendPromise(c.acceptorConstants[acc], v'.History(h).acceptors[acc], v'.History(h+1).acceptors[acc], prom);
       assert PromiseMessageMatchesHistory(c, v', prom, h+1);
       // if h+1 <= j, violates AcceptorPromisedMonotonic. Else, violates AcceptorAcceptedMonotonic
       assert false;

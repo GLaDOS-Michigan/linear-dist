@@ -66,7 +66,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 *                               Template Send Invariants                               *
 ***************************************************************************************/
 
-// Every Prepare is sent according to LeaderHost.PrepareSendFunc
+// Every Prepare is sent according to LeaderHost.SendPrepare
 ghost predicate SendPrepareValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -76,11 +76,11 @@ ghost predicate SendPrepareValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && LeaderHost.PrepareSendFunc(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPrepare(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
   )
 }
 
-// Every Propose is sent according to LeaderHost.ProposeSendFunc
+// Every Propose is sent according to LeaderHost.SendPropose
 ghost predicate SendProposeValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -90,11 +90,11 @@ ghost predicate SendProposeValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && LeaderHost.ProposeSendFunc(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPropose(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
   )
 }
 
-// Every Propose is sent according to AcceptorHost.PromiseSendFunc
+// Every Propose is sent according to AcceptorHost.SendPromise
 ghost predicate SendPromiseValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -104,11 +104,11 @@ ghost predicate SendPromiseValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && AcceptorHost.PromiseSendFunc(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendPromise(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
   )
 }
 
-// Every Accept is sent according to AcceptorHost.AcceptSendFunc
+// Every Accept is sent according to AcceptorHost.SendAccept
 ghost predicate SendAcceptValidity(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
@@ -118,7 +118,7 @@ ghost predicate SendAcceptValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && AcceptorHost.AcceptSendFunc(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendAccept(c.acceptorConstants[msg.acc], v.History(i).acceptors[msg.acc], v.History(i+1).acceptors[msg.acc], msg)
   )
 }
 
@@ -190,13 +190,13 @@ lemma InvNextSendPrepareValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && LeaderHost.PrepareSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPrepare(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsPrepareMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert LeaderHost.PrepareSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
+      assert LeaderHost.SendPrepare(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
     }
   }
 }
@@ -213,13 +213,13 @@ lemma InvNextSendProposeValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && LeaderHost.ProposeSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPropose(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsProposeMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert LeaderHost.ProposeSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
+      assert LeaderHost.SendPropose(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
     }
   }
 }
@@ -236,13 +236,13 @@ lemma InvNextSendPromiseValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && AcceptorHost.PromiseSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendPromise(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsPromiseMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert AcceptorHost.PromiseSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
+      assert AcceptorHost.SendPromise(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
     }
   }
 }
@@ -259,13 +259,13 @@ lemma InvNextSendAcceptValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && AcceptorHost.AcceptSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
+      && AcceptorHost.SendAccept(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsAcceptMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert AcceptorHost.AcceptSendFunc(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
+      assert AcceptorHost.SendAccept(c.acceptorConstants[msg.acc], v'.History(i).acceptors[msg.acc], v'.History(i+1).acceptors[msg.acc], msg);
     }
   }
 }

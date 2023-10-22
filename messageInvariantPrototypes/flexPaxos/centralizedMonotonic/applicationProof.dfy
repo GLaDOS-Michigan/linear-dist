@@ -416,7 +416,7 @@ lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
 {}
 
-lemma  InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
+lemma InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
@@ -796,9 +796,9 @@ lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables
   LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
 }
 
-// /***************************************************************************************
-// *                            Helper Definitions and Lemmas                             *
-// ***************************************************************************************/
+/***************************************************************************************
+*                            Helper Definitions and Lemmas                             *
+***************************************************************************************/
 
 ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
   && |quorum| >= c.p2Quorum

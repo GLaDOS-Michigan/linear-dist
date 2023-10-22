@@ -80,11 +80,11 @@ module LeaderHost {
   ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && PrepareSendFunc(c, v, v', msgOps.send.value)
+    && SendPrepare(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate PrepareSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendPrepare(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && true
     // send message and update v'
@@ -118,11 +118,11 @@ module LeaderHost {
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && ProposeSendFunc(c, v, v', msgOps.send.value)
+    && SendPropose(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate ProposeSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendPropose(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.CanPropose(c)
     // send message and update v'
@@ -253,14 +253,14 @@ module AcceptorHost {
     && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
     && if doPromise then
           && msgOps.send.Some?
-          && PromiseSendFunc(c, v, v', msgOps.send.value)
+          && SendPromise(c, v, v', msgOps.send.value)
         else
           && v' == v.(pendingPrepare := None)
           && msgOps.send == None
   }
 
   // Send predicate
-  ghost predicate PromiseSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendPromise(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.pendingPrepare.Some?
     && var bal := v.pendingPrepare.value.bal;
@@ -293,11 +293,11 @@ module AcceptorHost {
   {
     && msgOps.recv == None
     && msgOps.send.Some?
-    && AcceptSendFunc(c, v, v', msgOps.send.value)
+    && SendAccept(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate AcceptSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendAccept(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.pendingPrepare.None?
     && v.acceptedVB.Some?

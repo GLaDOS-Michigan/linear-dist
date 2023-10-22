@@ -253,14 +253,14 @@ module AcceptorHost {
     && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
     && if doPromise then
           && msgOps.send.Some?
-          && PromiseSendFunc(c, v, v', msgOps.send.value)
+          && SendPromise(c, v, v', msgOps.send.value)
         else
           && v' == v.(pendingPrepare := None)
           && msgOps.send == None
   }
 
   // Send predicate
-  ghost predicate PromiseSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendPromise(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.pendingPrepare.Some?
     && var bal := v.pendingPrepare.value.bal;
@@ -293,11 +293,11 @@ module AcceptorHost {
   {
     && msgOps.recv == None
     && msgOps.send.Some?
-    && AcceptSendFunc(c, v, v', msgOps.send.value)
+    && SendAccept(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate AcceptSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendAccept(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.pendingPrepare.None?
     && v.acceptedVB.Some?
