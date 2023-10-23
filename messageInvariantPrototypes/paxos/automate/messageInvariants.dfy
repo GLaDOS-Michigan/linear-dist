@@ -287,5 +287,5 @@ lemma InvNextReceivePromiseValidity(c: Constants, v: Variables, v': Variables)
   }
 }
 
-}  // end module PaxosProof
+}  // end module PaxosMessageInvariants
 
