@@ -128,27 +128,56 @@ ghost predicate SendAcceptValidity(c: Constants, v: Variables)
 
 // certified self-inductive
 // Leader updates receivedPromises based on Promise messages
+// ghost predicate {:opaque} LeaderValidReceivedPromiseMsgs(c: Constants, v: Variables)
+//   requires v.WF(c)
+// {
+//   forall ldr, i, acc |
+//     && c.ValidLeaderIdx(ldr)
+//     && v.ValidHistoryIdx(i)
+//     && acc in v.History(i).leaders[ldr].receivedPromises
+//   :: 
+//     (exists prom :: 
+//       && IsPromiseMessage(v, prom)
+//       && prom.bal == ldr
+//       && prom.acc == acc
+//       && (prom.vbOpt.Some?
+//           ==> 
+//           && v.History(i).leaders[ldr].highestHeardBallot.Some?
+//           && prom.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
+//         )
+//     )
+// }
+
+// Leader updates receivedPromises based on Promise messages
 ghost predicate {:opaque} LeaderValidReceivedPromiseMsgs(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, i, acc |
-    && c.ValidLeaderIdx(ldr)
+  forall idx, i, acc |
     && v.ValidHistoryIdx(i)
-    && acc in v.History(i).leaders[ldr].receivedPromises
+    && 0 <= idx < |c.leaderConstants|  // this can be derived
+    && LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v.History(i).leaders[idx], acc)
   :: 
-    (exists prom :: 
-      && IsPromiseMessage(v, prom)
-      && prom.bal == ldr
-      && prom.acc == acc
-      && (prom.vbOpt.Some?
-          ==> 
-          && v.History(i).leaders[ldr].highestHeardBallot.Some?
-          && prom.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
-        )
+    (exists msg :: 
+      && msg in v.network.sentMsgs
+      && LeaderHost.ReceivePromiseConclusion(c.leaderConstants[idx], v.History(i).leaders[idx], acc, msg)
     )
 }
 
 // certified self-inductive
+// Learner updates its receivedAccepts map based on a Accept message carrying that 
+// accepted ValBal pair
+// ghost predicate {:opaque} LearnerValidReceivedAcceptMsgs(c: Constants, v: Variables) 
+//   requires v.WF(c)
+// {
+//   forall idx, vb, acc, i | 
+//     && c.ValidLearnerIdx(idx)
+//     && v.ValidHistoryIdx(i)
+//     && vb in v.History(i).learners[idx].receivedAccepts
+//     && acc in v.History(i).learners[idx].receivedAccepts[vb]
+//   ::
+//     Accept(vb, acc) in v.network.sentMsgs
+// }
+
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
 // accepted ValBal pair
 ghost predicate {:opaque} LearnerValidReceivedAcceptMsgs(c: Constants, v: Variables) 
@@ -157,10 +186,12 @@ ghost predicate {:opaque} LearnerValidReceivedAcceptMsgs(c: Constants, v: Variab
   forall idx, vb, acc, i | 
     && c.ValidLearnerIdx(idx)
     && v.ValidHistoryIdx(i)
-    && vb in v.History(i).learners[idx].receivedAccepts
-    && acc in v.History(i).learners[idx].receivedAccepts[vb]
+    && LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v.History(i).learners[idx], acc, vb)
   ::
-    Accept(vb, acc) in v.network.sentMsgs
+   (exists msg :: 
+      && msg in v.network.sentMsgs
+      && LearnerHost.ReceiveAcceptConclusion(c.learnerConstants[idx], v.History(i).learners[idx], acc, vb, msg)
+   )
 }
 
 
@@ -278,6 +309,22 @@ lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variabl
 {
   reveal_LearnerValidReceivedAcceptMsgs();
   VariableNextProperties(c, v, v');
+  forall idx, i, acc, vb |
+    && v'.ValidHistoryIdx(i)
+    && 0 <= idx < |c.learnerConstants|
+    && LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v'.History(i).learners[idx], acc, vb)
+  ensures
+    (exists msg :: 
+      && msg in v'.network.sentMsgs
+      && LearnerHost.ReceiveAcceptConclusion(c.learnerConstants[idx], v'.History(i).learners[idx], acc, vb, msg)
+    )
+  {
+    if i == |v'.history| - 1 {
+      if !LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v.History(i-1).learners[idx], acc, vb) {
+        // trigger
+      }
+    }
+  }
 }
 
 lemma InvNextLeaderValidReceivedPromiseMsgs(c: Constants, v: Variables, v': Variables)
@@ -288,6 +335,22 @@ lemma InvNextLeaderValidReceivedPromiseMsgs(c: Constants, v: Variables, v': Vari
 {
   reveal_LeaderValidReceivedPromiseMsgs();
   VariableNextProperties(c, v, v');
+  forall idx, i, acc |
+    && v'.ValidHistoryIdx(i)
+    && 0 <= idx < |c.leaderConstants|
+    && LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v'.History(i).leaders[idx], acc)
+  ensures
+    (exists msg :: 
+      && msg in v'.network.sentMsgs
+      && LeaderHost.ReceivePromiseConclusion(c.leaderConstants[idx], v'.History(i).leaders[idx], acc, msg)
+    )
+  {
+    if i == |v'.history| - 1 {
+      if !LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v.History(i-1).leaders[idx], acc) {
+        // trigger
+      }
+    }
+  }
 }
 
 /***************************************************************************************

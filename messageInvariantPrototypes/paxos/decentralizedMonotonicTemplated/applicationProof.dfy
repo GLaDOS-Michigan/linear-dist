@@ -930,6 +930,8 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
     if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
       assert Accept(vb, acc) in v'.network.sentMsgs by {
         reveal_LearnerValidReceivedAcceptMsgs();
+        assert 0 <= lnr < |c.learnerConstants|;
+        assert LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[lnr], v'.History(i).learners[lnr], acc, vb);
       }
       var j :|  && v'.ValidHistoryIdxStrict(j)    // via SendAcceptValidity
                 && v'.History(j).acceptors[acc].HasAccepted(vb)
@@ -937,8 +939,12 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
       VariableNextProperties(c, v, v');
       assert v.ValidHistoryIdx(j);
       assert j < i;
-      reveal_LeaderValidReceivedPromiseMsgs();
-      var prom :|   && IsPromiseMessage(v', prom)  // via LeaderValidReceivedPromiseMsgs
+      assert 0 <= ldr < |c.leaderConstants|;
+      assert LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v'.History(i).leaders[ldr], acc);
+      var prom: Message;
+      {
+        reveal_LeaderValidReceivedPromiseMsgs();
+        prom :|   && IsPromiseMessage(v', prom)  // via LeaderValidReceivedPromiseMsgs
                     && prom.bal == ldr
                     && prom.acc == acc
                     && (prom.vbOpt.Some?
@@ -946,11 +952,16 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
                         && v'.History(i).leaders[ldr].highestHeardBallot.Some?
                         && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
                     );
+      }
       var h :|  // from SendPromiseValidity
         && v'.ValidHistoryIdxStrict(h)
         && AcceptorHost.SendPromise(c.acceptorConstants[acc], v'.History(h).acceptors[acc], v'.History(h+1).acceptors[acc], prom);
       assert PromiseMessageMatchesHistory(c, v', prom, h+1);
-      // if h+1 <= j, violates AcceptorPromisedMonotonic. Else, violates AcceptorAcceptedMonotonic
+      if h+1 <= j {
+        assert !AcceptorPromisedMonotonic(c, v');
+      } else {
+        assert !AcceptorAcceptedMonotonic(c, v');
+      }
       assert false;
     }
   }
