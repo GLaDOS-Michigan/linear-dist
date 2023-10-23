@@ -1221,9 +1221,9 @@ lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables
   LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
 }
 
-// /***************************************************************************************
-// *                            Helper Definitions and Lemmas                             *
-// ***************************************************************************************/
+/***************************************************************************************
+*                            Helper Definitions and Lemmas                             *
+***************************************************************************************/
 
 ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
   && |quorum| >= c.p2Quorum
