@@ -87,7 +87,7 @@ namespace Microsoft.Dafny
       }
       res += "  requires v.WF(c)\n" +
              "{\n" +
-             string.Format("  forall idx, i, {0} |\n", string.Join(",", args.ToArray())) +
+             string.Format("  forall idx, i, {0} |\n", string.Join(", ", args.ToArray())) +
              "    && v.ValidHistoryIdx(i)\n" +
              string.Format("    && 0 <= idx < |c.{0}|\n", variableField) +
              string.Format("    && {0}.{1}(c.{2}[idx], v.History(i).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
@@ -106,9 +106,27 @@ namespace Microsoft.Dafny
              string.Format("  requires {0}(c, v)\n", GetPredicateName()) +
              "  requires Next(c, v, v')\n" +
              string.Format("  ensures {0}(c, v')\n", GetPredicateName()) +
-             "{\n" +
-             "  assume false;\n" +
-             "}\n";
+             "{\n";
+      if (opaque) {
+        res += string.Format("  reveal_{0}();\n", GetPredicateName());
+      }
+      res += "  VariableNextProperties(c, v, v');\n";
+      res += string.Format("  forall idx, i, {0} |\n", string.Join(", ", args.ToArray())) +
+             "    && v'.ValidHistoryIdx(i)\n" +
+             string.Format("    && 0 <= idx < |c.{0}|\n", variableField) +
+             string.Format("    && {0}.{1}(c.{2}[idx], v'.History(i).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
+             "  ensures\n" +
+             "    (exists msg ::\n" +
+             "      && msg in v'.network.sentMsgs\n" +
+             string.Format("      && {0}.{1}(c.{2}[idx], v'.History(i).{2}[idx], {3}, msg)\n", module, GetConclusionName(), variableField, string.Join(",", args.ToArray())) +
+             "    )\n" +
+             "  {\n" + 
+             "    if i == |v'.history| - 1 {\n" + 
+             string.Format("      if !{0}.{1}(c.{2}[idx], v.History(i-1).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
+             "      {} // trigger\n" +
+             "    }\n" +
+             "  }\n";
+      res += "}\n";
       return res;
     }
 
