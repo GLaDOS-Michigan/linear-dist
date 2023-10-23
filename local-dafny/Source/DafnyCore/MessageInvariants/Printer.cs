@@ -53,12 +53,20 @@ namespace Microsoft.Dafny
         res += sendInv.ToPredicate() + "\n";
       }
 
+      // List Receive Invariants
+      foreach (var recvInv in file.GetReceiveInvariants()) {
+        res += recvInv.ToPredicate() + "\n";
+      }
+
       // Main message invariant
       res += "ghost predicate MessageInv(c: Constants, v: Variables)\n" +
              "{\n" +
              "  && v.WF(c)\n" +
              "  && ValidVariables(c, v)\n";
       foreach (var inv in file.GetSendInvariants()) {
+        res += String.Format("  && {0}(c, v)\n", inv.GetPredicateName());
+      }
+      foreach (var inv in file.GetReceiveInvariants()) {
         res += String.Format("  && {0}(c, v)\n", inv.GetPredicateName());
       }
       res += "}\n\n";
@@ -74,6 +82,9 @@ namespace Microsoft.Dafny
       foreach (var inv in file.GetSendInvariants()) {
         res += String.Format("  {0}(c, v, v');\n", inv.GetLemmaName());
       }
+      foreach (var inv in file.GetReceiveInvariants()) {
+        res += String.Format("  {0}(c, v, v');\n", inv.GetLemmaName());
+      }
       res += "}\n";
 
       res += "\n" +
@@ -84,6 +95,10 @@ namespace Microsoft.Dafny
 
       // InvNextProofs
       foreach (var pred in file.GetSendInvariants()) {
+        res += pred.ToLemma();
+        res += "\n";
+      }
+      foreach (var pred in file.GetReceiveInvariants()) {
         res += pred.ToLemma();
         res += "\n";
       }

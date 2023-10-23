@@ -437,12 +437,14 @@ module LearnerHost {
     && v' == v.(learned := Some(vb.v))      // learn new value
   }
 
+  // Receive predicate trigger
   // First 2 arguments are mandatory. Second argument identifies target host. 
   ghost predicate ReceiveAcceptTrigger(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal) {
     && vb in v.receivedAccepts
     && acc in v.receivedAccepts[vb]
   }
 
+  // Receive predicate conclusion
   ghost predicate ReceiveAcceptConclusion(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal, msg: Message) {
     msg == Accept(vb, acc)
   }

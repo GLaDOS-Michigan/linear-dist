@@ -32,7 +32,7 @@ namespace Microsoft.Dafny
         }
       }
       Debug.Assert(variableField != null, "variableField should not be null");
-      Console.WriteLine(string.Format("Found send predicate [{0}] in module [{1}] for msg type [{2}], in DistributedSystem.[Hosts.{3}]\n", sendPredicate.Name, module, msgType, variableField));
+      Console.WriteLine(string.Format("Found send predicate [{0}] in module [{1}] for msg type [{2}], in Hosts.[{3}]\n", sendPredicate.Name, module, msgType, variableField));
     
       var sendInv = new SendInvariant(sendPredicate.Name, msgType, module, variableField);
       return sendInv;
