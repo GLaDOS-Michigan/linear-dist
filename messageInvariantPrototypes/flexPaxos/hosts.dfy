@@ -115,6 +115,25 @@ module LeaderHost {
             )
   }
 
+  // Receive predicate trigger
+  // First 2 arguments are mandatory. Second argument identifies target host. 
+  ghost predicate ReceivePromiseTrigger(c: Constants, v: Variables, acc: AcceptorId) {
+    && acc in v.receivedPromises
+  }
+
+  // Receive predicate conclusion
+  // Same arguments as trigger, with an additional msg argument
+  ghost predicate ReceivePromiseConclusion(c: Constants, v: Variables, acc: AcceptorId, msg: Message) {
+    && msg.Promise?
+    && msg.bal == c.id
+    && msg.acc == acc
+    && (msg.vbOpt.Some?
+        ==> 
+        && v.highestHeardBallot.Some?
+        && msg.vbOpt.value.b <= v.highestHeardBallot.value
+      )
+  }
+
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
@@ -408,6 +427,18 @@ module LearnerHost {
     && v' == v.(
       receivedAccepts := UpdateReceivedAccepts(v.receivedAccepts, msgOps.recv.value.vb, msgOps.recv.value.acc)
     )
+  }
+
+  // Receive predicate trigger
+  // First 2 arguments are mandatory. Second argument identifies target host. 
+  ghost predicate ReceiveAcceptTrigger(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal) {
+    && vb in v.receivedAccepts
+    && acc in v.receivedAccepts[vb]
+  }
+
+  // Receive predicate conclusion
+  ghost predicate ReceiveAcceptConclusion(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal, msg: Message) {
+    msg == Accept(vb, acc)
   }
 
   ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, msgOps: MessageOps) {

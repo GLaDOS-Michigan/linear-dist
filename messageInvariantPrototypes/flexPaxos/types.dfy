@@ -13,6 +13,14 @@ datatype Message = Prepare(bal:LeaderId)
                 | Promise(bal:LeaderId, acc:AcceptorId, vbOpt:Option<ValBal>)  //valbal is the value-ballot pair with which the value was accepted
                 | Propose(bal:LeaderId, val:Value)
                 | Accept(vb:ValBal, acc:AcceptorId)
+{
+  ghost function Src() : nat {
+    if this.Prepare? then bal
+    else if this.Promise? then acc
+    else if this.Propose? then bal
+    else acc
+  }
+}
 
 datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 
