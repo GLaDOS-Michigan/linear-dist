@@ -1,3 +1,6 @@
+using System;
+using System.Diagnostics;
+
 namespace Microsoft.Dafny
 {
 
@@ -14,6 +17,37 @@ namespace Microsoft.Dafny
       this.module = module;
       this.variableField = variableField;
     }
+
+    public static SendInvariant FromFunction(Function sendPredicate, DatatypeDecl dsHosts) {
+      // Extract module and msgType
+      var module = ExtractSendInvariantModule(sendPredicate);
+      var msgType = ExtractSendInvariantMsgType(sendPredicate);
+      
+      // extract field name in DistributedSystem.Hosts of type seq<[module].Variables>
+      string variableField = null;
+      foreach (var formal in dsHosts.GetGroundingCtor().Formals) {
+        if (formal.DafnyName.Contains(string.Format("{0}.Variables", module))) {
+          variableField = formal.CompileName;
+          break;
+        }
+      }
+      Debug.Assert(variableField != null, "variableField should not be null");
+      Console.WriteLine(string.Format("Found send predicate [{0}] in module [{1}] for msg type [{2}], in DistributedSystem.[Hosts.{3}]\n", sendPredicate.Name, module, msgType, variableField));
+    
+      var sendInv = new SendInvariant(sendPredicate.Name, msgType, module, variableField);
+      return sendInv;
+    }
+
+    // Message invariant function is of format "Send<MsgType>"
+    private static string ExtractSendInvariantMsgType(Function func) {
+      return func.Name.Substring(4);
+    }
+
+    // Get the Module in Module.SendPredicate
+    private static string ExtractSendInvariantModule(Function func) {
+      return func.FullDafnyName.Substring(0, func.FullDafnyName.IndexOf('.'));
+    }
+    
 
     public string GetName() {
       return this.functionName;

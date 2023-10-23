@@ -44,34 +44,21 @@ public class MessageInvariantsDriver {
     }
 
     // Create SendInvariant objects
-    foreach (var si in sendPredicateDefs) {
-      // Extract module and msgType
-      var module = ExtractSendInvariantModule(si);
-      var msgType = ExtractSendInvariantMsgType(si);
-      
-      // extract field name in DistributedSystem.Hosts of type seq<[module].Variables>
-      string variableField = null;
-      foreach (var formal in dsHosts.GetGroundingCtor().Formals) {
-        if (formal.DafnyName.Contains(string.Format("{0}.Variables", module))) {
-          variableField = formal.CompileName;
-          break;
-        }
-      }
-      Debug.Assert(variableField != null, "variableField should not be null");
-      Console.WriteLine(string.Format("Found send predicate [{0}] in module [{1}] for msg type [{2}], in DistributedSystem.[Hosts.{3}]\n", si.Name, module, msgType, variableField));
-    
-      var sendInv = new SendInvariant(si.Name, msgType, module, variableField);
+    foreach (var si in sendPredicateDefs) {   
+      var sendInv = SendInvariant.FromFunction(si, dsHosts);
       msgInvFile.AddSendInvariant(sendInv);
     }
-  }
 
-  // Message invariant function is of format "Send<MsgType>"
-  private string ExtractSendInvariantMsgType(Function func) {
-    return func.Name.Substring(4);
-  }
-
-  private string ExtractSendInvariantModule(Function func) {
-    return func.FullDafnyName.Substring(0, func.FullDafnyName.IndexOf('.'));
+  //   // Find Receive Predicate definitions -- have a list of predicate names, and a map to 
+  //   // Trigger and Conclusion definitions
+  //   var receivePredicateNames = new List<string>();
+  //   var receivePredicateDefs = new Dictionary<string, Function>();
+  //   foreach (var kvp in program.ModuleSigs) {
+  //     foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
+  //       if (topLevelDecl.Name.StartsWith("Send")) {  // identifying marker for Send Predicate
+  //       }
+  //     }
+  //   }
   }
 
   public void WriteToFile() {
