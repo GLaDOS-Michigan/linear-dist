@@ -54,6 +54,9 @@ namespace Microsoft.Dafny
       return func.FullDafnyName.Substring(0, func.FullDafnyName.IndexOf('.'));
     }
 
+    public bool isOpaque() {
+      return opaque;
+    }
 
     public string GetName() {
       return functionName;

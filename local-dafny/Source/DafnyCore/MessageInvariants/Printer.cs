@@ -8,13 +8,12 @@ namespace Microsoft.Dafny
     private static readonly string[] includes = {"spec.dfy"};
     private static readonly string[] imports = {"Types", "UtilitiesLibrary", "DistributedSystem", "Obligations"};
 
-    private static readonly string InitImpliesMessageInv = 
+    private static readonly string InitImpliesMessageInvHeader = 
       "lemma InitImpliesMessageInv(c: Constants, v: Variables)\n" +
       "  requires Init(c, v)\n" +
       "  ensures MessageInv(c, v)\n" +
       "{\n" +
-      "  InitImpliesValidVariables(c, v);\n" + 
-      "}\n";
+      "  InitImpliesValidVariables(c, v);\n";
     private static readonly string MessageInvInductiveHeader = 
        "lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)\n" +
         "  requires MessageInv(c, v)\n" +
@@ -73,7 +72,16 @@ namespace Microsoft.Dafny
 
       // Proof obligations
       res += "// Base obligation\n";
-      res += InitImpliesMessageInv + "\n";
+      res += InitImpliesMessageInvHeader;
+      foreach (var ri in file.GetReceiveInvariants()) {
+        // reveal opaqued receive invariants
+        if (ri.isOpaque()) {
+          res += string.Format("  reveal_{0}();\n", ri.GetPredicateName());
+        }
+      }
+      res += "}\n";
+      
+      res += "\n";
       res += "// Inductive obligation\n";
 
       res += MessageInvInductiveHeader + 
