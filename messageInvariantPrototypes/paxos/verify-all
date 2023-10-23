@@ -23,3 +23,9 @@ cd decentralizedMonotonicTemplated
 ./verify
 cd - > /dev/null
 echo ""
+
+echo "Verifying automate"
+cd automate
+./verify-auto
+cd - > /dev/null
+echo ""

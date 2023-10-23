@@ -1,11 +1,11 @@
-include "messageInvariants.dfy"
+include "messageInvariantsAutogen.dfy"
 
 module PaxosProof {
   
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
-import opened PaxosMessageInvariants
+import opened MessageInvariants
 import opened Obligations
 
 
