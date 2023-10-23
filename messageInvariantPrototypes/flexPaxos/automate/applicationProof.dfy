@@ -1,11 +1,11 @@
-include "messageInvariants.dfy"
+include "messageInvariantsAutogen.dfy"
 
 module PaxosProof {
   
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
-import opened PaxosMessageInvariants
+import opened MessageInvariants
 import opened Obligations
 
 
@@ -893,7 +893,7 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   }
 }
 
-lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
+lemma {:timeLimitMultiplier 2} InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
   // v requirements
   requires ValidMessages(c, v)
