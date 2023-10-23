@@ -18,8 +18,8 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && SendPromiseValidity(c, v)
   && SendAcceptValidity(c, v)
   // Receive Invariants
-  && LeaderValidReceivedPromiseMsgs(c, v)
-  && LearnerValidReceivedAcceptMsgs(c, v)
+  && ReceivePromiseValidity(c, v)
+  && ReceiveAcceptValidity(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
@@ -27,8 +27,8 @@ lemma InitImpliesMessageInv(c: Constants, v: Variables)
   ensures MessageInv(c, v)
 {
   InitImpliesValidVariables(c, v);
-  reveal_LeaderValidReceivedPromiseMsgs();
-  reveal_LearnerValidReceivedAcceptMsgs();
+  reveal_ReceivePromiseValidity();
+  reveal_ReceiveAcceptValidity();
 }
 
 lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
@@ -42,8 +42,8 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   InvNextSendProposeValidity(c, v, v');
   InvNextSendPromiseValidity(c, v, v');
   InvNextSendAcceptValidity(c, v, v');
-  InvNextLeaderValidReceivedPromiseMsgs(c, v, v');
-  InvNextLearnerValidReceivedAccepts(c, v, v');
+  InvNextReceivePromiseValidity(c, v, v');
+  InvNextReceiveAcceptValidity(c, v, v');
 }
 
 /***************************************************************************************
@@ -102,46 +102,35 @@ ghost predicate SendAcceptValidity(c: Constants, v: Variables)
   )
 }
 
-/***************************************************************************************
-*                               Custom Receive Invariants                              *
-***************************************************************************************/
-
-// certified self-inductive
 // Leader updates receivedPromises based on Promise messages
-ghost predicate {:opaque} LeaderValidReceivedPromiseMsgs(c: Constants, v: Variables)
+ghost predicate {:opaque} ReceivePromiseValidity(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, i, acc |
-    && c.ValidLeaderIdx(ldr)
+  forall idx, i, acc |
     && v.ValidHistoryIdx(i)
-    && acc in v.History(i).leaders[ldr].receivedPromises
+    && 0 <= idx < |c.leaders|  // this can be derived
+    && LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v.History(i).leaders[idx], acc)
   :: 
-    (exists prom: Message :: 
-      && prom.Promise?
-      && prom in v.network.sentMsgs
-      && prom.bal == ldr
-      && prom.acc == acc
-      && (prom.vbOpt.Some?
-          ==> 
-          && v.History(i).leaders[ldr].highestHeardBallot.Some?
-          && prom.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
-        )
+    (exists msg :: 
+      && msg in v.network.sentMsgs
+      && LeaderHost.ReceivePromiseConclusion(c.leaders[idx], v.History(i).leaders[idx], acc, msg)
     )
 }
 
-// certified self-inductive
 // Learner updates its receivedAccepts map based on a Accept message carrying that 
 // accepted ValBal pair
-ghost predicate {:opaque} LearnerValidReceivedAcceptMsgs(c: Constants, v: Variables) 
+ghost predicate {:opaque} ReceiveAcceptValidity(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, vb, acc, i | 
     && c.ValidLearnerIdx(idx)
     && v.ValidHistoryIdx(i)
-    && vb in v.History(i).learners[idx].receivedAccepts
-    && acc in v.History(i).learners[idx].receivedAccepts[vb]
+    && LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v.History(i).learners[idx], acc, vb)
   ::
-    Accept(vb, acc) in v.network.sentMsgs
+   (exists msg :: 
+      && msg in v.network.sentMsgs
+      && LearnerHost.ReceiveAcceptConclusion(c.learners[idx], v.History(i).learners[idx], acc, vb, msg)
+   )
 }
 
 
@@ -246,24 +235,56 @@ lemma InvNextSendAcceptValidity(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
+lemma InvNextReceiveAcceptValidity(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
-  requires LearnerValidReceivedAcceptMsgs(c, v)
+  requires ReceiveAcceptValidity(c, v)
   requires Next(c, v, v')
-  ensures LearnerValidReceivedAcceptMsgs(c, v')
+  ensures ReceiveAcceptValidity(c, v')
 {
-  reveal_LearnerValidReceivedAcceptMsgs();
+  reveal_ReceiveAcceptValidity();
   VariableNextProperties(c, v, v');
+  forall idx, i, acc, vb |
+    && v'.ValidHistoryIdx(i)
+    && 0 <= idx < |c.learners|
+    && LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v'.History(i).learners[idx], acc, vb)
+  ensures
+    (exists msg :: 
+      && msg in v'.network.sentMsgs
+      && LearnerHost.ReceiveAcceptConclusion(c.learners[idx], v'.History(i).learners[idx], acc, vb, msg)
+    )
+  {
+    if i == |v'.history| - 1 {
+      if !LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v.History(i-1).learners[idx], acc, vb) {
+        // trigger
+      }
+    }
+  }
 }
 
-lemma InvNextLeaderValidReceivedPromiseMsgs(c: Constants, v: Variables, v': Variables)
+lemma InvNextReceivePromiseValidity(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
-  requires LeaderValidReceivedPromiseMsgs(c, v)
+  requires ReceivePromiseValidity(c, v)
   requires Next(c, v, v')
-  ensures LeaderValidReceivedPromiseMsgs(c, v')
+  ensures ReceivePromiseValidity(c, v')
 {
-  reveal_LeaderValidReceivedPromiseMsgs();
+  reveal_ReceivePromiseValidity();
   VariableNextProperties(c, v, v');
+  forall idx, i, acc |
+    && v'.ValidHistoryIdx(i)
+    && 0 <= idx < |c.leaders|
+    && LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v'.History(i).leaders[idx], acc)
+  ensures
+    (exists msg :: 
+      && msg in v'.network.sentMsgs
+      && LeaderHost.ReceivePromiseConclusion(c.leaders[idx], v'.History(i).leaders[idx], acc, msg)
+    )
+  {
+    if i == |v'.history| - 1 {
+      if !LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v.History(i-1).leaders[idx], acc) {
+        // trigger
+      }
+    }
+  }
 }
 
 }  // end module PaxosProof

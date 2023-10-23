@@ -893,7 +893,7 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   }
 }
 
-lemma {:timeLimitMultiplier 2} InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
+lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
   // v requirements
   requires ValidMessages(c, v)
@@ -903,8 +903,8 @@ lemma {:timeLimitMultiplier 2} InvNextLeaderHighestHeardToPromisedRangeHasNoAcce
 
   // v' requirements
   requires Next(c, v, v')
-  requires LearnerValidReceivedAcceptMsgs(c, v')  // custom receive invariant
-  requires LeaderValidReceivedPromiseMsgs(c, v')  // custom receive invariant
+  requires ReceiveAcceptValidity(c, v')  // custom receive invariant
+  requires ReceivePromiseValidity(c, v')  // custom receive invariant
   requires SendAcceptValidity(c, v')
   requires SendPromiseValidity(c, v')
   requires AcceptorAcceptedMonotonic(c, v')
@@ -926,7 +926,9 @@ lemma {:timeLimitMultiplier 2} InvNextLeaderHighestHeardToPromisedRangeHasNoAcce
   {
     if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
       assert Accept(vb, acc) in v'.network.sentMsgs by {
-        reveal_LearnerValidReceivedAcceptMsgs();
+        reveal_ReceiveAcceptValidity();
+        assert 0 <= lnr < |c.learners|;
+        assert LearnerHost.ReceiveAcceptTrigger(c.learners[lnr], v'.History(i).learners[lnr], acc, vb);
       }
       var j :|  && v'.ValidHistoryIdxStrict(j)    // via SendAcceptValidity
                 && v'.History(j).acceptors[acc].HasAccepted(vb)
@@ -934,20 +936,31 @@ lemma {:timeLimitMultiplier 2} InvNextLeaderHighestHeardToPromisedRangeHasNoAcce
       VariableNextProperties(c, v, v');
       assert v.ValidHistoryIdx(j);
       assert j < i;
-      reveal_LeaderValidReceivedPromiseMsgs();
-      var prom :|   && IsPromiseMessage(v', prom)  // via LeaderValidReceivedPromiseMsgs
-                    && prom.bal == ldr
-                    && prom.acc == acc
-                    && (prom.vbOpt.Some?
-                        ==> 
-                        && v'.History(i).leaders[ldr].highestHeardBallot.Some?
-                        && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
-                    );
+      var prom: Message;
+      {
+        assert 0 <= ldr < |c.leaders|;
+        assert LeaderHost.ReceivePromiseTrigger(c.leaders[ldr], v'.History(i).leaders[ldr], acc);
+        reveal_ReceivePromiseValidity();
+        prom :|     && prom in v'.network.sentMsgs
+                    && LeaderHost.ReceivePromiseConclusion(c.leaders[ldr], v'.History(i).leaders[ldr], acc, prom);
+      }
+      assert && prom.Promise?  // via ReceivePromiseValidity
+            && prom.bal == ldr
+            && prom.acc == acc
+            && (prom.vbOpt.Some?
+                ==> 
+                && v'.History(i).leaders[ldr].highestHeardBallot.Some?
+                && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
+      );
       var h :|  // from SendPromiseValidity
         && v'.ValidHistoryIdxStrict(h)
         && AcceptorHost.SendPromise(c.acceptors[acc], v'.History(h).acceptors[acc], v'.History(h+1).acceptors[acc], prom);
       assert PromiseMessageMatchesHistory(c, v', prom, h+1);
-      // if h+1 <= j, violates AcceptorPromisedMonotonic. Else, violates AcceptorAcceptedMonotonic
+      if h+1 <= j {
+        assert !AcceptorPromisedMonotonic(c, v');
+      } else {
+        assert !AcceptorAcceptedMonotonic(c, v');
+      }
       assert false;
     }
   }
