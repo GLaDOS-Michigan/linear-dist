@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -32,29 +33,35 @@ public class MessageInvariantsDriver {
     }
     Debug.Assert(dsHosts != null, "dsHosts should not be null");
 
-    // Find Send invariants
+    // Find Send Predicate definitions
+    var sendPredicateDefs = new List<Function>();
     foreach (var kvp in program.ModuleSigs) {
       foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
         if (topLevelDecl.Name.StartsWith("Send")) {  // identifying marker for Send Predicate
-          // Extract module and msgType
-          var module = ExtractSendInvariantModule(topLevelDecl);
-          var msgType = ExtractSendInvariantMsgType(topLevelDecl);
-          
-          // extract field name in DistributedSystem.Hosts of type seq<[module].Variables>
-          string variableField = null;
-          foreach (var formal in dsHosts.GetGroundingCtor().Formals) {
-            if (formal.DafnyName.Contains(string.Format("{0}.Variables", module))) {
-              variableField = formal.CompileName;
-              break;
-            }
-          }
-          Debug.Assert(variableField != null, "variableField should not be null");
-          Console.WriteLine(string.Format("Found send predicate [{0}] in module [{1}] for msg type [{2}], in DistributedSystem.[Hosts.{3}]\n", topLevelDecl.Name, module, msgType, variableField));
-        
-          var sendInv = new SendInvariant(topLevelDecl.Name, msgType, module, variableField);
-          msgInvFile.AddSendInvariant(sendInv);
+          sendPredicateDefs.Add(topLevelDecl);
         }
       }
+    }
+
+    // Create SendInvariant objects
+    foreach (var si in sendPredicateDefs) {
+      // Extract module and msgType
+      var module = ExtractSendInvariantModule(si);
+      var msgType = ExtractSendInvariantMsgType(si);
+      
+      // extract field name in DistributedSystem.Hosts of type seq<[module].Variables>
+      string variableField = null;
+      foreach (var formal in dsHosts.GetGroundingCtor().Formals) {
+        if (formal.DafnyName.Contains(string.Format("{0}.Variables", module))) {
+          variableField = formal.CompileName;
+          break;
+        }
+      }
+      Debug.Assert(variableField != null, "variableField should not be null");
+      Console.WriteLine(string.Format("Found send predicate [{0}] in module [{1}] for msg type [{2}], in DistributedSystem.[Hosts.{3}]\n", si.Name, module, msgType, variableField));
+    
+      var sendInv = new SendInvariant(si.Name, msgType, module, variableField);
+      msgInvFile.AddSendInvariant(sendInv);
     }
   }
 
