@@ -80,11 +80,11 @@ module LeaderHost {
   ghost predicate NextPrepareStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && PrepareSendFunc(c, v, v', msgOps.send.value)
+    && SendPrepare(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate PrepareSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendPrepare(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && true
     // send message and update v'
@@ -118,11 +118,11 @@ module LeaderHost {
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
-    && ProposeSendFunc(c, v, v', msgOps.send.value)
+    && SendPropose(c, v, v', msgOps.send.value)
   }
 
   // Send predicate
-  ghost predicate ProposeSendFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate SendPropose(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.CanPropose(c)
     // send message and update v'

@@ -76,7 +76,7 @@ ghost predicate SendPrepareValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && LeaderHost.PrepareSendFunc(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPrepare(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
   )
 }
 
@@ -90,7 +90,7 @@ ghost predicate SendProposeValidity(c: Constants, v: Variables)
   :: 
   (exists i ::
       && v.ValidHistoryIdxStrict(i)
-      && LeaderHost.ProposeSendFunc(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPropose(c.leaderConstants[msg.bal], v.History(i).leaders[msg.bal], v.History(i+1).leaders[msg.bal], msg)
   )
 }
 
@@ -190,13 +190,13 @@ lemma InvNextSendPrepareValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && LeaderHost.PrepareSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPrepare(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsPrepareMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert LeaderHost.PrepareSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
+      assert LeaderHost.SendPrepare(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
     }
   }
 }
@@ -213,13 +213,13 @@ lemma InvNextSendProposeValidity(c: Constants, v: Variables, v': Variables)
   ensures
   (exists i ::
       && v'.ValidHistoryIdxStrict(i)
-      && LeaderHost.ProposeSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
+      && LeaderHost.SendPropose(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg)
   ) {
     VariableNextProperties(c, v, v');
     if !IsProposeMessage(v, msg) {
       // witness and trigger
       var i := |v'.history|-2;
-      assert LeaderHost.ProposeSendFunc(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
+      assert LeaderHost.SendPropose(c.leaderConstants[msg.bal], v'.History(i).leaders[msg.bal], v'.History(i+1).leaders[msg.bal], msg);
     }
   }
 }
