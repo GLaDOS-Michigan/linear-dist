@@ -939,10 +939,10 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
       VariableNextProperties(c, v, v');
       assert v.ValidHistoryIdx(j);
       assert j < i;
-      assert 0 <= ldr < |c.leaderConstants|;
-      assert LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v'.History(i).leaders[ldr], acc);
       var prom: Message;
       {
+        assert 0 <= ldr < |c.leaderConstants|;
+        assert LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v'.History(i).leaders[ldr], acc);
         reveal_LeaderValidReceivedPromiseMsgs();
         prom :|   && IsPromiseMessage(v', prom)  // via LeaderValidReceivedPromiseMsgs
                     && prom.bal == ldr
