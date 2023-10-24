@@ -188,10 +188,14 @@ ghost predicate {:opaque} LearnerValidReceivedAcceptMsgs(c: Constants, v: Variab
     && v.ValidHistoryIdx(i)
     && LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v.History(i).learners[idx], acc, vb)
   ::
-   (exists msg :: 
-      && msg in v.network.sentMsgs
-      && LearnerHost.ReceiveAcceptConclusion(c.learnerConstants[idx], v.History(i).learners[idx], acc, vb, msg)
-   )
+   (exists j, msg :: 
+       && j < i
+       && v.ValidHistoryIdxStrict(j)
+       && msg in v.network.sentMsgs
+       && !LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v.History(j).learners[idx], acc, vb)
+       && LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v.History(j+1).learners[idx], acc, vb)
+       && LearnerHost.ReceiveAccept(c.learnerConstants[idx], v.History(j).learners[idx], v.History(j+1).learners[idx], msg)
+    )
 }
 
 
@@ -308,20 +312,28 @@ lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variabl
   ensures LearnerValidReceivedAcceptMsgs(c, v')
 {
   reveal_LearnerValidReceivedAcceptMsgs();
-  VariableNextProperties(c, v, v');
-  forall idx, i, acc, vb |
-    && v'.ValidHistoryIdx(i)
+  forall idx, vb, acc, i |
     && 0 <= idx < |c.learnerConstants|
+    && v'.ValidHistoryIdx(i)
     && LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v'.History(i).learners[idx], acc, vb)
   ensures
-    (exists msg :: 
+    (exists j, msg :: 
+      && j < i
+      && v'.ValidHistoryIdxStrict(j)
       && msg in v'.network.sentMsgs
-      && LearnerHost.ReceiveAcceptConclusion(c.learnerConstants[idx], v'.History(i).learners[idx], acc, vb, msg)
+      && !LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v'.History(j).learners[idx], acc, vb)
+      && LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v'.History(j+1).learners[idx], acc, vb)
+      && LearnerHost.ReceiveAccept(c.learnerConstants[idx], v'.History(j).learners[idx], v'.History(j+1).learners[idx], msg)
     )
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
-      if !LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v.History(i-1).learners[idx], acc, vb) {
-        // trigger
+      if !LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[idx], v.Last().learners[idx], acc, vb) {
+        // witnesses and triggers
+        var j := |v.history|-1;
+        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        var msg := dsStep.msgOps.recv.value;
+        assert LearnerHost.ReceiveAccept(c.learnerConstants[idx], v'.History(j).learners[idx], v'.History(j+1).learners[idx], msg);
       }
     }
   }

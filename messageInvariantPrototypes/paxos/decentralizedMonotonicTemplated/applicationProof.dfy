@@ -929,9 +929,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
   {
     if acc in v'.History(i).learners[lnr].receivedAccepts[vb] {
       assert Accept(vb, acc) in v'.network.sentMsgs by {
-        reveal_LearnerValidReceivedAcceptMsgs();
-        assert 0 <= lnr < |c.learnerConstants|;
-        assert LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[lnr], v'.History(i).learners[lnr], acc, vb);
+        AcceptMessageExistence(c, v', i, lnr, vb, acc);
       }
       var j :|  && v'.ValidHistoryIdxStrict(j)    // via SendAcceptValidity
                 && v'.History(j).acceptors[acc].HasAccepted(vb)
@@ -945,13 +943,13 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
         assert LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v'.History(i).leaders[ldr], acc);
         reveal_LeaderValidReceivedPromiseMsgs();
         prom :|   && IsPromiseMessage(v', prom)  // via LeaderValidReceivedPromiseMsgs
-                    && prom.bal == ldr
-                    && prom.acc == acc
-                    && (prom.vbOpt.Some?
-                        ==> 
-                        && v'.History(i).leaders[ldr].highestHeardBallot.Some?
-                        && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
-                    );
+                  && prom.bal == ldr
+                  && prom.acc == acc
+                  && (prom.vbOpt.Some?
+                      ==> 
+                      && v'.History(i).leaders[ldr].highestHeardBallot.Some?
+                      && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
+                  );
       }
       var h :|  // from SendPromiseValidity
         && v'.ValidHistoryIdxStrict(h)
@@ -965,6 +963,18 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
       assert false;
     }
   }
+}
+
+lemma AcceptMessageExistence(c: Constants, v: Variables, i: int, lnr:LearnerId, vb: ValBal, acc: AcceptorId) 
+  requires v.WF(c)
+  requires v.ValidHistoryIdx(i)
+  requires c.ValidLearnerIdx(lnr)
+  requires vb in v.History(i).learners[lnr].receivedAccepts
+  requires LearnerHost.ReceiveAcceptTrigger(c.learnerConstants[lnr], v.History(i).learners[lnr], acc, vb)
+  requires LearnerValidReceivedAcceptMsgs(c, v)  // custom receive invariant
+  ensures Accept(vb, acc) in v.network.sentMsgs
+{
+  reveal_LearnerValidReceivedAcceptMsgs();
 }
 
 ghost predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: Message, i: nat)

@@ -423,9 +423,14 @@ module LearnerHost {
   ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && msgOps.recv.value.Accept?
+    && ReceiveAccept(c, v, v', msgOps.recv.value)
+  }
+
+  // Receive predicate
+  ghost predicate ReceiveAccept(c: Constants, v: Variables, v': Variables, msg: Message) {
+    && msg.Accept?
     && v' == v.(
-      receivedAccepts := UpdateReceivedAccepts(v.receivedAccepts, msgOps.recv.value.vb, msgOps.recv.value.acc)
+      receivedAccepts := UpdateReceivedAccepts(v.receivedAccepts, msg.vb, msg.acc)
     )
   }
 
@@ -442,11 +447,6 @@ module LearnerHost {
   ghost predicate ReceiveAcceptTrigger(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal) {
     && vb in v.receivedAccepts
     && acc in v.receivedAccepts[vb]
-  }
-
-  // Receive predicate conclusion
-  ghost predicate ReceiveAcceptConclusion(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal, msg: Message) {
-    msg == Accept(vb, acc)
   }
 
   ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
