@@ -5,6 +5,7 @@ include "spec.dfy"
 module MessageInvariants {
 import opened Types
 import opened UtilitiesLibrary
+import opened MonotonicityLibrary
 import opened DistributedSystem
 import opened Obligations
 
@@ -32,7 +33,7 @@ ghost predicate DecisionMsgsAgreeWithLeader(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall msg | msg in v.network.sentMsgs && msg.DecideMsg? 
-  :: v.GetCoordinator(c).decision.Some? && msg.decision == v.GetCoordinator(c).decision.value
+  :: v.GetCoordinator(c).decision.WOSome? && msg.decision == v.GetCoordinator(c).decision.value
 }
 
 // If a participant has decided, then there must be a corresponding DecideMsg

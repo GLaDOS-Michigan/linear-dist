@@ -1,11 +1,10 @@
-// User level proofs of application invariants
-
 include "messageInvariants.dfy"
 
 
 module TwoPCInvariantProof {
 import opened Types
 import opened UtilitiesLibrary
+import opened MonotonicityLibrary
 import opened DistributedSystem
 import opened Obligations
 import opened MessageInvariants
@@ -85,7 +84,7 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
         /* Proof by contradiction. Suppose coordinator decided Commit. Then it must have
         a Yes vote from all participants, including noVoter. This is a contradiction */
         var l, l' := v.GetCoordinator(c), v'.GetCoordinator(c);
-        if l.decision.None? && l'.decision == Some(Commit) {
+        if l.decision.WONone? && l'.decision == WOSome(Commit) {
           YesVotesContainsAllParticipantsWhenFull(c, v);
           assert GetParticipantPreference(c, noVoter) == Yes;  // witness
           assert false;

@@ -6,6 +6,7 @@ include "spec.dfy"
 module MessageInvariants {
 import opened Types
 import opened UtilitiesLibrary
+import opened MonotonicityLibrary
 import opened DistributedSystem
 
 // Message Invariant: self inductive
@@ -33,7 +34,7 @@ ghost predicate VoteMsgImpliesNominee(c: Constants, v: Variables)
   requires ValidMessages(c, v)
 {
   forall msg | msg in v.network.sentMsgs && msg.Vote?
-  :: v.hosts[msg.voter].nominee == Some(msg.candidate)
+  :: v.hosts[msg.voter].nominee == WOSome(msg.candidate)
 }
 
 ghost predicate MessageInv(c: Constants, v: Variables) 

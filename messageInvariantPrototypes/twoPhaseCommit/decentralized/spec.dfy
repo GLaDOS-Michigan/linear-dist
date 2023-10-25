@@ -15,6 +15,7 @@ include "distributedSystem.dfy"
 module Obligations {
   import opened Types
   import opened UtilitiesLibrary
+  import opened MonotonicityLibrary
   import opened DistributedSystem
 
   // AC-1: All processes that reach a decision reach the same decision as the coordinator.
@@ -70,39 +71,39 @@ module Obligations {
     requires v.WF(c)
     requires c.ValidParticipantId(pidx)
   {
-    v.participants[pidx].decision.Some?
+    v.participants[pidx].decision.WOSome?
   }
 
   ghost predicate ParticipantDecidedCommit(c: Constants, v: Variables, pidx: HostId) 
     requires v.WF(c)
     requires c.ValidParticipantId(pidx)
   {
-    v.participants[pidx].decision == Some(Commit)
+    v.participants[pidx].decision == WOSome(Commit)
   }
 
   ghost predicate ParticipantDecidedAbort(c: Constants, v: Variables, pidx: HostId) 
     requires v.WF(c)
     requires c.ValidParticipantId(pidx)
   {
-    v.participants[pidx].decision == Some(Abort)
+    v.participants[pidx].decision == WOSome(Abort)
   }
 
   ghost predicate CoordinatorHasDecided(c: Constants, v: Variables) 
     requires v.WF(c)
   {
-    v.GetCoordinator(c).decision.Some?
+    v.GetCoordinator(c).decision.WOSome?
   }
 
   ghost predicate CoordinatorDecidedCommit(c: Constants, v: Variables) 
     requires v.WF(c)
   {
-    v.GetCoordinator(c).decision == Some(Commit)
+    v.GetCoordinator(c).decision == WOSome(Commit)
   }
 
   ghost predicate CoordinatorDecidedAbort(c: Constants, v: Variables) 
     requires v.WF(c)
   {
-    v.GetCoordinator(c).decision == Some(Abort)
+    v.GetCoordinator(c).decision == WOSome(Abort)
   }
 
   ghost function GetParticipantPreference(c: Constants, i: int) : Vote

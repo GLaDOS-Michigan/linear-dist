@@ -5,6 +5,7 @@ include "messageInvariants.dfy"
 
 module ToyLeaderElectionProof {
 import opened Types
+import opened MonotonicityLibrary
 import opened UtilitiesLibrary
 import opened DistributedSystem
 import opened MessageInvariants
@@ -100,8 +101,8 @@ lemma SafetyProof(c: Constants, v': Variables)
     var rv1, rv2 :=  v'.hosts[l1].receivedVotes, v'.hosts[l2].receivedVotes;
     var rogueId := QuorumIntersection(allHosts, rv1, rv2);  // witness
 
-    assert v'.hosts[rogueId].nominee == Some(l1);  // trigger
-    assert v'.hosts[rogueId].nominee == Some(l2);  // trigger
+    assert v'.hosts[rogueId].nominee == WOSome(l1);  // trigger
+    assert v'.hosts[rogueId].nominee == WOSome(l2);  // trigger
     assert false;
   }
 }
