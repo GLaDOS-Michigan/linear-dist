@@ -1,35 +1,18 @@
+include "monotonicityInvariants.dfy"
 include "messageInvariants.dfy"
 
 module TwoPCInvariantProof {
 import opened Types
 import opened UtilitiesLibrary
+import opened MonotonicityLibrary
 import opened DistributedSystem
+import opened MonotonicityInvariants
 import opened MessageInvariants
 import opened Obligations
 
 /***************************************************************************************
 *                                Application Invariants                                *
 ***************************************************************************************/
-
-// Monotonicity bundle
-ghost predicate MonotonicityInv(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  CoordinatorDecisionMonotonic(c, v)
-}
-
-ghost predicate CoordinatorDecisionMonotonic(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall i, j |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && v.History(i).GetCoordinator(c).decision.Some?
-  ::
-    v.History(i).GetCoordinator(c).decision == v.History(j).GetCoordinator(c).decision
-}
-
 
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
@@ -80,13 +63,9 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
-  assert MonotonicityInv(c, v') by {
-    InvNextCoordinatorDecisionMonotonic(c, v, v');
-  }
-  assert SafetyAC1(c, v') by {
-    assume false;
-  }
+  MonotonicityInvInductive(c, v, v');
   LeaderTallyReflectsPreferencesInductive(c, v, v');
+  AC1Proof(c, v, v');
   AC3Proof(c, v, v');
   AC4Proof(c, v, v');
 }
@@ -114,6 +93,14 @@ lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Va
   VariableNextProperties(c, v, v');
 }
 
+lemma AC1Proof(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures SafetyAC1(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
+
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
@@ -129,7 +116,7 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
         /* Proof by contradiction. Suppose coordinator decided Commit. Then it must have
         a Yes vote from all participants, including noVoter. This is a contradiction */
         var l, l' := v.Last().GetCoordinator(c), v'.Last().GetCoordinator(c);
-        if l.decision.None? && l'.decision == Some(Commit) {
+        if l.decision.WONone? && l'.decision == WOSome(Commit) {
           YesVotesContainsAllParticipantsWhenFull(c, v, |v.history|-1);
           assert GetParticipantPreference(c, noVoter) == Yes;  // witness
           assert false;

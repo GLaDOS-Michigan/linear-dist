@@ -3,6 +3,7 @@ include "types.dfy"
 module CoordinatorHost {
   import opened Types
   import opened UtilitiesLibrary
+  import opened MonotonicityLibrary
 
   datatype Constants = Constants(numParticipants: nat)
 
@@ -12,7 +13,7 @@ module CoordinatorHost {
   }
 
   datatype Variables = Variables(
-    decision: Option<Decision>, 
+    decision: WriteOnceOption<Decision>, 
     yesVotes: set<HostId>,
     noVotes: set<HostId>
   )
@@ -50,7 +51,7 @@ module CoordinatorHost {
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && v.decision.None?
+    && v.decision.WONone?
     && v.yesVotes == {}
     && v.noVotes == {}
   }
@@ -112,14 +113,14 @@ module CoordinatorHost {
   // Send predicate
   ghost predicate SendDecideMsg(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
-    && v.decision.None?
+    && v.decision.WONone?
     && (|v.noVotes| > 0 || |v.yesVotes| == c.numParticipants)
     // send message and update v'
     && if |v.noVotes| > 0 then
-        && v' == v.(decision := Some(Abort))
+        && v' == v.(decision := WOSome(Abort))
         && msg == DecideMsg(Abort)
     else if |v.yesVotes| == c.numParticipants then
-        && v' == v.(decision := Some(Commit))
+        && v' == v.(decision := WOSome(Commit))
         && msg == DecideMsg(Commit)
     else
       false
@@ -135,6 +136,7 @@ module CoordinatorHost {
 module ParticipantHost {
   import opened Types
   import opened UtilitiesLibrary
+  import opened MonotonicityLibrary
 
   datatype Constants = Constants(hostId: HostId, preference: Vote)
 
@@ -147,7 +149,7 @@ module ParticipantHost {
     // Boolean flag that acts as enabling condition for sending VoteMsg, introduced to make
     // receiving voteReq and sending vote two distinct steps.
     sendVote: bool,
-    decision: Option<Decision>
+    decision: WriteOnceOption<Decision>
   )
   {
     ghost predicate WF(c: Constants) {
@@ -188,7 +190,7 @@ module ParticipantHost {
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.sendVote == false
-    && v.decision == None
+    && v.decision == WONone
   }
 
   datatype Step =
@@ -229,9 +231,9 @@ module ParticipantHost {
   ghost predicate NextReceiveDecisionStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && msg.DecideMsg?
-    && v.decision.None?
+    && v.decision.WONone?
     // update v'
-    && v' == v.(decision := Some(msg.decision))
+    && v' == v.(decision := WOSome(msg.decision))
   }
 
   ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {

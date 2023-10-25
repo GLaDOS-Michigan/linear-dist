@@ -4,7 +4,6 @@ module MessageInvariants {
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
-import opened Obligations
 
 // All VoteMsg have a valid participant HostId as src
 ghost predicate VoteMsgValidSrc(c: Constants, v: Variables)
