@@ -49,25 +49,20 @@ public class MessageInvariantsDriver {
       msgInvFile.AddSendInvariant(sendInv);
     }
 
-    // Find Receive Predicate definitions -- have a list of predicate names, and a map to 
+    // Find Receive Predicate trigger definitions
     // Trigger and Conclusion definitions
-    var receivePredicateNames = new List<string>();
-    var receivePredicateDefs = new Dictionary<string, Function>();
+    var receivePredicateTriggers = new List<Function>();
     foreach (var kvp in program.ModuleSigs) {
       foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
-        if (topLevelDecl.Name.StartsWith("Receive")) {  // identifying marker for Receive Predicate
-          if (topLevelDecl.Name.EndsWith("Trigger")) {
-            var baseName = topLevelDecl.Name.Substring(0, topLevelDecl.Name.Length-"Trigger".Length);
-            receivePredicateNames.Add(baseName);
-          }
-          receivePredicateDefs.Add(topLevelDecl.Name, topLevelDecl);
+        if (topLevelDecl.Name.StartsWith("Receive") && topLevelDecl.Name.EndsWith("Trigger"))  {  // identifying marker for Receive Predicate
+          receivePredicateTriggers.Add(topLevelDecl);
         }
       }
     }
 
     // Create ReceiveInvariant objects
-    foreach (var rp in receivePredicateNames) {   
-      var recvInv = ReceiveInvariant.FromTriggerFunction(rp, receivePredicateDefs[rp + "Trigger"], dsHosts);
+    foreach (var rpt in receivePredicateTriggers) {
+      var recvInv = ReceiveInvariant.FromTriggerFunction(rpt, dsHosts);
       msgInvFile.AddReceiveInvariant(recvInv);
     }
   } // end method Resolve()

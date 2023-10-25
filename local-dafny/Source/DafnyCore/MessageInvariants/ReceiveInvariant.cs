@@ -21,7 +21,7 @@ namespace Microsoft.Dafny
       this.args = args;
     }
 
-    public static ReceiveInvariant FromTriggerFunction(string baseName, Function receivePredicateTrigger, DatatypeDecl dsHosts) {
+    public static ReceiveInvariant FromTriggerFunction(Function receivePredicateTrigger, DatatypeDecl dsHosts) {
       // Extract module and msgType
       var module = ExtractReceiveInvariantModule(receivePredicateTrigger);
       
@@ -43,8 +43,9 @@ namespace Microsoft.Dafny
         args.Add(receivePredicateTrigger.Formals[i].Name);
       }
       
+      var baseName = receivePredicateTrigger.Name.Substring(0, receivePredicateTrigger.Name.Length-"Trigger".Length);
       Console.WriteLine(string.Format("Found recv predicate [{0}] with [{1}] args in module [{2}], in Hosts.[{3}]\n", baseName, args.Count, module, variableField));
-    
+      
       var recvInv = new ReceiveInvariant(baseName, module, variableField, args);
       return recvInv;
     }
@@ -64,10 +65,6 @@ namespace Microsoft.Dafny
 
     public string GetTriggerName() {
       return string.Format("{0}Trigger", functionName);
-    }
-
-    public string GetConclusionName() {
-      return string.Format("{0}Conclusion", functionName);
     }
 
     public string GetPredicateName() {
@@ -92,9 +89,13 @@ namespace Microsoft.Dafny
              string.Format("    && 0 <= idx < |c.{0}|\n", variableField) +
              string.Format("    && {0}.{1}(c.{2}[idx], v.History(i).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
              "  ::\n" + 
-             "    (exists msg ::\n" +
+             "    (exists j, msg ::\n" +
+             "      && j < i\n" +
+             "      && v.ValidHistoryIdxStrict(j)\n" +
              "      && msg in v.network.sentMsgs\n" +
-             string.Format("      && {0}.{1}(c.{2}[idx], v.History(i).{2}[idx], {3}, msg)\n", module, GetConclusionName(), variableField, string.Join(",", args.ToArray())) +
+             string.Format("      && !{0}.{1}(c.{2}[idx], v.History(j).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
+             string.Format("      && {0}.{1}(c.{2}[idx], v.History(j+1).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
+             string.Format("      && {0}.{1}(c.{2}[idx], v.History(j).{2}[idx], v.History(j+1).{2}[idx], msg)\n", module, GetName(), variableField) +
              "    )\n" +
              "}\n";
       return res;
@@ -110,20 +111,30 @@ namespace Microsoft.Dafny
       if (opaque) {
         res += string.Format("  reveal_{0}();\n", GetPredicateName());
       }
-      res += "  VariableNextProperties(c, v, v');\n";
       res += string.Format("  forall idx, i, {0} |\n", string.Join(", ", args.ToArray())) +
              "    && v'.ValidHistoryIdx(i)\n" +
              string.Format("    && 0 <= idx < |c.{0}|\n", variableField) +
              string.Format("    && {0}.{1}(c.{2}[idx], v'.History(i).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
              "  ensures\n" +
-             "    (exists msg ::\n" +
-             "      && msg in v'.network.sentMsgs\n" +
-             string.Format("      && {0}.{1}(c.{2}[idx], v'.History(i).{2}[idx], {3}, msg)\n", module, GetConclusionName(), variableField, string.Join(",", args.ToArray())) +
+             "    (exists j, msg ::\n" +
+             "      && j < i\n" +
+             "      && v'.ValidHistoryIdxStrict(j)\n" +
+             "      && msg in v.network.sentMsgs\n" +
+             string.Format("      && !{0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
+             string.Format("      && {0}.{1}(c.{2}[idx], v'.History(j+1).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
+             string.Format("      && {0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], v'.History(j+1).{2}[idx], msg)\n", module, GetName(), variableField) +
              "    )\n" +
              "  {\n" + 
+             "    VariableNextProperties(c, v, v');\n" +
              "    if i == |v'.history| - 1 {\n" + 
-             string.Format("      if !{0}.{1}(c.{2}[idx], v.History(i-1).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
-             "      {} // trigger\n" +
+             string.Format("      if !{0}.{1}(c.{2}[idx], v.Last().{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
+             "      {\n" +
+             "        // witness and triggers\n" +
+             "        var j := |v.history|-1;\n" +
+             "        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);\n" +
+             "        var msg := dsStep.msgOps.recv.value;\n" +
+             string.Format("        assert {0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], v'.History(j+1).{2}[idx], msg);\n", module, GetName(), variableField) +
+             "      }\n" +
              "    }\n" +
              "  }\n";
       res += "}\n";
