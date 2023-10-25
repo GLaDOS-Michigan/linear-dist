@@ -95,10 +95,15 @@ module LeaderHost {
   ghost predicate NextReceivePromiseStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && msgOps.recv.value.Promise?
-    && var bal := msgOps.recv.value.bal;
-    && var acc := msgOps.recv.value.acc;
-    && var vbOpt := msgOps.recv.value.vbOpt;
+    && ReceivePromise(c, v, v', msgOps.recv.value)
+  }
+
+  // Receive predicate
+  ghost predicate ReceivePromise(c: Constants, v: Variables, v': Variables, msg: Message) {
+    && msg.Promise?
+    && var bal := msg.bal;
+    && var acc := msg.acc;
+    && var vbOpt := msg.vbOpt;
     && bal == c.id  // message is meant for me
     // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
     // probably simplify proof, preventing the leader from potentially equivocating
@@ -119,19 +124,6 @@ module LeaderHost {
   // First 2 arguments are mandatory. Second argument identifies target host. 
   ghost predicate ReceivePromiseTrigger(c: Constants, v: Variables, acc: AcceptorId) {
     && acc in v.receivedPromises
-  }
-
-  // Receive predicate conclusion
-  // Same arguments as trigger, with an additional msg argument
-  ghost predicate ReceivePromiseConclusion(c: Constants, v: Variables, acc: AcceptorId, msg: Message) {
-    && msg.Promise?
-    && msg.bal == c.id
-    && msg.acc == acc
-    && (msg.vbOpt.Some?
-        ==> 
-        && v.highestHeardBallot.Some?
-        && msg.vbOpt.value.b <= v.highestHeardBallot.value
-      )
   }
 
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -423,9 +415,14 @@ module LearnerHost {
   ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && msgOps.recv.value.Accept?
+    && ReceiveAccept(c, v, v', msgOps.recv.value)
+  }
+
+  // Receive predicate
+  ghost predicate ReceiveAccept(c: Constants, v: Variables, v': Variables, msg: Message) {
+    && msg.Accept?
     && v' == v.(
-      receivedAccepts := UpdateReceivedAccepts(v.receivedAccepts, msgOps.recv.value.vb, msgOps.recv.value.acc)
+      receivedAccepts := UpdateReceivedAccepts(v.receivedAccepts, msg.vb, msg.acc)
     )
   }
 
@@ -434,11 +431,6 @@ module LearnerHost {
   ghost predicate ReceiveAcceptTrigger(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal) {
     && vb in v.receivedAccepts
     && acc in v.receivedAccepts[vb]
-  }
-
-  // Receive predicate conclusion
-  ghost predicate ReceiveAcceptConclusion(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal, msg: Message) {
-    msg == Accept(vb, acc)
   }
 
   ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, msgOps: MessageOps) {
