@@ -530,12 +530,14 @@ lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
 
 
 lemma InvNextOneValuePerBallotAcceptors(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires MessageInv(c, v')
+  requires v.WF(c) && v'.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires ValidProposeMesssage(c, v)
+  requires MonotonicityInv(c, v)
+  requires OneValuePerBallot(c, v)
   requires Next(c, v, v')
   ensures OneValuePerBallotAcceptors(c, v')
 {
-  VariableNextProperties(c, v, v');
   forall a1, a2, i|
     && v'.ValidHistoryIdx(i)
     && c.ValidAcceptorIdx(a1)
@@ -548,6 +550,7 @@ lemma InvNextOneValuePerBallotAcceptors(c: Constants, v: Variables, v': Variable
     v'.History(i).acceptors[a1].acceptedVB.value.v
         == v'.History(i).acceptors[a2].acceptedVB.value.v
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       VariableNextProperties(c, v, v');
