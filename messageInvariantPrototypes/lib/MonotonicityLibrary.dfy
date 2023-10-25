@@ -10,6 +10,13 @@ module MonotonicityLibrary {
     }
   }
 
+  datatype MonotonicNatOption = MNSome(value: nat) | MNNone
+  {
+    ghost predicate SatisfiesMonotonic(past: MonotonicNatOption) {
+      past.MNSome? ==> (this.MNSome? && past.value <= this.value)
+    }
+  }
+
   datatype MonotonicSet<T> = MonotonicSet(s: set<T>)
   {
     ghost predicate SatisfiesMonotonic(past: MonotonicSet<T>) {

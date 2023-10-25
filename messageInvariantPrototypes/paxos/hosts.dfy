@@ -6,6 +6,7 @@ include "types.dfy"
 ***************************************************************************************/
 
 module LeaderHost {
+  import opened MonotonicityLibrary
   import opened UtilitiesLibrary
   import opened Types
 
@@ -19,17 +20,17 @@ module LeaderHost {
   datatype Variables = Variables(
     receivedPromises: set<AcceptorId>, 
     value: Value, 
-    highestHeardBallot: Option<LeaderId>) 
-  {
+    highestHeardBallot: MonotonicNatOption  // holds LeaderId
+  ) {
 
     // My highestHeardBallot >= b
     ghost predicate HeardAtLeast(b: LeaderId) {
-      highestHeardBallot.Some? && highestHeardBallot.value >= b
+      highestHeardBallot.MNSome? && highestHeardBallot.value >= b
     }
     
     // My highestHeardBallot < b
     ghost predicate HeardAtMost(b: LeaderId) {
-      highestHeardBallot.None? || highestHeardBallot.value < b
+      highestHeardBallot.MNNone? || highestHeardBallot.value < b
     }
 
     ghost predicate CanPropose(c: Constants) {
@@ -62,7 +63,7 @@ module LeaderHost {
   ghost predicate Init(c: Constants, v: Variables) {
     && v.receivedPromises == {}
     && v.value == c.preferredValue
-    && v.highestHeardBallot == None
+    && v.highestHeardBallot == MNNone
   }
 
   datatype Step =
@@ -116,7 +117,7 @@ module LeaderHost {
     v' == v.(
               receivedPromises := v.receivedPromises + {acc},
               value :=  if doUpdate then vbOpt.value.v else v.value,
-              highestHeardBallot := if doUpdate then Some(vbOpt.value.b) else v.highestHeardBallot
+              highestHeardBallot := if doUpdate then MNSome(vbOpt.value.b) else v.highestHeardBallot
             )
   }
 
@@ -159,6 +160,7 @@ module LeaderHost {
 ***************************************************************************************/
 
 module AcceptorHost {
+  import opened MonotonicityLibrary
   import opened UtilitiesLibrary
   import opened Types
 
@@ -172,37 +174,37 @@ module AcceptorHost {
 
   datatype Variables = Variables(
     pendingPrepare: Option<PendingPrepare>,
-    promised: Option<LeaderId>,
-    acceptedVB: Option<ValBal>) 
-  {
+    promised: MonotonicNatOption,   // contains LeaderId
+    acceptedVB: MonotonicVBOption
+  ) {
 
     ghost predicate HasAccepted(vb: ValBal) {
-      && acceptedVB.Some?
+      && acceptedVB.MVBSome?
       && acceptedVB.value == vb
     }
 
     ghost predicate HasAcceptedValue(v: Value) {
-      && acceptedVB.Some?
+      && acceptedVB.MVBSome?
       && acceptedVB.value.v == v
     }
 
     ghost predicate HasPromisedAtLeast(b: LeaderId) {
-      && promised.Some?
+      && promised.MNSome?
       && b <= promised.value
     }
 
     ghost predicate HasPromised(b: LeaderId) {
-      && promised.Some?
+      && promised.MNSome?
       && b == promised.value
     }
 
     ghost predicate HasAcceptedAtLeastBal(b: LeaderId) {
-      && acceptedVB.Some?
+      && acceptedVB.MVBSome?
       && b <= acceptedVB.value.b
     }
 
     ghost predicate HasAcceptedAtMostBal(b: LeaderId) {
-      acceptedVB.Some? ==> acceptedVB.value.b < b
+      acceptedVB.MVBSome? ==> acceptedVB.value.b < b
     }
   } // end datatype Variables (acceptor)
 
@@ -224,8 +226,8 @@ module AcceptorHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && v.promised == None
-    && v.acceptedVB == None
+    && v.promised == MNNone
+    && v.acceptedVB == MVBNone
     && v.pendingPrepare == None
   }
 
@@ -261,7 +263,7 @@ module AcceptorHost {
     && msgOps.recv.None?
     && v.pendingPrepare.Some?
     && var bal := v.pendingPrepare.value.bal;
-    && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+    && var doPromise := v.promised.MNNone? || (v.promised.MNSome? && v.promised.value < bal);
     && if doPromise then
           && msgOps.send.Some?
           && SendPromise(c, v, v', msgOps.send.value)
@@ -275,13 +277,13 @@ module AcceptorHost {
     // enabling conditions
     && v.pendingPrepare.Some?
     && var bal := v.pendingPrepare.value.bal;
-    && var doPromise := v.promised.None? || (v.promised.Some? && v.promised.value < bal);
+    && var doPromise := v.promised.MNNone? || (v.promised.MNSome? && v.promised.value < bal);
     && doPromise
     // send message and update v'
     && v' == v.(
-            promised := Some(bal),
+            promised := MNSome(bal),
             pendingPrepare := None)
-    && msg == Promise(bal, c.id, v.acceptedVB)
+    && msg == Promise(bal, c.id, v.acceptedVB.ToOption())
   }
 
   ghost predicate NextMaybeAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -291,11 +293,11 @@ module AcceptorHost {
     && v.pendingPrepare.None?
     && var bal := msgOps.recv.value.bal;
     && var val := msgOps.recv.value.val;
-    && var doAccept := v.promised.None? || (v.promised.Some? && v.promised.value <= bal);
+    && var doAccept := v.promised.MNNone? || (v.promised.MNSome? && v.promised.value <= bal);
     &&  if doAccept then
           && v' == v.(
-                promised := Some(bal), 
-                acceptedVB := Some(VB(val, bal)))
+                promised := MNSome(bal), 
+                acceptedVB := MVBSome(VB(val, bal)))
         else
           && v' == v
   }
@@ -311,8 +313,8 @@ module AcceptorHost {
   ghost predicate SendAccept(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.pendingPrepare.None?
-    && v.acceptedVB.Some?
-    && v.promised == Some(v.acceptedVB.value.b)
+    && v.acceptedVB.MVBSome?
+    && v.promised == MNSome(v.acceptedVB.value.b)
     // send message and update v'
     && msg == Accept(v.acceptedVB.value, c.id)
     && v' == v

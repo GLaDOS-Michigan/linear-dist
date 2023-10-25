@@ -1,3 +1,4 @@
+include "monotonicityInvariants.dfy"
 include "messageInvariants.dfy"
 
 module PaxosProof {
@@ -5,6 +6,7 @@ module PaxosProof {
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
+import opened MonotonicityInvariants
 import opened PaxosMessageInvariants
 import opened Obligations
 
@@ -27,8 +29,8 @@ ghost predicate OneValuePerBallotAcceptors(c: Constants, v: Variables)
     && v.ValidHistoryIdx(i)
     && c.ValidAcceptorIdx(a1)
     && c.ValidAcceptorIdx(a2)
-    && v.History(i).acceptors[a1].acceptedVB.Some?
-    && v.History(i).acceptors[a2].acceptedVB.Some?
+    && v.History(i).acceptors[a1].acceptedVB.MVBSome?
+    && v.History(i).acceptors[a2].acceptedVB.MVBSome?
     && v.History(i).acceptors[a1].acceptedVB.value.b 
         == v.History(i).acceptors[a2].acceptedVB.value.b 
   ::
@@ -172,9 +174,9 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
     && var vi := v.History(i);
     && (vi.acceptors[acc].pendingPrepare.Some? 
         ==> c.ValidLeaderIdx(vi.acceptors[acc].pendingPrepare.value.bal))
-    && (vi.acceptors[acc].promised.Some? 
+    && (vi.acceptors[acc].promised.MNSome? 
         ==> c.ValidLeaderIdx(vi.acceptors[acc].promised.value))
-    && (vi.acceptors[acc].acceptedVB.Some? 
+    && (vi.acceptors[acc].acceptedVB.MVBSome? 
         ==> c.ValidLeaderIdx(vi.acceptors[acc].acceptedVB.value.b))
 }
 
@@ -185,10 +187,10 @@ ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables)
   forall acc, i | 
     && v.ValidHistoryIdx(i)
     && c.ValidAcceptorIdx(acc) 
-    && v.History(i).acceptors[acc].acceptedVB.Some?
+    && v.History(i).acceptors[acc].acceptedVB.MVBSome?
   :: 
     && var vi := v.History(i);
-    && vi.acceptors[acc].promised.Some?
+    && vi.acceptors[acc].promised.MNSome?
     && vi.acceptors[acc].acceptedVB.value.b <= vi.acceptors[acc].promised.value
 }
 
@@ -199,7 +201,7 @@ ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables)
   forall acc:AcceptorId, i | 
     && v.ValidHistoryIdx(i)
     && c.ValidAcceptorIdx(acc)
-    && v.History(i).acceptors[acc].acceptedVB.Some?
+    && v.History(i).acceptors[acc].acceptedVB.MVBSome?
   ::
     var vb := v.History(i).acceptors[acc].acceptedVB.value;
     && v.History(i).LeaderCanPropose(c, vb.b)
@@ -224,7 +226,7 @@ ghost predicate LeaderHighestHeardUpperBound(c: Constants, v: Variables)
   forall ldr:LeaderId, i | 
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
-    && v.History(i).leaders[ldr].highestHeardBallot.Some?
+    && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
   :: 
     v.History(i).leaders[ldr].highestHeardBallot.value < ldr
 }
@@ -237,7 +239,7 @@ ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables)
   forall ldr:LeaderId, i | 
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
-    && v.History(i).leaders[ldr].highestHeardBallot.Some?
+    && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
   ::
     // note that once a leader CanPropose(), its value does not change
     && var vi := v.History(i);
@@ -319,90 +321,6 @@ ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
     v.History(i).leaders[ldrBal].value == vb.v
 }
 
-//// Monoticity properties
-
-ghost predicate LeaderCanProposeMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, ldr |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && c.ValidLeaderIdx(ldr)
-    && v.History(i).LeaderCanPropose(c, ldr)
-  :: 
-    && v.History(j).LeaderCanPropose(c, ldr)
-    && v.History(j).leaders[ldr].value == v.History(i).leaders[ldr].value
-}
-
-ghost predicate LeaderHighestHeardMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, ldr |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && c.ValidLeaderIdx(ldr)
-    && v.History(i).leaders[ldr].highestHeardBallot.Some?
-  :: 
-    && v.History(j).leaders[ldr].highestHeardBallot.Some?
-    && v.History(i).leaders[ldr].highestHeardBallot.value <= v.History(j).leaders[ldr].highestHeardBallot.value
-}
-
-ghost predicate AcceptorAcceptedMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, acc | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidAcceptorIdx(acc)
-    && i <= j
-    && v.History(i).acceptors[acc].acceptedVB.Some?
-  ::
-    && v.History(j).acceptors[acc].acceptedVB.Some?
-    && v.History(i).acceptors[acc].acceptedVB.value.b <= v.History(j).acceptors[acc].acceptedVB.value.b
-}
-
-ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, acc | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidAcceptorIdx(acc)
-    && i <= j
-    && v.History(i).acceptors[acc].promised.Some?
-  ::
-    && v.History(j).acceptors[acc].promised.Some?
-    && v.History(i).acceptors[acc].promised.value <= v.History(j).acceptors[acc].promised.value
-}
-
-ghost predicate LearnerReceivedAcceptsMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, lnr, vb | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidLearnerIdx(lnr)
-    && i <= j
-    && vb in v.History(i).learners[lnr].receivedAccepts
-  ::
-    && 0 < |v.History(i).learners[lnr].receivedAccepts[vb]|
-    && vb in v.History(j).learners[lnr].receivedAccepts
-    && v.History(i).learners[lnr].receivedAccepts[vb] <= v.History(j).learners[lnr].receivedAccepts[vb]
-}
-
-// Monotonicity Bundle
-ghost predicate MonotonicityInv(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  && LeaderHighestHeardMonotonic(c, v)
-  && LeaderCanProposeMonotonic(c, v)
-  && AcceptorAcceptedMonotonic(c, v)
-  && AcceptorPromisedMonotonic(c, v)
-  && LearnerReceivedAcceptsMonotonic(c, v)
-}
-
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
@@ -450,6 +368,7 @@ lemma InitImpliesInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures Inv(c, v)
 {
+  InitImpliesMonotonicityInv(c, v);
   InitImpliesMessageInv(c, v);
 }
 
@@ -489,29 +408,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
-lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires MonotonicityInv(c, v)
-  requires AcceptorPromisedLargerThanAccepted(c, v)
-  requires Next(c, v, v')
-  ensures MonotonicityInv(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
-
-lemma MessageContainmentPreservesNext(c: Constants, v: Variables, v': Variables, s: Variables, s': Variables)
-  requires v.WF(c)
-  requires s.WF(c)
-  requires Next(c, v, v')
-  requires v.history == s.history
-  requires v'.history == s'.history
-  requires v'.network.sentMsgs <= s'.network.sentMsgs
-  requires s.network.sentMsgs == s'.network.sentMsgs
-  ensures Next(c, s, s')
-{
-  var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-  assert NextStep(c, s.Last(), s'.Last(), s.network, s'.network, dsStep); // trigger
-}
 
 lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -813,7 +709,7 @@ lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variab
   forall ldr:LeaderId, i | 
     && v'.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
-    && v'.History(i).leaders[ldr].highestHeardBallot.Some?
+    && v'.History(i).leaders[ldr].highestHeardBallot.MNSome?
   ensures
     v'.History(i).leaders[ldr].highestHeardBallot.value < ldr
   {
@@ -840,7 +736,7 @@ lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variabl
   forall ldr:LeaderId, i | 
     && v'.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
-    && v'.History(i).leaders[ldr].highestHeardBallot.Some?
+    && v'.History(i).leaders[ldr].highestHeardBallot.MNSome?
   ensures
     // note that once a leader CanPropose(), its value does not change
     && var vi' := v'.History(i);
@@ -964,7 +860,7 @@ lemma PromiseMessageExistence(c: Constants, v: Variables, i: int, ldr: LeaderId,
             && promiseMsg.acc == acc
             && (promiseMsg.vbOpt.Some?
                 ==> 
-                && v.History(i).leaders[ldr].highestHeardBallot.Some?
+                && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
                 && promiseMsg.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
             )
 {
@@ -975,7 +871,7 @@ lemma PromiseMessageExistence(c: Constants, v: Variables, i: int, ldr: LeaderId,
                 && promiseMsg.acc == acc
                 && (promiseMsg.vbOpt.Some?
                     ==> 
-                    && v.History(i).leaders[ldr].highestHeardBallot.Some?
+                    && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
                     && promiseMsg.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
                 );
 }
@@ -1002,9 +898,9 @@ ghost predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: M
 {
   reveal_ValidMessageSrc();
   && v.ValidHistoryIdx(i)
-  && v.History(i).acceptors[prom.acc].promised.Some?
+  && v.History(i).acceptors[prom.acc].promised.MNSome?
   && prom.bal == v.History(i).acceptors[prom.acc].promised.value
-  && prom.vbOpt == v.History(i).acceptors[prom.acc].acceptedVB
+  && prom.vbOpt == v.History(i).acceptors[prom.acc].acceptedVB.ToOption()
 }
 
 lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, v': Variables)

@@ -1,4 +1,4 @@
-include "../lib/UtilitiesLibrary.dfy"
+include "../lib/MonotonicityLibrary.dfy"
 
 module Types {
 import opened UtilitiesLibrary
@@ -8,6 +8,18 @@ type AcceptorId = nat
 type LearnerId = nat
 type Value(!new)
 datatype ValBal = VB(v:Value, b:LeaderId)
+
+datatype MonotonicVBOption = MVBSome(value: ValBal) | MVBNone
+{
+  ghost predicate SatisfiesMonotonic(past: MonotonicVBOption) {
+    past.MVBSome? ==> (this.MVBSome? && past.value.b <= this.value.b)
+  }
+
+  ghost function ToOption() : Option<ValBal> {
+    if this.MVBNone? then None
+    else Some(this.value)
+  }
+}
 
 datatype Message = Prepare(bal:LeaderId)
                 | Promise(bal:LeaderId, acc:AcceptorId, vbOpt:Option<ValBal>)  //valbal is the value-ballot pair with which the value was accepted
