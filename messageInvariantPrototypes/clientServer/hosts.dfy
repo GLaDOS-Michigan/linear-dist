@@ -102,6 +102,7 @@ module ServerHost {
 
 module ClientHost {
   import opened UtilitiesLibrary
+  import opened MonotonicityLibrary
   import opened Types
 
   datatype Constants = Constants(clientId: ClientId)
@@ -110,7 +111,7 @@ module ClientHost {
     c.clientId == clientId
   }
 
-  datatype Variables = Variables(requests: set<nat>, responses: set<nat>)
+  datatype Variables = Variables(requests: MonotonicSet<nat>, responses: set<nat>)
   {
     ghost predicate WF(c: Constants) {
       true
@@ -140,7 +141,7 @@ module ClientHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && 0 < |v.requests|  // non-deterministic set
+    && 0 < |v.requests.s|  // non-deterministic set
     && v.responses == {}
   }
 
@@ -169,7 +170,7 @@ module ClientHost {
     // send message and update v'
     && msg.RequestMsg?
     && msg.r.clientId == c.clientId
-    && msg.r.reqId in v.requests
+    && msg.r.reqId in v.requests.s
     && v' == v
   }
 

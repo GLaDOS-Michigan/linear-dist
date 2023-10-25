@@ -24,7 +24,7 @@ ghost predicate RequestMsgsValid(c: Constants, v: Variables)
   requires RequestMsgsValidSource(c, v)
 {
   forall req | req in v.network.sentMsgs && req.RequestMsg?
-  :: req.r.reqId in v.clients[req.r.clientId].requests
+  :: req.r.reqId in v.clients[req.r.clientId].requests.s
 }
 
 // certified self inductive, modulo requires

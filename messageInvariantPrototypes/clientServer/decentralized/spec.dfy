@@ -3,6 +3,7 @@ include "distributedSystem.dfy"
 module Obligations {
   import opened Types
   import opened UtilitiesLibrary
+  import opened MonotonicityLibrary
   import opened DistributedSystem
 
   // All responses received by clients are for valid requests
@@ -15,6 +16,6 @@ module Obligations {
   }
 
   ghost predicate SafetySingleClient(v: ClientHost.Variables) {
-    v.responses <= v.requests 
+    v.responses <= v.requests.s
   }
 }

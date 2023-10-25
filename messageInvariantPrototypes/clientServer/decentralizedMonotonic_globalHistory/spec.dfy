@@ -15,6 +15,6 @@ module Obligations {
   }
 
   ghost predicate SafetySingleClient(v: ClientHost.Variables) {
-    v.responses <= v.requests 
+    v.responses <= v.requests.s
   }
 }

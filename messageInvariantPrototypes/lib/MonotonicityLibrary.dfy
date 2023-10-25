@@ -9,4 +9,11 @@ module MonotonicityLibrary {
       past.WOSome? ==> past == this
     }
   }
+
+  datatype MonotonicSet<T> = MonotonicSet(s: set<T>)
+  {
+    ghost predicate SatisfiesMonotonic(past: MonotonicSet<T>) {
+      past.s <= this.s
+    }
+  }
 }
