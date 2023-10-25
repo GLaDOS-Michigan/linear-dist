@@ -941,7 +941,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
       {
         assert 0 <= ldr < |c.leaderConstants|;
         assert LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v'.History(i).leaders[ldr], acc);
-        reveal_LeaderValidReceivedPromiseMsgs();
+        PromiseMessageExistence(c, v', i, ldr, acc);
         prom :|   && IsPromiseMessage(v', prom)  // via LeaderValidReceivedPromiseMsgs
                   && prom.bal == ldr
                   && prom.acc == acc
@@ -963,6 +963,34 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
       assert false;
     }
   }
+}
+
+lemma PromiseMessageExistence(c: Constants, v: Variables, i: int, ldr: LeaderId, acc: AcceptorId) 
+  requires v.WF(c)
+  requires v.ValidHistoryIdx(i)
+  requires c.ValidLeaderIdx(ldr)
+  requires LeaderHighestHeardMonotonic(c, v)
+  requires LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v.History(i).leaders[ldr], acc)
+  requires LeaderValidReceivedPromiseMsgs(c, v)
+  ensures exists prom : Message :: 
+            && prom.Promise?
+            && prom in v.network.sentMsgs
+            && prom.bal == ldr
+            && prom.acc == acc
+            && (prom.vbOpt.Some?
+                ==> 
+                && v.History(i).leaders[ldr].highestHeardBallot.Some?
+                && prom.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
+            )
+{
+  reveal_LeaderValidReceivedPromiseMsgs();
+  var j, msg :|   // trigger
+      && j < i
+      && v.ValidHistoryIdxStrict(j)
+      && msg in v.network.sentMsgs
+      && !LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v.History(j).leaders[ldr], acc)
+      && LeaderHost.ReceivePromiseTrigger(c.leaderConstants[ldr], v.History(j+1).leaders[ldr], acc)
+      && LeaderHost.ReceivePromise(c.leaderConstants[ldr], v.History(j).leaders[ldr], v.History(j+1).leaders[ldr], msg);
 }
 
 lemma AcceptMessageExistence(c: Constants, v: Variables, i: int, lnr:LearnerId, vb: ValBal, acc: AcceptorId) 

@@ -154,12 +154,16 @@ ghost predicate {:opaque} LeaderValidReceivedPromiseMsgs(c: Constants, v: Variab
 {
   forall idx, i, acc |
     && v.ValidHistoryIdx(i)
-    && 0 <= idx < |c.leaderConstants|  // this can be derived
+    && 0 <= idx < |c.leaderConstants|
     && LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v.History(i).leaders[idx], acc)
   :: 
-    (exists msg :: 
+    (exists j, msg :: 
+      && j < i
+      && v.ValidHistoryIdxStrict(j)
       && msg in v.network.sentMsgs
-      && LeaderHost.ReceivePromiseConclusion(c.leaderConstants[idx], v.History(i).leaders[idx], acc, msg)
+      && !LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v.History(j).leaders[idx], acc)
+      && LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v.History(j+1).leaders[idx], acc)
+      && LeaderHost.ReceivePromise(c.leaderConstants[idx], v.History(j).leaders[idx], v.History(j+1).leaders[idx], msg)
     )
 }
 
@@ -346,20 +350,28 @@ lemma InvNextLeaderValidReceivedPromiseMsgs(c: Constants, v: Variables, v': Vari
   ensures LeaderValidReceivedPromiseMsgs(c, v')
 {
   reveal_LeaderValidReceivedPromiseMsgs();
-  VariableNextProperties(c, v, v');
   forall idx, i, acc |
     && v'.ValidHistoryIdx(i)
     && 0 <= idx < |c.leaderConstants|
     && LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v'.History(i).leaders[idx], acc)
   ensures
-    (exists msg :: 
+    (exists j, msg :: 
+      && j < i
+      && v'.ValidHistoryIdxStrict(j)
       && msg in v'.network.sentMsgs
-      && LeaderHost.ReceivePromiseConclusion(c.leaderConstants[idx], v'.History(i).leaders[idx], acc, msg)
+      && !LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v'.History(j).leaders[idx], acc)
+      && LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v'.History(j+1).leaders[idx], acc)
+      && LeaderHost.ReceivePromise(c.leaderConstants[idx], v'.History(j).leaders[idx], v'.History(j+1).leaders[idx], msg)
     )
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
-      if !LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v.History(i-1).leaders[idx], acc) {
-        // trigger
+      if !LeaderHost.ReceivePromiseTrigger(c.leaderConstants[idx], v.Last().leaders[idx], acc) {
+        // witnesses and triggers
+        var j := |v.history|-1;
+        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        var msg := dsStep.msgOps.recv.value;
+        assert LeaderHost.ReceivePromise(c.leaderConstants[idx], v'.History(j).leaders[idx], v'.History(j+1).leaders[idx], msg);
       }
     }
   }
