@@ -108,12 +108,16 @@ ghost predicate {:opaque} ReceivePromiseValidity(c: Constants, v: Variables)
 {
   forall idx, i, acc |
     && v.ValidHistoryIdx(i)
-    && 0 <= idx < |c.leaders|  // this can be derived
+    && 0 <= idx < |c.leaders|
     && LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v.History(i).leaders[idx], acc)
   :: 
-    (exists msg :: 
+    (exists j, msg :: 
+      && j < i
+      && v.ValidHistoryIdxStrict(j)
       && msg in v.network.sentMsgs
-      && LeaderHost.ReceivePromiseConclusion(c.leaders[idx], v.History(i).leaders[idx], acc, msg)
+      && !LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v.History(j).leaders[idx], acc)
+      && LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v.History(j+1).leaders[idx], acc)
+      && LeaderHost.ReceivePromise(c.leaders[idx], v.History(j).leaders[idx], v.History(j+1).leaders[idx], msg)
     )
 }
 
@@ -127,10 +131,14 @@ ghost predicate {:opaque} ReceiveAcceptValidity(c: Constants, v: Variables)
     && v.ValidHistoryIdx(i)
     && LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v.History(i).learners[idx], acc, vb)
   ::
-   (exists msg :: 
-      && msg in v.network.sentMsgs
-      && LearnerHost.ReceiveAcceptConclusion(c.learners[idx], v.History(i).learners[idx], acc, vb, msg)
-   )
+   (exists j, msg :: 
+       && j < i
+       && v.ValidHistoryIdxStrict(j)
+       && msg in v.network.sentMsgs
+       && !LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v.History(j).learners[idx], acc, vb)
+       && LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v.History(j+1).learners[idx], acc, vb)
+       && LearnerHost.ReceiveAccept(c.learners[idx], v.History(j).learners[idx], v.History(j+1).learners[idx], msg)
+    )
 }
 
 
@@ -242,20 +250,28 @@ lemma InvNextReceiveAcceptValidity(c: Constants, v: Variables, v': Variables)
   ensures ReceiveAcceptValidity(c, v')
 {
   reveal_ReceiveAcceptValidity();
-  VariableNextProperties(c, v, v');
-  forall idx, i, acc, vb |
-    && v'.ValidHistoryIdx(i)
+  forall idx, vb, acc, i |
     && 0 <= idx < |c.learners|
+    && v'.ValidHistoryIdx(i)
     && LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v'.History(i).learners[idx], acc, vb)
   ensures
-    (exists msg :: 
+    (exists j, msg :: 
+      && j < i
+      && v'.ValidHistoryIdxStrict(j)
       && msg in v'.network.sentMsgs
-      && LearnerHost.ReceiveAcceptConclusion(c.learners[idx], v'.History(i).learners[idx], acc, vb, msg)
+      && !LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v'.History(j).learners[idx], acc, vb)
+      && LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v'.History(j+1).learners[idx], acc, vb)
+      && LearnerHost.ReceiveAccept(c.learners[idx], v'.History(j).learners[idx], v'.History(j+1).learners[idx], msg)
     )
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
-      if !LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v.History(i-1).learners[idx], acc, vb) {
-        // trigger
+      if !LearnerHost.ReceiveAcceptTrigger(c.learners[idx], v.Last().learners[idx], acc, vb) {
+        // witnesses and triggers
+        var j := |v.history|-1;
+        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        var msg := dsStep.msgOps.recv.value;
+        assert LearnerHost.ReceiveAccept(c.learners[idx], v'.History(j).learners[idx], v'.History(j+1).learners[idx], msg);
       }
     }
   }
@@ -268,20 +284,28 @@ lemma InvNextReceivePromiseValidity(c: Constants, v: Variables, v': Variables)
   ensures ReceivePromiseValidity(c, v')
 {
   reveal_ReceivePromiseValidity();
-  VariableNextProperties(c, v, v');
   forall idx, i, acc |
     && v'.ValidHistoryIdx(i)
     && 0 <= idx < |c.leaders|
     && LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v'.History(i).leaders[idx], acc)
   ensures
-    (exists msg :: 
+    (exists j, msg :: 
+      && j < i
+      && v'.ValidHistoryIdxStrict(j)
       && msg in v'.network.sentMsgs
-      && LeaderHost.ReceivePromiseConclusion(c.leaders[idx], v'.History(i).leaders[idx], acc, msg)
+      && !LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v'.History(j).leaders[idx], acc)
+      && LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v'.History(j+1).leaders[idx], acc)
+      && LeaderHost.ReceivePromise(c.leaders[idx], v'.History(j).leaders[idx], v'.History(j+1).leaders[idx], msg)
     )
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
-      if !LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v.History(i-1).leaders[idx], acc) {
-        // trigger
+      if !LeaderHost.ReceivePromiseTrigger(c.leaders[idx], v.Last().leaders[idx], acc) {
+        // witnesses and triggers
+        var j := |v.history|-1;
+        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        var msg := dsStep.msgOps.recv.value;
+        assert LeaderHost.ReceivePromise(c.leaders[idx], v'.History(j).leaders[idx], v'.History(j+1).leaders[idx], msg);
       }
     }
   }
