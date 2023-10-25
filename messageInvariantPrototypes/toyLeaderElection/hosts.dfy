@@ -1,4 +1,4 @@
-include "../lib/UtilitiesLibrary.dfy"
+include "../lib/MonotonicityLibrary.dfy"
 
 module Types {
   import opened UtilitiesLibrary
@@ -22,6 +22,7 @@ module Types {
 module Host {
   import opened Types
   import opened UtilitiesLibrary
+  import opened MonotonicityLibrary
 
   datatype Constants = Constants(hostId: HostId, clusterSize: nat)
 
@@ -32,9 +33,9 @@ module Host {
   }
 
   datatype Variables = Variables(
-    receivedVotes: set<HostId>,   // monotonic set
-    nominee: Option<HostId>,      // monotonic option
-    isLeader: bool                // am I the leader?
+    receivedVotes: set<HostId>,
+    nominee: WriteOnceOption<HostId>,   // monotonic option
+    isLeader: bool                      // am I the leader?
   ) {
     ghost predicate HasVoteFrom(voter: HostId) 
     {
@@ -43,7 +44,7 @@ module Host {
 
     ghost predicate Nominates(h: HostId) 
     {
-      nominee == Some(h)
+      nominee == WOSome(h)
     }
   }
 
@@ -67,7 +68,7 @@ module Host {
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.receivedVotes == {}
-    && v.nominee == None
+    && v.nominee == WONone
     && v.isLeader == false
   }
 
@@ -98,9 +99,9 @@ module Host {
   ghost predicate NextHostNominateSelfStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.None?
-    && v.nominee.None?
+    && v.nominee.WONone?
     && v' == v.(
-        nominee := Some(c.hostId)
+        nominee := WOSome(c.hostId)
       )
   }
 
@@ -115,7 +116,7 @@ module Host {
   ***/
   ghost predicate SendVoteReq(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
-    && v.nominee.Some?
+    && v.nominee.WOSome?
     && v.nominee.value == c.hostId
     // send message and update v'
     && msg == VoteReq(v.nominee.value)
@@ -131,10 +132,10 @@ module Host {
   // Receive predicate
   ghost predicate VoteReqRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
-    && v.nominee.None?
+    && v.nominee.WONone?
     && msg.VoteReq?
     // update v'
-    && v' == v.(nominee := Some(msg.candidate))
+    && v' == v.(nominee := WOSome(msg.candidate))
   }
 
   ghost predicate NextHostSendVoteStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -148,7 +149,7 @@ module Host {
   ***/
   ghost predicate SendVote(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
-    && v.nominee.Some?
+    && v.nominee.WOSome?
     // send message and update v'
     && msg == Vote(c.hostId, v.nominee.value)
     && v' == v
