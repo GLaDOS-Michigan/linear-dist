@@ -6,7 +6,7 @@ namespace Microsoft.Dafny
   public class MsgInvPrinter {
 
     private static readonly string[] includes = {"spec.dfy"};
-    private static readonly string[] imports = {"Types", "UtilitiesLibrary", "DistributedSystem", "Obligations"};
+    private static readonly string[] imports = {"Types", "UtilitiesLibrary", "DistributedSystem"};
 
     private static readonly string InitImpliesMessageInvHeader = 
       "lemma InitImpliesMessageInv(c: Constants, v: Variables)\n" +
