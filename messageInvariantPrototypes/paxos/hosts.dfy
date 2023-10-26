@@ -357,7 +357,7 @@ module LearnerHost {
 
   datatype Variables = Variables(
     // maps ValBal to acceptors that accepted such pair
-    receivedAccepts: map<ValBal, set<AcceptorId>>,
+    receivedAccepts: MonotonicReceivedAccepts,
     learned: Option<Value>
   ) {
     
@@ -385,7 +385,7 @@ module LearnerHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && v.receivedAccepts == map[]
+    && v.receivedAccepts == RA(map[])
     && v.learned == None
   }
 
@@ -400,18 +400,18 @@ module LearnerHost {
       case StutterStep => NextStutterStep(c, v, v', msgOps)
   }
 
-  function UpdateReceivedAccepts(receivedAccepts: map<ValBal, set<AcceptorId>>, 
-    vb: ValBal, acc: AcceptorId) : (out: map<ValBal, set<AcceptorId>>)
+  function UpdateReceivedAccepts(receivedAccepts: MonotonicReceivedAccepts, 
+    vb: ValBal, acc: AcceptorId) : (out: MonotonicReceivedAccepts)
     // Tony: ensures clauses are exactly how I can prove to the user, and tell dafny, that 
     // data structures annotated as monotonic actually are monotonic --- cool!
-    ensures vb in receivedAccepts ==> vb in out
-    ensures vb in receivedAccepts ==> |receivedAccepts[vb]| <= |out[vb]|
+    ensures vb in receivedAccepts.m ==> vb in out.m
+    ensures vb in receivedAccepts.m ==> |receivedAccepts.m[vb]| <= |out.m[vb]|
   {
-    if vb in receivedAccepts then 
-      UnionIncreasesCardinality(receivedAccepts[vb], {acc});
-      receivedAccepts[vb := receivedAccepts[vb] + {acc}]
+    if vb in receivedAccepts.m then 
+      UnionIncreasesCardinality(receivedAccepts.m[vb], {acc});
+      RA(receivedAccepts.m[vb := receivedAccepts.m[vb] + {acc}])
     else 
-      receivedAccepts[vb := {acc}]
+      RA(receivedAccepts.m[vb := {acc}])
   }
 
   ghost predicate NextReceiveAcceptStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -431,16 +431,16 @@ module LearnerHost {
   // Receive predicate trigger
   // First 2 arguments are mandatory. Second argument identifies target host. 
   ghost predicate ReceiveAcceptTrigger(c: Constants, v: Variables, acc: AcceptorId, vb: ValBal) {
-    && vb in v.receivedAccepts
-    && acc in v.receivedAccepts[vb]
+    && vb in v.receivedAccepts.m
+    && acc in v.receivedAccepts.m[vb]
   }
 
   ghost predicate NextLearnStep(c: Constants, v: Variables, v': Variables, vb: ValBal, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.None?
-    && vb in v.receivedAccepts              // enabling
-    && |v.receivedAccepts[vb]| >= c.f + 1   // enabling
-    && v' == v.(learned := Some(vb.v))      // learn new value
+    && vb in v.receivedAccepts.m              // enabling
+    && |v.receivedAccepts.m[vb]| >= c.f + 1   // enabling
+    && v' == v.(learned := Some(vb.v))        // learn new value
   }
 
   ghost predicate NextStutterStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {

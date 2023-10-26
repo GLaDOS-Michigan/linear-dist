@@ -19,7 +19,7 @@ ghost predicate CoordinatorDecisionMonotonic(c: Constants, v: Variables)
     && v.ValidHistoryIdx(j)
     && i <= j
   ::
-    v.History(j).coordinator[idx].decision.SatisfiesWriteOnce(v.History(i).coordinator[idx].decision)
+    v.History(j).coordinator[idx].decision.SatisfiesMonotonic(v.History(i).coordinator[idx].decision)
 }
 
 ghost predicate ParticipantDecisionMonotonic(c: Constants, v: Variables) 
@@ -31,7 +31,7 @@ ghost predicate ParticipantDecisionMonotonic(c: Constants, v: Variables)
     && v.ValidHistoryIdx(j)
     && i <= j
   ::
-    v.History(j).participants[idx].decision.SatisfiesWriteOnce(v.History(i).participants[idx].decision)
+    v.History(j).participants[idx].decision.SatisfiesMonotonic(v.History(i).participants[idx].decision)
 }
 
 ghost predicate MonotonicityInv(c: Constants, v: Variables) 

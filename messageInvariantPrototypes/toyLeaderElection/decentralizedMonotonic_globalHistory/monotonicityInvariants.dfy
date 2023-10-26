@@ -19,7 +19,7 @@ ghost predicate HostNomineeMonotonic(c: Constants, v: Variables)
     && c.ValidHostId(idx)
     && i <= j
   ::
-    v.History(j).hosts[idx].nominee.SatisfiesWriteOnce(v.History(i).hosts[idx].nominee)
+    v.History(j).hosts[idx].nominee.SatisfiesMonotonic(v.History(i).hosts[idx].nominee)
 }
 
 ghost predicate MonotonicityInv(c: Constants, v: Variables) 

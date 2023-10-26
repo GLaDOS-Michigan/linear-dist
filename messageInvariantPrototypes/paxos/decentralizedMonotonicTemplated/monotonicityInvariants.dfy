@@ -63,16 +63,13 @@ ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
 ghost predicate LearnerReceivedAcceptsMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall i, j, lnr, vb | 
+  forall i, j, lnr | 
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
     && c.ValidLearnerIdx(lnr)
     && i <= j
-    && vb in v.History(i).learners[lnr].receivedAccepts
   ::
-    && 0 < |v.History(i).learners[lnr].receivedAccepts[vb]|
-    && vb in v.History(j).learners[lnr].receivedAccepts
-    && v.History(i).learners[lnr].receivedAccepts[vb] <= v.History(j).learners[lnr].receivedAccepts[vb]
+    v.History(j).learners[lnr].receivedAccepts.SatisfiesMonotonic(v.History(i).learners[lnr].receivedAccepts)
 }
 
 

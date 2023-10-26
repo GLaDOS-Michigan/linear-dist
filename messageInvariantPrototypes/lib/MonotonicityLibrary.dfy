@@ -5,7 +5,7 @@ module MonotonicityLibrary {
 
   datatype WriteOnceOption<T> = WOSome(value:T) | WONone
   {
-    ghost predicate SatisfiesWriteOnce(past: WriteOnceOption<T>) {
+    ghost predicate SatisfiesMonotonic(past: WriteOnceOption<T>) {
       past.WOSome? ==> past == this
     }
   }
