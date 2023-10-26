@@ -427,7 +427,6 @@ lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables
   requires Next(c, v, v')
   ensures OneValuePerBallotLearners(c, v')
 {
-  VariableNextProperties(c, v, v');
   forall l1, l2, vb1, vb2, i|
     && v'.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(l1)
@@ -438,9 +437,10 @@ lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables
   ensures
     vb1.v == vb2.v
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      VariableNextProperties(c, v, v');
+      LeaderCanProposeMonotonicLemma(c, v);
       if dsStep.LearnerStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
         assert vb1.v == vb2.v;
@@ -456,7 +456,8 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
   requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
   requires SendProposeValidity(c, v) && SendProposeValidity(c, v')
   requires SendAcceptValidity(c, v) && SendAcceptValidity(c, v')
-  requires LeaderCanProposeMonotonic(c, v)
+  requires LeaderReceivedPromisesMonotonic(c, v)
+  requires LeaderCanProposeVMonotonic(c, v)
   requires LearnerReceivedAcceptsMonotonic(c, v')
   requires OneValuePerBallot(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
@@ -475,6 +476,7 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
     vb1.v == vb2.v
   {
     VariableNextProperties(c, v, v');
+    LeaderCanProposeMonotonicLemma(c, v);
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       if dsStep.AcceptorStep? {
@@ -504,7 +506,8 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
 lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v) && v'.WF(c)
   requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
-  requires LeaderCanProposeMonotonic(c, v')
+  requires LeaderReceivedPromisesMonotonic(c, v')
+  requires LeaderCanProposeVMonotonic(c, v')
   requires Next(c, v, v')
   ensures OneValuePerBallotLeaderAndLearners(c, v')
 {
@@ -517,6 +520,7 @@ lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': 
     acceptedVal == v'.History(i).leaders[ldr].value
   {
     VariableNextProperties(c, v, v');
+    LeaderCanProposeMonotonicLemma(c, v');
   }
 }
 
@@ -620,7 +624,7 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
   requires SendAcceptValidity(c, v)
-  requires LeaderCanProposeMonotonic(c, v)
+  requires LeaderCanProposeVMonotonic(c, v)
   requires LearnerValidReceivedAcceptsKeys(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
@@ -659,7 +663,7 @@ lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Var
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
   requires SendProposeValidity(c, v)
-  requires LeaderCanProposeMonotonic(c, v)
+  requires LeaderCanProposeVMonotonic(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')
@@ -1353,5 +1357,38 @@ lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, v
       // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
     }
   }
+}
+
+lemma LeaderCanProposeMonotonicLemma(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires LeaderReceivedPromisesMonotonic(c, v)
+  requires LeaderCanProposeVMonotonic(c, v)
+  ensures forall i, j, ldr |
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && i <= j
+    && c.ValidLeaderIdx(ldr)
+    && v.History(i).LeaderCanPropose(c, ldr)
+  :: 
+    && v.History(j).LeaderCanPropose(c, ldr)
+    && v.History(j).leaders[ldr].value == v.History(i).leaders[ldr].value
+{
+  // forall i, j, ldr |
+  //   && v.ValidHistoryIdx(i)
+  //   && v.ValidHistoryIdx(j)
+  //   && i <= j
+  //   && c.ValidLeaderIdx(ldr)
+  //   && v.History(i).LeaderCanPropose(c, ldr)
+  // ensures
+  //   && v.History(j).LeaderCanPropose(c, ldr)
+  //   && v.History(j).leaders[ldr].value == v.History(i).leaders[ldr].value
+  // {
+  //   var lc := c.leaderConstants[ldr];
+  //   // SetContainmentCardinality(v.History(i).leaders[ldr].receivedPromises.s, v.History(j).leaders[ldr].receivedPromises.s);
+  //   // var val := v.History(j).leaders[ldr].value;
+  //   // assert v.History(i).leaders[ldr].MonotonicCanProposeV(lc, val);
+  
+  //   // assert v.History(j).leaders[ldr].value == v.History(i).leaders[ldr].value;
+  // }
 }
 } // end module PaxosProof

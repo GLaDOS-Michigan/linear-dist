@@ -36,6 +36,12 @@ module LeaderHost {
     ghost predicate CanPropose(c: Constants) {
       && |receivedPromises.s| >= c.f+1
     }
+
+    // Monotonic Property
+    ghost predicate MonotonicCanProposeV(c: Constants, val: Value) {
+      && CanPropose(c)
+      && value == val
+    }
   } // end datatype Variables (Leader)
 
   ghost predicate GroupWFConstants(grp_c: seq<Constants>, f: nat) {
@@ -122,7 +128,7 @@ module LeaderHost {
   ghost predicate ReceivePromiseTrigger(c: Constants, v: Variables, acc: AcceptorId) {
     && acc in v.receivedPromises.s
   }
-  
+
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
@@ -132,7 +138,7 @@ module LeaderHost {
   // Send predicate
   ghost predicate SendPropose(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
-    && v.CanPropose(c)
+    && v.MonotonicCanProposeV(c, v.value)
     && v.HeardAtMost(c.id)
     // send message and update v'
     && msg == Propose(c.id, v.value)

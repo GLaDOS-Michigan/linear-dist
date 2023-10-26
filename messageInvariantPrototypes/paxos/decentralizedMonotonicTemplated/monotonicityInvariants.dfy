@@ -10,18 +10,17 @@ import opened DistributedSystem
 *                               Monotonicity Invariants                                *
 ***************************************************************************************/
 
-ghost predicate LeaderCanProposeMonotonic(c: Constants, v: Variables)
+ghost predicate LeaderCanProposeVMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall i, j, ldr |
+  forall i, j, ldr, val |
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
     && i <= j
     && c.ValidLeaderIdx(ldr)
-    && v.History(i).LeaderCanPropose(c, ldr)
+    && v.History(i).leaders[ldr].MonotonicCanProposeV(c.leaderConstants[ldr], val)
   :: 
-    && v.History(j).LeaderCanPropose(c, ldr)
-    && v.History(j).leaders[ldr].value == v.History(i).leaders[ldr].value
+    && v.History(j).leaders[ldr].MonotonicCanProposeV(c.leaderConstants[ldr], val)
 }
 
 ghost predicate LeaderReceivedPromisesMonotonic(c: Constants, v: Variables)
@@ -88,9 +87,8 @@ ghost predicate MonotonicityInv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && LeaderHighestHeardMonotonic(c, v)
-  && LeaderCanProposeMonotonic(c, v)
+  && LeaderCanProposeVMonotonic(c, v)
   && LeaderReceivedPromisesMonotonic(c, v)
-  // && LeaderValueMonotonic(c, v)
   && AcceptorAcceptedMonotonic(c, v)
   && AcceptorPromisedMonotonic(c, v)
   && LearnerReceivedAcceptsMonotonic(c, v)

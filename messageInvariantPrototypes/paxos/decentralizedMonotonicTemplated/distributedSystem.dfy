@@ -85,7 +85,7 @@ module DistributedSystem {
       requires WF(c)
       requires c.ValidLeaderIdx(ldr)
     {
-      leaders[ldr].CanPropose(c.leaderConstants[ldr])
+      leaders[ldr].MonotonicCanProposeV(c.leaderConstants[ldr], leaders[ldr].value)
     }
   }
 
