@@ -200,7 +200,7 @@ ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
   forall ldr, acc, i | 
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
-    && acc in v.History(i).leaders[ldr].receivedPromises
+    && acc in v.History(i).leaders[ldr].receivedPromises.s
   ::
     c.ValidAcceptorIdx(acc)
 }
@@ -235,7 +235,7 @@ ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables)
     && vi.leaders[b].value == vi.leaders[ldr].value
 }
 
-// For all ldr, acc such that acc in ldr.receivedPromises, acc's current promise
+// For all ldr, acc such that acc in ldr.receivedPromises.s, acc's current promise
 // must be >= ldr's ballot
 ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables)
   requires v.WF(c)
@@ -244,7 +244,7 @@ ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Vari
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
-    && acc in v.History(i).leaders[ldr].receivedPromises
+    && acc in v.History(i).leaders[ldr].receivedPromises.s
   ::
     v.History(i).acceptors[acc].HasPromisedAtLeast(ldr)
 }
@@ -262,7 +262,7 @@ ghost predicate LeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: V
     && vb in v.History(i).learners[lnr].receivedAccepts.m
     && vb.b < ldr
     && v.History(i).leaders[ldr].HeardAtMost(vb.b)
-    && acc in v.History(i).leaders[ldr].receivedPromises
+    && acc in v.History(i).leaders[ldr].receivedPromises.s
   ::
     acc !in v.History(i).learners[lnr].receivedAccepts.m[vb]
 }
@@ -752,7 +752,7 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
     && v'.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
-    && acc in v'.History(i).leaders[ldr].receivedPromises
+    && acc in v'.History(i).leaders[ldr].receivedPromises.s
   ensures
     v'.History(i).acceptors[acc].HasPromisedAtLeast(ldr)
   {
@@ -798,7 +798,7 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
     && vb in v'.History(i).learners[lnr].receivedAccepts.m
     && vb.b < ldr
     && v'.History(i).leaders[ldr].HeardAtMost(vb.b)
-    && acc in v'.History(i).leaders[ldr].receivedPromises
+    && acc in v'.History(i).leaders[ldr].receivedPromises.s
   ensures
     acc !in v'.History(i).learners[lnr].receivedAccepts.m[vb]
   {
@@ -1047,10 +1047,10 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
       var acc := dsStep.msgOps.recv.value.acc;
       if acc !in choosingAccs {
         // In this case, by quorum intersection, acc must already be in ldr.receivePromises
-        // Because, choosingAccs !! v.leaders[ldr].receivedPromises
+        // Because, choosingAccs !! v.leaders[ldr].receivedPromises.s
         reveal_ValidMessageSrc();
         var allAccs := GetAcceptorSet(c, v);
-        var e := QuorumIntersection(allAccs, choosingAccs, h.leaders[ldr].receivedPromises + {acc});
+        var e := QuorumIntersection(allAccs, choosingAccs, h.leaders[ldr].receivedPromises.s + {acc});
         assert false;
       }      
     }    
@@ -1088,7 +1088,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
       assert v.Last().LeaderCanPropose(c, ldr);  // trigger
       if !v.Last().leaders[ldr].HeardAtLeast(vb.b) {
         var allAccs := GetAcceptorSet(c, v);
-        var e := QuorumIntersection(allAccs, choosingAccs, v.Last().leaders[ldr].receivedPromises);
+        var e := QuorumIntersection(allAccs, choosingAccs, v.Last().leaders[ldr].receivedPromises.s);
         assert false;
       } 
     } else {

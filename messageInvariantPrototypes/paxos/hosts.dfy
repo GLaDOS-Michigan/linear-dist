@@ -18,7 +18,7 @@ module LeaderHost {
   }
 
   datatype Variables = Variables(
-    receivedPromises: set<AcceptorId>, 
+    receivedPromises: MonotonicSet<AcceptorId>, 
     value: Value, 
     highestHeardBallot: MonotonicNatOption  // holds LeaderId
   ) {
@@ -34,11 +34,7 @@ module LeaderHost {
     }
 
     ghost predicate CanPropose(c: Constants) {
-      && |receivedPromises| >= c.f+1
-      // Enabling condition that my hightest heard 
-      // is smaller than my own ballot. Not a safety issue, but can probably simplify proof.
-      // It is equivalent to being preempted
-      && HeardAtMost(c.id)
+      && |receivedPromises.s| >= c.f+1
     }
   } // end datatype Variables (Leader)
 
@@ -61,7 +57,7 @@ module LeaderHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && v.receivedPromises == {}
+    && v.receivedPromises.s == {}
     && v.value == c.preferredValue
     && v.highestHeardBallot == MNNone
   }
@@ -109,14 +105,14 @@ module LeaderHost {
     // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
     // probably simplify proof, preventing the leader from potentially equivocating
     // on its proposed value after receiving extraneous straggling promises.
-    && |v.receivedPromises| <= c.f
-    && acc !in v.receivedPromises
+    && |v.receivedPromises.s| <= c.f
+    && acc !in v.receivedPromises.s
     && var doUpdate := 
           && vbOpt.Some? 
           && v.HeardAtMost(vbOpt.value.b);
     v' == v.(
-              receivedPromises := v.receivedPromises + {acc},
-              value :=  if doUpdate then vbOpt.value.v else v.value,
+              receivedPromises := MonotonicSet(v.receivedPromises.s + {acc}),
+              value := if doUpdate then vbOpt.value.v else v.value,
               highestHeardBallot := if doUpdate then MNSome(vbOpt.value.b) else v.highestHeardBallot
             )
   }
@@ -124,9 +120,9 @@ module LeaderHost {
   // Receive predicate trigger
   // First 2 arguments are mandatory. Second argument identifies target host. 
   ghost predicate ReceivePromiseTrigger(c: Constants, v: Variables, acc: AcceptorId) {
-    && acc in v.receivedPromises
+    && acc in v.receivedPromises.s
   }
-
+  
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.None?
     && msgOps.send.Some?
@@ -137,6 +133,7 @@ module LeaderHost {
   ghost predicate SendPropose(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.CanPropose(c)
+    && v.HeardAtMost(c.id)
     // send message and update v'
     && msg == Propose(c.id, v.value)
     && v' == v

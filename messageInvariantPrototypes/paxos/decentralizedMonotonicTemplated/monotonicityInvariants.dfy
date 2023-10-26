@@ -24,6 +24,18 @@ ghost predicate LeaderCanProposeMonotonic(c: Constants, v: Variables)
     && v.History(j).leaders[ldr].value == v.History(i).leaders[ldr].value
 }
 
+ghost predicate LeaderReceivedPromisesMonotonic(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall i, j, ldr |
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && i <= j
+    && c.ValidLeaderIdx(ldr)
+  :: 
+    v.History(j).leaders[ldr].receivedPromises.SatisfiesMonotonic(v.History(i).leaders[ldr].receivedPromises)
+}
+
 ghost predicate LeaderHighestHeardMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
@@ -72,12 +84,13 @@ ghost predicate LearnerReceivedAcceptsMonotonic(c: Constants, v: Variables)
     v.History(j).learners[lnr].receivedAccepts.SatisfiesMonotonic(v.History(i).learners[lnr].receivedAccepts)
 }
 
-
 ghost predicate MonotonicityInv(c: Constants, v: Variables) 
 {
   && v.WF(c)
   && LeaderHighestHeardMonotonic(c, v)
   && LeaderCanProposeMonotonic(c, v)
+  && LeaderReceivedPromisesMonotonic(c, v)
+  // && LeaderValueMonotonic(c, v)
   && AcceptorAcceptedMonotonic(c, v)
   && AcceptorPromisedMonotonic(c, v)
   && LearnerReceivedAcceptsMonotonic(c, v)
