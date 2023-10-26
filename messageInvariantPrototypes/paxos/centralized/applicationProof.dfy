@@ -161,18 +161,6 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
         ==> c.ValidLeaderIdx(v.acceptors[acc].acceptedVB.value.b))
 }
 
-// If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
-ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall acc | 
-    && c.ValidAcceptorIdx(acc) 
-    && v.acceptors[acc].acceptedVB.Some?
-  :: 
-    && v.acceptors[acc].promised.Some?
-    && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
-}
-
 ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
@@ -303,7 +291,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerReceivedAcceptImpliesProposed(c, v)
   && LearnerReceivedAcceptImpliesAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
-  && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedImpliesProposed(c, v)
   && LeaderValidReceivedPromises(c, v)
   && LeaderHighestHeardUpperBound(c, v)
@@ -380,7 +367,6 @@ lemma  InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
-  ensures AcceptorPromisedLargerThanAccepted(c, v')
   ensures LeaderValidReceivedPromises(c, v')
   ensures LeaderHighestHeardUpperBound(c, v')
 {}
@@ -390,7 +376,6 @@ lemma InvInductiveHelper3(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
   requires AcceptorAcceptedImpliesProposed(c, v')
-  requires AcceptorPromisedLargerThanAccepted(c, v')
   ensures LeaderHearedImpliesProposed(c, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
 {

@@ -177,20 +177,6 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
         ==> c.ValidLeaderIdx(vi.acceptors[acc].acceptedVB.value.b))
 }
 
-// If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
-ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall acc, i | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidAcceptorIdx(acc) 
-    && v.history[i].acceptors[acc].acceptedVB.Some?
-  :: 
-    && var vi := v.history[i];
-    && vi.acceptors[acc].promised.Some?
-    && vi.acceptors[acc].acceptedVB.value.b <= vi.acceptors[acc].promised.value
-}
-
 ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
@@ -331,7 +317,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerReceivedAcceptImpliesProposed(c, v)
   && LearnerReceivedAcceptImpliesAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
-  && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedImpliesProposed(c, v)
   && LeaderValidReceivedPromises(c, v)
   && LeaderHighestHeardUpperBound(c, v)
@@ -377,7 +362,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvInductiveHelper3(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
-  InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
   InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
@@ -423,7 +407,6 @@ lemma  InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
-  ensures AcceptorPromisedLargerThanAccepted(c, v')
   ensures LeaderValidReceivedPromises(c, v')
   ensures LeaderHighestHeardUpperBound(c, v')
 {}
@@ -433,7 +416,6 @@ lemma InvInductiveHelper3(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
   requires AcceptorAcceptedImpliesProposed(c, v')
-  requires AcceptorPromisedLargerThanAccepted(c, v')
   ensures LeaderHearedImpliesProposed(c, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
 {
@@ -451,10 +433,26 @@ lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures OneValuePerBallot(c, v')
 {
-  InvNextOneValuePerBallotHelper(c, v, v');
+  InvNextOneValuePerBallotHelper1(c, v, v');
+  InvNextOneValuePerBallotHelper2(c, v, v');
 }
 
-lemma InvNextOneValuePerBallotHelper(c: Constants, v: Variables, v': Variables)
+lemma InvNextOneValuePerBallotHelper1(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires OneValuePerBallot(c, v)
+  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
+  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
+  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires AcceptorAcceptedImpliesProposed(c, v)
+  requires Next(c, v, v')
+  ensures OneValuePerBallotAcceptors(c, v')
+  ensures OneValuePerBallotLearners(c, v')
+{
+  var sysStep :| NextStep(c, v.Last(), v'.Last(), sysStep);
+  VariableNextProperties(c, v, v', sysStep);
+}
+
+lemma InvNextOneValuePerBallotHelper2(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires OneValuePerBallot(c, v)
   requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
@@ -465,7 +463,10 @@ lemma InvNextOneValuePerBallotHelper(c: Constants, v: Variables, v': Variables)
   ensures OneValuePerBallotAcceptorsAndLearners(c, v')
   ensures OneValuePerBallotLeaderAndLearners(c, v')
   ensures OneValuePerBallotLeaderAndAcceptors(c, v')
-{}
+{
+  var sysStep :| NextStep(c, v.Last(), v'.Last(), sysStep);
+  VariableNextProperties(c, v, v', sysStep);
+}
 
 lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables) 
   requires v.WF(c) && v'.WF(c)
@@ -508,15 +509,6 @@ lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v'
   {
     // Tickle the triggers
   }
-}
-
-lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': Variables) 
-  requires v.WF(c) && v'.WF(c)
-  requires AcceptorPromisedLargerThanAccepted(c, v)
-  requires Next(c, v, v')
-  ensures AcceptorPromisedLargerThanAccepted(c, v')
-{
-  // This needs its own lemma to avoid timeout
 }
 
 lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)

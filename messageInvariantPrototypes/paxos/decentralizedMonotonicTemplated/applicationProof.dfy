@@ -180,20 +180,6 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
         ==> c.ValidLeaderIdx(vi.acceptors[acc].acceptedVB.value.b))
 }
 
-// If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
-ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall acc, i | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidAcceptorIdx(acc) 
-    && v.History(i).acceptors[acc].acceptedVB.MVBSome?
-  :: 
-    && var vi := v.History(i);
-    && vi.acceptors[acc].promised.MNSome?
-    && vi.acceptors[acc].acceptedVB.value.b <= vi.acceptors[acc].promised.value
-}
-
 ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
@@ -332,7 +318,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerReceivedAcceptImpliesProposed(c, v)
   && LearnerReceivedAcceptImpliesAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
-  && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedImpliesProposed(c, v)
   && LeaderValidReceivedPromises(c, v)
   && LeaderHighestHeardUpperBound(c, v)
@@ -387,7 +372,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
   InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
   InvNextAcceptorValidPromisedAndAccepted(c, v, v');
-  InvNextAcceptorPromisedLargerThanAccepted(c, v, v');
   InvNextAcceptorAcceptedImpliesProposed(c, v, v');
   InvNextLeaderValidReceivedPromises(c, v, v');
   InvNextLeaderHighestHeardUpperBound(c, v, v');
@@ -667,15 +651,6 @@ lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v'
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesAccepted(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
-
-lemma InvNextAcceptorPromisedLargerThanAccepted(c: Constants, v: Variables, v': Variables) 
-  requires v.WF(c)
-  requires AcceptorPromisedLargerThanAccepted(c, v)
-  requires Next(c, v, v')
-  ensures AcceptorPromisedLargerThanAccepted(c, v')
 {
   VariableNextProperties(c, v, v');
 }

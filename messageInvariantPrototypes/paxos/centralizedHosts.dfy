@@ -149,6 +149,10 @@ module AcceptorHost {
     acceptedVB: Option<ValBal>) 
   {
 
+    ghost predicate WF() {
+      acceptedVB.Some? ==> (promised.Some? && acceptedVB.value.b <= promised.value)
+    }
+
     ghost predicate HasAccepted(vb: ValBal) {
       && acceptedVB.Some?
       && acceptedVB.value == vb
@@ -184,6 +188,7 @@ module AcceptorHost {
   ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWFConstants(grp_c)
     && |grp_v| == |grp_c| == 2*f+1
+    && (forall i | 0 <= i < |grp_c| :: grp_v[i].WF())
   }
 
   ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 

@@ -86,7 +86,7 @@ ghost predicate LeaderValidReceivedPromiseMsgs(c: Constants, v: Variables)
       && prom.acc == acc
       && (prom.vbOpt.Some?
           ==> 
-          && v.History(i).leaders[ldr].highestHeardBallot.Some?
+          && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
           && prom.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
         )
     )
@@ -98,7 +98,7 @@ ghost predicate LeaderValidHighestHeard(c: Constants, v: Variables)
   forall ldr, i | 
     && c.ValidLeaderIdx(ldr)
     && v.ValidHistoryIdx(i)
-    && v.History(i).leaders[ldr].highestHeardBallot.Some?
+    && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
   :: 
     (exists prom :: 
       && IsPromiseMessage(v, prom)
@@ -149,7 +149,7 @@ ghost predicate AcceptorValidAccepted(c: Constants, v: Variables)
   forall acc, i |
     && c.ValidAcceptorIdx(acc) 
     && v.ValidHistoryIdx(i)
-    && v.History(i).acceptors[acc].acceptedVB.Some?
+    && v.History(i).acceptors[acc].acceptedVB.MVBSome?
   :: 
     && var vb := v.History(i).acceptors[acc].acceptedVB.value;
     && Propose(vb.b, vb.v) in v.network.sentMsgs
@@ -175,9 +175,9 @@ ghost predicate PromiseMessageMatchesHistory(c: Constants, v: Variables, prom: M
 {
   reveal_ValidMessageSrc();
   && v.ValidHistoryIdx(i)
-  && v.History(i).acceptors[prom.acc].promised.Some?
+  && v.History(i).acceptors[prom.acc].promised.MNSome?
   && prom.bal == v.History(i).acceptors[prom.acc].promised.value
-  && prom.vbOpt == v.History(i).acceptors[prom.acc].acceptedVB
+  && prom.vbOpt == v.History(i).acceptors[prom.acc].acceptedVB.ToOption()
 }
 
 // certified self-inductive
@@ -212,8 +212,8 @@ ghost predicate LearnerValidReceivedAcceptMsgs(c: Constants, v: Variables)
   forall idx, vb, acc, i | 
     && c.ValidLearnerIdx(idx)
     && v.ValidHistoryIdx(i)
-    && vb in v.History(i).learners[idx].receivedAccepts
-    && acc in v.History(i).learners[idx].receivedAccepts[vb]
+    && vb in v.History(i).learners[idx].receivedAccepts.m
+    && acc in v.History(i).learners[idx].receivedAccepts.m[vb]
   ::
     Accept(vb, acc) in v.network.sentMsgs
 }
@@ -302,7 +302,7 @@ lemma InvNextValidPromiseMessage(c: Constants, v: Variables, v': Variables)
       var ac, a, a' := c.acceptorConstants[actor], v.Last().acceptors[actor], v'.Last().acceptors[actor];
       var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
       if step.MaybePromiseStep? {
-        var doPromise := a.promised.None? || (a.promised.Some? && a.promised.value < a.pendingPrepare.value.bal);
+        var doPromise := a.promised.MNNone? || (a.promised.MNSome? && a.promised.value < a.pendingPrepare.value.bal);
         if doPromise {
           assert PromiseMessageMatchesHistory(c, v', prom, |v'.history|-1);  // trigger
         }

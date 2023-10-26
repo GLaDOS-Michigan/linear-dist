@@ -178,6 +178,10 @@ module AcceptorHost {
     acceptedVB: MonotonicVBOption
   ) {
 
+    ghost predicate WF() {
+      acceptedVB.MVBSome? ==> (promised.MNSome? && acceptedVB.value.b <= promised.value)
+    }
+
     ghost predicate HasAccepted(vb: ValBal) {
       && acceptedVB.MVBSome?
       && acceptedVB.value == vb
@@ -217,6 +221,7 @@ module AcceptorHost {
   ghost predicate GroupWF(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) {
     && GroupWFConstants(grp_c)
     && |grp_v| == |grp_c| == 2*f+1
+    && (forall i | 0 <= i < |grp_c| :: grp_v[i].WF())
   }
 
   ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 
@@ -293,7 +298,7 @@ module AcceptorHost {
     && v.pendingPrepare.None?
     && var bal := msgOps.recv.value.bal;
     && var val := msgOps.recv.value.val;
-    && var doAccept := v.promised.MNNone? || (v.promised.MNSome? && v.promised.value <= bal);
+    && var doAccept := (v.promised.MNSome? ==> v.promised.value <= bal);
     &&  if doAccept then
           && v' == v.(
                 promised := MNSome(bal), 

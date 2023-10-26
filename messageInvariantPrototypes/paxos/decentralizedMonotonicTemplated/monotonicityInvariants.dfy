@@ -95,7 +95,6 @@ lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures MonotonicityInv(c, v')
 {
-  assume false;
   VariableNextProperties(c, v, v');
 }
 
