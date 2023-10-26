@@ -51,4 +51,16 @@ datatype MonotonicReceivedAccepts = RA(m: map<ValBal, set<AcceptorId>>)
       && past.m[vb] <= this.m[vb]
   }
 }
+
+datatype MonotonicPromisesAndValue = PV(promises: set<AcceptorId>, value: Value, f: nat) 
+{
+  ghost predicate SatisfiesMonotonic(past: MonotonicPromisesAndValue) {
+    && past.promises <= this.promises
+    && |past.promises| <= |this.promises|
+    && (forall val: Value | |past.promises| >= f+1 && past.value == val
+        :: this.value == val
+    )
+  }
+}
+
 }

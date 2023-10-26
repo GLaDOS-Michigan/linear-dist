@@ -18,10 +18,13 @@ module LeaderHost {
   }
 
   datatype Variables = Variables(
-    receivedPromises: MonotonicSet<AcceptorId>, 
-    value: Value, 
+    receivedPromisesAndValue: MonotonicPromisesAndValue,
     highestHeardBallot: MonotonicNatOption  // holds LeaderId
   ) {
+
+    ghost predicate WF(c: Constants) {
+      receivedPromisesAndValue.f == c.f
+    }
 
     // My highestHeardBallot >= b
     ghost predicate HeardAtLeast(b: LeaderId) {
@@ -34,13 +37,20 @@ module LeaderHost {
     }
 
     ghost predicate CanPropose(c: Constants) {
-      && |receivedPromises.s| >= c.f+1
+      && |receivedPromisesAndValue.promises| >= c.f+1
     }
 
-    // Monotonic Property
-    ghost predicate MonotonicCanProposeV(c: Constants, val: Value) {
+    ghost predicate CanProposeV(c: Constants, val: Value) {
       && CanPropose(c)
-      && value == val
+      && receivedPromisesAndValue.value == val
+    }
+
+    ghost function Value() : Value {
+      receivedPromisesAndValue.value
+    }
+
+    ghost function ReceivedPromises() : set<AcceptorId> {
+      receivedPromisesAndValue.promises
     }
   } // end datatype Variables (Leader)
 
@@ -54,6 +64,7 @@ module LeaderHost {
     && 0 < f
     && GroupWFConstants(grp_c, f)
     && |grp_v| == |grp_c|
+    && (forall i | 0 <= i < |grp_c| :: grp_v[i].WF(grp_c[i]))
   }
 
   ghost predicate GroupInit(grp_c: seq<Constants>, grp_v: seq<Variables>, f: nat) 
@@ -63,8 +74,7 @@ module LeaderHost {
   }
 
   ghost predicate Init(c: Constants, v: Variables) {
-    && v.receivedPromises.s == {}
-    && v.value == c.preferredValue
+    && v.receivedPromisesAndValue == PV({}, c.preferredValue, c.f)
     && v.highestHeardBallot == MNNone
   }
 
@@ -111,14 +121,13 @@ module LeaderHost {
     // Enabling condition that I don't yet have a quorum. Not a safety issue, but can
     // probably simplify proof, preventing the leader from potentially equivocating
     // on its proposed value after receiving extraneous straggling promises.
-    && |v.receivedPromises.s| <= c.f
-    && acc !in v.receivedPromises.s
+    && |v.receivedPromisesAndValue.promises| <= c.f
+    && acc !in v.receivedPromisesAndValue.promises
     && var doUpdate := 
           && vbOpt.Some? 
           && v.HeardAtMost(vbOpt.value.b);
     v' == v.(
-              receivedPromises := MonotonicSet(v.receivedPromises.s + {acc}),
-              value := if doUpdate then vbOpt.value.v else v.value,
+              receivedPromisesAndValue := PV(v.receivedPromisesAndValue.promises + {acc}, if doUpdate then vbOpt.value.v else v.receivedPromisesAndValue.value, c.f),
               highestHeardBallot := if doUpdate then MNSome(vbOpt.value.b) else v.highestHeardBallot
             )
   }
@@ -126,7 +135,7 @@ module LeaderHost {
   // Receive predicate trigger
   // First 2 arguments are mandatory. Second argument identifies target host. 
   ghost predicate ReceivePromiseTrigger(c: Constants, v: Variables, acc: AcceptorId) {
-    && acc in v.receivedPromises.s
+    && acc in v.receivedPromisesAndValue.promises
   }
 
   ghost predicate NextProposeStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -138,10 +147,10 @@ module LeaderHost {
   // Send predicate
   ghost predicate SendPropose(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
-    && v.MonotonicCanProposeV(c, v.value)
+    && v.CanProposeV(c, v.receivedPromisesAndValue.value)
     && v.HeardAtMost(c.id)
     // send message and update v'
-    && msg == Propose(c.id, v.value)
+    && msg == Propose(c.id, v.receivedPromisesAndValue.value)
     && v' == v
   }
 
