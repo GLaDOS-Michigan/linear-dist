@@ -1,5 +1,4 @@
-// User level proofs of application invariants
-
+include "monotonicityInvariantsAutogen.dfy"
 include "messageInvariantsAutogen.dfy"
 
 
@@ -7,25 +6,13 @@ module ToyLeaderElectionProof {
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
+import opened MonotonicityInvariants
 import opened MessageInvariants
 import opened Obligations
 
 /***************************************************************************************
 *                                Application Invariants                                *
 ***************************************************************************************/
-
-ghost predicate {:opaque} HostNomineeMonotonic(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall i, j, idx |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidHostId(idx)
-    && i <= j
-    && v.History(i).hosts[idx].nominee.WOSome?
-  ::
-    v.History(i).hosts[idx].nominee == v.History(j).hosts[idx].nominee
-}
 
 // Application Invariant: Host having a vote implies voter nominated that host
 ghost predicate HasVoteImpliesVoterNominates(c: Constants, v: Variables)
@@ -50,7 +37,6 @@ ghost predicate ReceivedVotesValid(c: Constants, v: Variables)
     v.History(i).hosts[h].receivedVotes <= (set x | 0 <= x < |c.hosts|)
 }
 
-// Note that this becomes a message invariant in the async networked version
 ghost predicate IsLeaderImpliesHasQuorum(c: Constants, v: Variables)
   requires v.WF(c)
 {
@@ -94,10 +80,8 @@ lemma InitImpliesInv(c: Constants, v: Variables)
   requires Init(c, v)
   ensures Inv(c, v)
 {
+  InitImpliesMonotonicityInv(c, v);
   InitImpliesMessageInv(c, v);
-  assert HostNomineeMonotonic(c, v) by {
-    reveal_HostNomineeMonotonic();
-  }
 }
 
 lemma InvInductive(c: Constants, v: Variables, v': Variables)
@@ -105,8 +89,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
+  MonotonicityInvInductive(c, v, v');
   MessageInvInductive(c, v, v');
-  InvNextHostNomineeMonotonic(c, v, v');
   InvNextReceivedVotesValid(c, v, v');
   InvNextIsLeaderImpliesHasQuorum(c, v, v');
   InvNextHasVoteImpliesVoterNominates(c, v, v');
@@ -118,17 +102,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 *                                        Proof                                         *
 ***************************************************************************************/
 
-lemma InvNextHostNomineeMonotonic(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires HostNomineeMonotonic(c, v)
-  requires Next(c, v, v')
-  ensures HostNomineeMonotonic(c, v')
-{
-  VariableNextProperties(c, v, v');
-  assert HostNomineeMonotonic(c, v') by {
-    reveal_HostNomineeMonotonic();
-  }
-}
 
 lemma InvNextReceivedVotesValid(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
@@ -170,17 +143,12 @@ lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variab
     if i == |v'.history|-1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
-      if v.Last().hosts[nominee].HasVoteFrom(voter) {
-        assert v'.History(i).hosts[voter].Nominates(nominee) by {
-          reveal_HostNomineeMonotonic();
-        }
-      } else {
+      if !v.Last().hosts[nominee].HasVoteFrom(voter) {
         // actor == nominee;
         var hc, h, h' := c.hosts[actor], v.Last().hosts[actor], v'.Last().hosts[actor];
         var step :| Host.NextStep(hc, h, h', step, msgOps);
         if step.RecvVoteStep? {
           var msg := msgOps.recv.value;
-          reveal_HostNomineeMonotonic();
         }  else {
           ReceiveVotesUpdatedInRecvVoteStep(hc, h, h', step, msgOps);
           assert false;
