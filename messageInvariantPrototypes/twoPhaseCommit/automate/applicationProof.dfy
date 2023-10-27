@@ -65,10 +65,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 {
   MessageInvInductive(c, v, v');
   MonotonicityInvInductive(c, v, v');
-  assert SafetyAC1(c, v') by {
-    assume false;
-  }
   LeaderTallyReflectsPreferencesInductive(c, v, v');
+  AC1Proof(c, v, v');
   AC3Proof(c, v, v');
   AC4Proof(c, v, v');
 }
@@ -81,6 +79,14 @@ lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Va
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LeaderTallyReflectsPreferences(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
+
+lemma AC1Proof(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures SafetyAC1(c, v')
 {
   VariableNextProperties(c, v, v');
 }
