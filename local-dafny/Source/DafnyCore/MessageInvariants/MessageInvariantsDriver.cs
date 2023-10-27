@@ -33,6 +33,12 @@ public class MessageInvariantsDriver {
     }
     Debug.Assert(dsHosts != null, "dsHosts should not be null");
 
+    ResolveSendInvariants(dsHosts, program);
+    ResolveReceiveInvariants(dsHosts, program);
+    
+  } // end method Resolve()
+
+  private void ResolveSendInvariants(DatatypeDecl dsHosts, Program program) {
     // Find Send Predicate definitions
     var sendPredicateDefs = new List<Function>();
     foreach (var kvp in program.ModuleSigs) {
@@ -48,7 +54,9 @@ public class MessageInvariantsDriver {
       var sendInv = SendInvariant.FromFunction(sp, dsHosts);
       msgInvFile.AddSendInvariant(sendInv);
     }
+  }
 
+  private void ResolveReceiveInvariants(DatatypeDecl dsHosts, Program program) {
     // Find Receive Predicate trigger definitions
     // Trigger and Conclusion definitions
     var receivePredicateTriggers = new List<Function>();
@@ -65,7 +73,7 @@ public class MessageInvariantsDriver {
       var recvInv = ReceiveInvariant.FromTriggerFunction(rpt, dsHosts);
       msgInvFile.AddReceiveInvariant(recvInv);
     }
-  } // end method Resolve()
+  }
 
   public void WriteToFile() {
     string dafnyString = MsgInvPrinter.Print(msgInvFile);
