@@ -3,6 +3,7 @@ include "messageInvariantsAutogen.dfy"
 module TwoPCInvariantProof {
 import opened Types
 import opened UtilitiesLibrary
+import opened MonotonicityLibrary
 import opened DistributedSystem
 import opened MessageInvariants
 import opened Obligations
@@ -25,7 +26,7 @@ ghost predicate CoordinatorDecisionMonotonic(c: Constants, v: Variables)
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
     && i <= j
-    && v.History(i).GetCoordinator(c).decision.Some?
+    && v.History(i).GetCoordinator(c).decision.WOSome?
   ::
     v.History(i).GetCoordinator(c).decision == v.History(j).GetCoordinator(c).decision
 }
@@ -129,7 +130,7 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
         /* Proof by contradiction. Suppose coordinator decided Commit. Then it must have
         a Yes vote from all participants, including noVoter. This is a contradiction */
         var l, l' := v.Last().GetCoordinator(c), v'.Last().GetCoordinator(c);
-        if l.decision.None? && l'.decision == Some(Commit) {
+        if l.decision.WONone? && l'.decision == WOSome(Commit) {
           YesVotesContainsAllParticipantsWhenFull(c, v, |v.history|-1);
           assert GetParticipantPreference(c, noVoter) == Yes;  // witness
           assert false;

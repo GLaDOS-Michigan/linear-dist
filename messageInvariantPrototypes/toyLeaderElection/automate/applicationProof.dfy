@@ -22,7 +22,7 @@ ghost predicate {:opaque} HostNomineeMonotonic(c: Constants, v: Variables)
     && v.ValidHistoryIdx(j)
     && c.ValidHostId(idx)
     && i <= j
-    && v.History(i).hosts[idx].nominee.Some?
+    && v.History(i).hosts[idx].nominee.WOSome?
   ::
     v.History(i).hosts[idx].nominee == v.History(j).hosts[idx].nominee
 }

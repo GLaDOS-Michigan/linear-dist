@@ -21,8 +21,8 @@ ghost predicate ClientRequestsMonotonic(c: Constants, v: Variables)
     && i <= j
     && c.ValidClientIdx(idx) 
   :: 
-    && v.History(i).clients[idx].requests <= 
-        v.History(j).clients[idx].requests
+    && v.History(i).clients[idx].requests.s <= 
+        v.History(j).clients[idx].requests.s
 }
 
 ghost predicate MonotonicityInv(c: Constants, v: Variables)
@@ -42,7 +42,7 @@ ghost predicate ServerRequestsValid(c: Constants, v: Variables)
   ::
     && var req := v.History(i).GetServer(c).currentRequest.value;
     && c.ValidClientIdx(req.clientId)
-    && req.reqId in v.History(i).clients[req.clientId].requests
+    && req.reqId in v.History(i).clients[req.clientId].requests.s
 }
 
 ghost predicate ApplicationInv(c: Constants, v: Variables)
@@ -108,7 +108,7 @@ lemma InvNextServerRequestsValid(c: Constants, v: Variables, v': Variables)
   ensures
     && var req := v'.History(i).GetServer(c).currentRequest.value;
     && c.ValidClientIdx(req.clientId)
-    && req.reqId in v'.History(i).clients[req.clientId].requests
+    && req.reqId in v'.History(i).clients[req.clientId].requests.s
   {}
 }
 

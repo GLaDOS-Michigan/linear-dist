@@ -26,6 +26,6 @@ echo ""
 
 echo "Verifying automate"
 cd automate
-./verify
+./verify-auto
 cd - > /dev/null
 echo ""
