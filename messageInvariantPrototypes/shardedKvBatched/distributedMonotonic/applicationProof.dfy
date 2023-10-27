@@ -1,12 +1,11 @@
-// User level proofs of application invariants
-
-include "spec.dfy"
+include "messageInvariants.dfy"
 
 module ShardedKVProof {
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem
   import opened Obligations
+  import opened MessageInvariants
 
   ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
    requires v.WF(c)
@@ -59,7 +58,6 @@ module ShardedKVProof {
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && ValidMessages(c, v)
     && HostsCompleteKeys (c, v)
     && AtMostOneInFlight(c, v)
     && LiveKeyImpliesNoneInFlight(c, v)
@@ -68,6 +66,7 @@ module ShardedKVProof {
   ghost predicate Inv(c: Constants, v: Variables)
   {
     && v.WF(c)
+    && MessageInv(c, v)
     && ApplicationInv(c, v)
     && Safety(c, v)
   }
@@ -80,14 +79,16 @@ module ShardedKVProof {
   lemma InitImpliesInv(c: Constants, v: Variables)
     requires Init(c, v)
     ensures Inv(c, v)
-  {}
+  {
+    InitImpliesMessageInv(c, v);
+  }
 
   lemma InvInductive(c: Constants, v: Variables, v': Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures Inv(c, v')
   {
-    assert v'.WF(c);
+    MessageInvInductive(c, v, v');
     InvNextHostsCompleteKeys(c, v, v');
     InvNextAtMostOneInFlight(c, v, v');
     InvNextLiveKeyImpliesNoneInFlight(c, v, v');

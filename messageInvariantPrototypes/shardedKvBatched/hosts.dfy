@@ -97,6 +97,7 @@ module Host {
     && SendReconf(c, v, v', msgOps.send.value)
   }
 
+  // Send predicate
   ghost predicate SendReconf(c: Constants, v: Variables, v': Variables, msg: Message) 
     requires v.WF(c)
   {

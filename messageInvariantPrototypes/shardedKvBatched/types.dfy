@@ -1,4 +1,4 @@
-include "../lib/UtilitiesLibrary.dfy"
+include "../lib/MonotonicityLibrary.dfy"
 
 module Types {
   import opened UtilitiesLibrary
@@ -11,6 +11,10 @@ module Types {
   datatype Message = Reconf(src: nat, dst: nat, vks: VersionedKeys) {
     ghost function Src() : nat {
       src
+    }
+
+    ghost function Dst() : nat {
+      dst
     }
   }
 
