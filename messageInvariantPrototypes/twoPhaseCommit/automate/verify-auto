@@ -6,6 +6,7 @@ dafnyVerify="/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafn
 files="../../lib/* ../hosts.dfy distributedSystem.dfy spec.dfy messageInvariantsAutogen.dfy monotonicityInvariantsAutogen.dfy applicationProof.dfy"
 
 rm -f messageInvariantsAutogen.dfy monotonicityInvariantsAutogen.dfy
+echo "Generating invariants"
 $dafnyMsgInv "distributedSystem.dfy" > autoInvs.log
 
 echo "Verifying $files"
