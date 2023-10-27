@@ -3,9 +3,9 @@ include "UtilitiesLibrary.dfy"
 module MonotonicityLibrary {
   import opened UtilitiesLibrary
 
-  datatype WriteOnceOption<T> = WOSome(value:T) | WONone
+  datatype MonotonicWriteOnceOption<T> = WOSome(value:T) | WONone
   {
-    ghost predicate SatisfiesMonotonic(past: WriteOnceOption<T>) {
+    ghost predicate SatisfiesMonotonic(past: MonotonicWriteOnceOption<T>) {
       past.WOSome? ==> past == this
     }
   }

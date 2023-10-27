@@ -10,12 +10,14 @@ public class MessageInvariantsDriver {
 
   public Program program;
   public MessageInvariantsFile msgInvFile;
+  public MonotonicityInvariantsFile monoInvFile;
 
   // Constructor
   public MessageInvariantsDriver(Program program)
   {
     this.program = program;
     msgInvFile = new MessageInvariantsFile();
+    monoInvFile = new MonotonicityInvariantsFile();
   }
 
   public void Resolve() {
@@ -33,10 +35,30 @@ public class MessageInvariantsDriver {
     }
     Debug.Assert(dsHosts != null, "dsHosts should not be null");
 
+    ResolveMonotonicityInvariants(dsHosts, program);
     ResolveSendInvariants(dsHosts, program);
     ResolveReceiveInvariants(dsHosts, program);
     
   } // end method Resolve()
+
+  private void ResolveMonotonicityInvariants(DatatypeDecl dsHosts, Program program) {
+    foreach (var kvp in program.ModuleSigs) {
+      var module = kvp.Value.ModuleDef;
+      if (module.DafnyName.Contains("Host")) {
+
+        // Find Variable type definition
+        foreach (var decl in module.SourceDecls) {
+          if (decl.Name.Equals("Variables")) {
+            var monoInvs = MonotonicityInvariant.FromVariableDecl((DatatypeDecl) decl, dsHosts);
+            foreach (var mi in monoInvs) {
+              monoInvFile.AddInvariant(mi);
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
 
   private void ResolveSendInvariants(DatatypeDecl dsHosts, Program program) {
     // Find Send Predicate definitions
@@ -76,10 +98,17 @@ public class MessageInvariantsDriver {
   }
 
   public void WriteToFile() {
-    string dafnyString = MsgInvPrinter.Print(msgInvFile);
-    string outputFullname = Path.GetDirectoryName(program.FullName) + "/messageInvariantsAutogen.dfy";
-    Console.WriteLine(string.Format("Writing message invariants to {0}", outputFullname));
-    File.WriteAllText(outputFullname, dafnyString);
+    // Write monotonicity invariants
+    string monoInvString = MsgInvPrinter.PrintMonotonicityInvariants(monoInvFile);
+    string monoInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/monotonicityInvariantsAutogen.dfy";
+    Console.WriteLine(string.Format("Writing monotonicity invariants to {0}", monoInvOutputFullname));
+    File.WriteAllText(monoInvOutputFullname, monoInvString);
+
+    // Write message invariants
+    string msgInvString = MsgInvPrinter.PrintMessageInvariants(msgInvFile);
+    string msgInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/messageInvariantsAutogen.dfy";
+    Console.WriteLine(string.Format("Writing message invariants to {0}", msgInvOutputFullname));
+    File.WriteAllText(msgInvOutputFullname, msgInvString);
   }
 }  // end class MessageInvariantsDriver
 } // end namespace Microsoft.Dafny

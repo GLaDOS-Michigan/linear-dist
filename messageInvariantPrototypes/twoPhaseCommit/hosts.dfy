@@ -13,7 +13,7 @@ module CoordinatorHost {
   }
 
   datatype Variables = Variables(
-    decision: WriteOnceOption<Decision>, 
+    decision: MonotonicWriteOnceOption<Decision>, 
     yesVotes: set<HostId>,
     noVotes: set<HostId>
   )
@@ -149,7 +149,7 @@ module ParticipantHost {
     // Boolean flag that acts as enabling condition for sending VoteMsg, introduced to make
     // receiving voteReq and sending vote two distinct steps.
     sendVote: bool,
-    decision: WriteOnceOption<Decision>
+    decision: MonotonicWriteOnceOption<Decision>
   )
   {
     ghost predicate WF(c: Constants) {

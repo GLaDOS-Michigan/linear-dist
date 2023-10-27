@@ -1,5 +1,5 @@
 include "monotonicityInvariants.dfy"
-include "messageInvariants.dfy"
+include "messageInvariantsAutogen.dfy"
 
 module TwoPCInvariantProof {
 import opened Types

@@ -1,24 +1,39 @@
 using System;
-using System.Collections.Generic;
 
 namespace Microsoft.Dafny
 {
   public class MsgInvPrinter {
 
     private static readonly string[] includes = {"spec.dfy"};
-    private static readonly string[] imports = {"Types", "UtilitiesLibrary", "DistributedSystem"};
+    private static readonly string[] imports = {"Types", "UtilitiesLibrary", "MonotonicityLibrary", "DistributedSystem"};
 
+    private static readonly string InitImpliesMonotonicityInv = 
+      "lemma InitImpliesMonotonicityInv(c: Constants, v: Variables)\n" +
+      "  requires Init(c, v)\n" +
+      "  ensures MonotonicityInv(c, v)\n" +
+      "{}\n";
+    
     private static readonly string InitImpliesMessageInvHeader = 
       "lemma InitImpliesMessageInv(c: Constants, v: Variables)\n" +
       "  requires Init(c, v)\n" +
       "  ensures MessageInv(c, v)\n" +
       "{\n" +
       "  InitImpliesValidVariables(c, v);\n";
-    private static readonly string MessageInvInductiveHeader = 
-       "lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)\n" +
-        "  requires MessageInv(c, v)\n" +
+      
+    private static readonly string MonotonicityInvInductive = 
+       "lemma MonotonicityInvInductiveInductive(c: Constants, v: Variables, v': Variables)\n" +
+        "  requires MonotonicityInv(c, v)\n" +
         "  requires Next(c, v, v')\n" +
-        "  ensures MessageInv(c, v')\n";
+        "  ensures MonotonicityInv(c, v')\n" +
+        "{\n" +
+        "  VariableNextProperties(c, v, v');\n" +
+        "}\n";
+
+    private static readonly string MessageInvInductiveHeader = 
+      "lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)\n" +
+      "  requires MessageInv(c, v)\n" +
+      "  requires Next(c, v, v')\n" +
+      "  ensures MessageInv(c, v')\n";
 
     private static readonly string VariableNextProperties =
     "lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)\n" + 
@@ -33,7 +48,48 @@ namespace Microsoft.Dafny
     "  assert 1 < |v'.history|;\n" +
     "}\n";
 
-    public static string Print(MessageInvariantsFile file) {
+    public static string PrintMonotonicityInvariants(MonotonicityInvariantsFile file) {
+      string res = "";
+
+      // Module preamble 
+      foreach (string i in includes) {
+        res += String.Format("include \"{0}\"\n", i);
+      }
+      res += "\n";
+      res += "module MonotonicityInvariants {\n"; // begin MonotinicityInvariants module
+      foreach (string i in imports) {
+        res += String.Format("import opened {0}\n", i);
+      }
+      res += "\n";
+
+      foreach (var monoInv in file.GetInvariants()) {
+        res += monoInv.ToPredicate() + "\n";
+      }
+
+      // Main monotonicity invariant
+      res += "ghost predicate MonotonicityInv(c: Constants, v: Variables)\n" +
+             "{\n" +
+             "  && v.WF(c)\n";
+      foreach (var inv in file.GetInvariants()) {
+        res += String.Format("  && {0}(c, v)\n", inv.GetPredicateName());
+      }
+      res += "}\n\n";
+
+      // Proof obligations
+      res += "// Base obligation\n";
+      res += InitImpliesMonotonicityInv;
+      
+      res += "\n";
+      res += "// Inductive obligation\n";
+
+      res += MonotonicityInvInductive;
+      // Footer
+      res += "} // end module MonotonicityInvariants";
+      return res;
+    }
+    
+
+    public static string PrintMessageInvariants(MessageInvariantsFile file) {
       string res = "";
 
       // Module preamble 

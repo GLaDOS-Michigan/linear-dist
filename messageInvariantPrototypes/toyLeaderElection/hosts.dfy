@@ -34,7 +34,7 @@ module Host {
 
   datatype Variables = Variables(
     receivedVotes: set<HostId>,
-    nominee: WriteOnceOption<HostId>,   // monotonic option
+    nominee: MonotonicWriteOnceOption<HostId>,   // monotonic option
     isLeader: bool                      // am I the leader?
   ) {
     ghost predicate HasVoteFrom(voter: HostId) 
