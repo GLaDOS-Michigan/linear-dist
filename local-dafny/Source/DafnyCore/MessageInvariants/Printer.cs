@@ -21,7 +21,7 @@ namespace Microsoft.Dafny
       "  InitImpliesValidVariables(c, v);\n";
       
     private static readonly string MonotonicityInvInductive = 
-       "lemma MonotonicityInvInductiveInductive(c: Constants, v: Variables, v': Variables)\n" +
+       "lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)\n" +
         "  requires MonotonicityInv(c, v)\n" +
         "  requires Next(c, v, v')\n" +
         "  ensures MonotonicityInv(c, v')\n" +

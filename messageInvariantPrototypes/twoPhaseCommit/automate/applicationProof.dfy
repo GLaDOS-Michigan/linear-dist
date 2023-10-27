@@ -1,4 +1,4 @@
-include "monotonicityInvariants.dfy"
+include "monotonicityInvariantsAutogen.dfy"
 include "messageInvariantsAutogen.dfy"
 
 module TwoPCInvariantProof {
@@ -76,17 +76,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 /***************************************************************************************
 *                                        Proof                                         *
 ***************************************************************************************/
-
-
-lemma InvNextCoordinatorDecisionMonotonic(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires CoordinatorDecisionMonotonic(c, v)
-  requires Next(c, v, v') 
-  ensures CoordinatorDecisionMonotonic(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
-
 
 lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
