@@ -1,3 +1,4 @@
+include "monotonicityInvariants.dfy"
 include "messageInvariants.dfy"
 
 module PaxosProof {
@@ -5,6 +6,7 @@ module PaxosProof {
 import opened Types
 import opened UtilitiesLibrary
 import opened DistributedSystem
+import opened MonotonicityInvariants
 import opened PaxosMessageInvariants
 import opened Obligations
 
@@ -319,89 +321,6 @@ ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
     v.History(i).leaders[ldrBal].Value() == vb.v
 }
 
-//// Monoticity properties
-
-ghost predicate LeaderCanProposeMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, ldr |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && c.ValidLeaderIdx(ldr)
-    && v.History(i).LeaderCanPropose(c, ldr)
-  :: 
-    && v.History(j).LeaderCanPropose(c, ldr)
-    && v.History(j).leaders[ldr].Value() == v.History(i).leaders[ldr].Value()
-}
-
-ghost predicate LeaderHighestHeardMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, ldr |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && c.ValidLeaderIdx(ldr)
-    && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
-  :: 
-    && v.History(j).leaders[ldr].highestHeardBallot.MNSome?
-    && v.History(i).leaders[ldr].highestHeardBallot.value <= v.History(j).leaders[ldr].highestHeardBallot.value
-}
-
-ghost predicate AcceptorAcceptedMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, acc | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidAcceptorIdx(acc)
-    && i <= j
-    && v.History(i).acceptors[acc].acceptedVB.MVBSome?
-  ::
-    && v.History(j).acceptors[acc].acceptedVB.MVBSome?
-    && v.History(i).acceptors[acc].acceptedVB.value.b <= v.History(j).acceptors[acc].acceptedVB.value.b
-}
-
-ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, acc | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidAcceptorIdx(acc)
-    && i <= j
-    && v.History(i).acceptors[acc].promised.MNSome?
-  ::
-    && v.History(j).acceptors[acc].promised.MNSome?
-    && v.History(i).acceptors[acc].promised.value <= v.History(j).acceptors[acc].promised.value
-}
-
-ghost predicate LearnerReceivedAcceptsMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, lnr, vb | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidLearnerIdx(lnr)
-    && i <= j
-    && vb in v.History(i).learners[lnr].receivedAccepts.m
-  ::
-    && 0 < |v.History(i).learners[lnr].receivedAccepts.m[vb]|
-    && vb in v.History(j).learners[lnr].receivedAccepts.m
-    && v.History(i).learners[lnr].receivedAccepts.m[vb] <= v.History(j).learners[lnr].receivedAccepts.m[vb]
-}
-
-// Monotonicity Bundle
-ghost predicate MonotonicityInv(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  && LeaderHighestHeardMonotonic(c, v)
-  && LeaderCanProposeMonotonic(c, v)
-  && AcceptorAcceptedMonotonic(c, v)
-  && AcceptorPromisedMonotonic(c, v)
-  && LearnerReceivedAcceptsMonotonic(c, v)
-}
 
 // Application bundle
 ghost predicate ApplicationInv(c: Constants, v: Variables)
@@ -576,7 +495,7 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
   requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
   requires SendProposeValidity(c, v) && SendProposeValidity(c, v')
   requires SendAcceptValidity(c, v) && SendAcceptValidity(c, v')
-  requires LeaderCanProposeMonotonic(c, v)
+  requires LeaderReceivedPromisesAndValueMonotonic(c, v)
   requires LearnerReceivedAcceptsMonotonic(c, v')
   requires OneValuePerBallot(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
@@ -624,7 +543,7 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
 lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v) && v'.WF(c)
   requires ValidMessageSrc(c, v) && ValidMessageSrc(c, v')
-  requires LeaderCanProposeMonotonic(c, v')
+  requires LeaderReceivedPromisesAndValueMonotonic(c, v')
   requires Next(c, v, v')
   ensures OneValuePerBallotLeaderAndLearners(c, v')
 {
@@ -739,7 +658,7 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
   requires SendAcceptValidity(c, v)
-  requires LeaderCanProposeMonotonic(c, v)
+  requires LeaderReceivedPromisesAndValueMonotonic(c, v)
   requires LearnerValidReceivedAcceptsKeys(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
@@ -787,7 +706,7 @@ lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Var
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
   requires SendProposeValidity(c, v)
-  requires LeaderCanProposeMonotonic(c, v)
+  requires LeaderReceivedPromisesAndValueMonotonic(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')

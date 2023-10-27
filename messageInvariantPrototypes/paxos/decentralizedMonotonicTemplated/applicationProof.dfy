@@ -440,7 +440,6 @@ lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables
     VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      LeaderCanProposeMonotonicLemma(c, v);
       if dsStep.LearnerStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
         assert vb1.v == vb2.v;
@@ -475,7 +474,6 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
     vb1.v == vb2.v
   {
     VariableNextProperties(c, v, v');
-    LeaderCanProposeMonotonicLemma(c, v);
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       if dsStep.AcceptorStep? {
@@ -518,7 +516,6 @@ lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': 
     acceptedVal == v'.History(i).leaders[ldr].Value()
   {
     VariableNextProperties(c, v, v');
-    LeaderCanProposeMonotonicLemma(c, v');
   }
 }
 
@@ -1356,18 +1353,4 @@ lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, v
     }
   }
 }
-
-lemma LeaderCanProposeMonotonicLemma(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires LeaderReceivedPromisesAndValueMonotonic(c, v)
-  ensures forall i, j, ldr |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && c.ValidLeaderIdx(ldr)
-    && v.History(i).LeaderCanPropose(c, ldr)
-  :: 
-    && v.History(j).LeaderCanPropose(c, ldr)
-    && v.History(j).leaders[ldr].Value() == v.History(i).leaders[ldr].Value()
-{}
 } // end module PaxosProof
