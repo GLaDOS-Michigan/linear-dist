@@ -62,5 +62,4 @@ datatype MonotonicPromisesAndValue = PV(promises: set<AcceptorId>, value: Value,
     )
   }
 }
-
 }

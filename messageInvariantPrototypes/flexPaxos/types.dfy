@@ -1,4 +1,4 @@
-include "../lib/UtilitiesLibrary.dfy"
+include "../lib/MonotonicityLibrary.dfy"
 
 module Types {
 import opened UtilitiesLibrary
@@ -35,6 +35,44 @@ lemma FiniteBallots(b1: LeaderId, b2: LeaderId) returns (res: seq<LeaderId>)
   } else {
     var sub := FiniteBallots(b1, b2-1);
     return sub + [b2];
+  }
+}
+
+
+/// Some custom monotonic datatypes
+
+datatype MonotonicVBOption = MVBSome(value: ValBal) | MVBNone
+{
+  ghost predicate SatisfiesMonotonic(past: MonotonicVBOption) {
+    past.MVBSome? ==> (this.MVBSome? && past.value.b <= this.value.b)
+  }
+
+  ghost function ToOption() : Option<ValBal> {
+    if this.MVBNone? then None
+    else Some(this.value)
+  }
+}
+
+datatype MonotonicReceivedAccepts = RA(m: map<ValBal, set<AcceptorId>>) 
+{
+  ghost predicate SatisfiesMonotonic(past: MonotonicReceivedAccepts) {
+    forall vb | 
+    && vb in past.m 
+    :: 
+      && 0 < |past.m[vb]|
+      && vb in this.m
+      && past.m[vb] <= this.m[vb]
+  }
+}
+
+datatype MonotonicPromisesAndValue = PV(promises: set<AcceptorId>, value: Value, p1Quorum: nat) 
+{
+  ghost predicate SatisfiesMonotonic(past: MonotonicPromisesAndValue) {
+    && past.promises <= this.promises
+    && |past.promises| <= |this.promises|
+    && (forall val: Value | |past.promises| >= p1Quorum && past.value == val
+        :: this.value == val
+    )
   }
 }
 }

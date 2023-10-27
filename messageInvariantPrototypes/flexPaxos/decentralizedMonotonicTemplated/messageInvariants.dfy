@@ -134,7 +134,7 @@ ghost predicate {:opaque} LeaderValidReceivedPromiseMsgs(c: Constants, v: Variab
   forall ldr, i, acc |
     && c.ValidLeaderIdx(ldr)
     && v.ValidHistoryIdx(i)
-    && acc in v.History(i).leaders[ldr].receivedPromises
+    && acc in v.History(i).leaders[ldr].ReceivedPromises()
   :: 
     (exists prom :: 
       && IsPromiseMessage(v, prom)
@@ -142,7 +142,7 @@ ghost predicate {:opaque} LeaderValidReceivedPromiseMsgs(c: Constants, v: Variab
       && prom.acc == acc
       && (prom.vbOpt.Some?
           ==> 
-          && v.History(i).leaders[ldr].highestHeardBallot.Some?
+          && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
           && prom.vbOpt.value.b <= v.History(i).leaders[ldr].highestHeardBallot.value
         )
     )
@@ -157,8 +157,8 @@ ghost predicate {:opaque} LearnerValidReceivedAcceptMsgs(c: Constants, v: Variab
   forall idx, vb, acc, i | 
     && c.ValidLearnerIdx(idx)
     && v.ValidHistoryIdx(i)
-    && vb in v.History(i).learners[idx].receivedAccepts
-    && acc in v.History(i).learners[idx].receivedAccepts[vb]
+    && vb in v.History(i).learners[idx].receivedAccepts.m
+    && acc in v.History(i).learners[idx].receivedAccepts.m[vb]
   ::
     Accept(vb, acc) in v.network.sentMsgs
 }
