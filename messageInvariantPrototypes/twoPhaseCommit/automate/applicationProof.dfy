@@ -1,35 +1,18 @@
-include "messageInvariantsAutogen.dfy"
+include "monotonicityInvariants.dfy"
+include "messageInvariants.dfy"
 
 module TwoPCInvariantProof {
 import opened Types
 import opened UtilitiesLibrary
 import opened MonotonicityLibrary
 import opened DistributedSystem
+import opened MonotonicityInvariants
 import opened MessageInvariants
 import opened Obligations
 
 /***************************************************************************************
 *                                Application Invariants                                *
 ***************************************************************************************/
-
-// Monotonicity bundle
-ghost predicate MonotonicityInv(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  CoordinatorDecisionMonotonic(c, v)
-}
-
-ghost predicate CoordinatorDecisionMonotonic(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall i, j |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && v.History(i).GetCoordinator(c).decision.WOSome?
-  ::
-    v.History(i).GetCoordinator(c).decision == v.History(j).GetCoordinator(c).decision
-}
 
 
 // Application bundle
@@ -81,9 +64,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   MessageInvInductive(c, v, v');
-  assert MonotonicityInv(c, v') by {
-    InvNextCoordinatorDecisionMonotonic(c, v, v');
-  }
+  MonotonicityInvInductive(c, v, v');
   assert SafetyAC1(c, v') by {
     assume false;
   }
