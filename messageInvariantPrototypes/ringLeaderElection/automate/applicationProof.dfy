@@ -1,3 +1,4 @@
+include "monotonicityInvariantsAutogen.dfy"
 include "messageInvariantsAutogen.dfy"
 
 module RingLeaderElectionProof {
