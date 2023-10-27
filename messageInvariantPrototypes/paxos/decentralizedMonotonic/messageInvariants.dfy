@@ -78,7 +78,7 @@ ghost predicate LeaderValidReceivedPromiseMsgs(c: Constants, v: Variables)
   forall ldr, i, acc |
     && c.ValidLeaderIdx(ldr)
     && v.ValidHistoryIdx(i)
-    && acc in v.History(i).leaders[ldr].receivedPromises
+    && acc in v.History(i).leaders[ldr].ReceivedPromises()
   :: 
     (exists prom :: 
       && IsPromiseMessage(v, prom)
@@ -103,7 +103,7 @@ ghost predicate LeaderValidHighestHeard(c: Constants, v: Variables)
     (exists prom :: 
       && IsPromiseMessage(v, prom)
       && prom.bal == ldr
-      && prom.vbOpt == Some(VB(v.History(i).leaders[ldr].value, v.History(i).leaders[ldr].highestHeardBallot.value))
+      && prom.vbOpt == Some(VB(v.History(i).leaders[ldr].Value(), v.History(i).leaders[ldr].highestHeardBallot.value))
     )
 }
 
@@ -120,7 +120,7 @@ ghost predicate ValidProposeMesssage(c: Constants, v: Variables)
       && v.ValidHistoryIdx(i)
       && var ldr := v.History(i).leaders[prop.bal];
       && ldr.CanPropose(c.leaderConstants[prop.bal])
-      && prop.val == ldr.value
+      && prop.val == ldr.Value()
     )
 }
 
@@ -238,8 +238,30 @@ lemma InvNextLeaderValidReceivedPromiseMsgs(c: Constants, v: Variables, v': Vari
   requires LeaderValidReceivedPromiseMsgs(c, v)
   requires Next(c, v, v')
   ensures LeaderValidReceivedPromiseMsgs(c, v')
-{
-  VariableNextProperties(c, v, v');
+{  
+  forall ldr, i, acc |
+    && c.ValidLeaderIdx(ldr)
+    && v'.ValidHistoryIdx(i)
+    && acc in v'.History(i).leaders[ldr].ReceivedPromises()
+  ensures
+    (exists prom :: 
+      && IsPromiseMessage(v', prom)
+      && prom.bal == ldr
+      && prom.acc == acc
+      && (prom.vbOpt.Some?
+          ==> 
+          && v'.History(i).leaders[ldr].highestHeardBallot.MNSome?
+          && prom.vbOpt.value.b <= v'.History(i).leaders[ldr].highestHeardBallot.value
+        )
+    )
+  {
+    VariableNextProperties(c, v, v');
+    if i == |v'.history| - 1 { 
+      if acc !in v'.History(i-1).leaders[ldr].ReceivedPromises() {
+        // trigger
+      }
+    }
+  }
 }
 
 lemma InvNextLeaderValidHighestHeard(c: Constants, v: Variables, v': Variables)
