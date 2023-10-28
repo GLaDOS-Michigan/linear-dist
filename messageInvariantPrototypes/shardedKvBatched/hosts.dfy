@@ -137,6 +137,11 @@ module Host {
     && v.myKeys[key].version < msg.vks[key]
   }
 
+  // Uniqueness owned by host definition
+  ghost predicate HostOwnsKey(c: Constants, v: Variables, key: UniqueKey) {
+    && v.HasLiveKey(key)
+  }
+
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
