@@ -13,8 +13,8 @@ module Host {
   }
 
   datatype Variables = Variables(
-    myKeys: map<Key, Entry>,   // is the key live, and the version number
-    nextKeysToSend: set<Key>,  // next keys to transfer to dest
+    myKeys: map<UniqueKey, Entry>,   // is the key live, and the version number
+    nextKeysToSend: set<UniqueKey>,  // next keys to transfer to dest
     nextDst: HostId
   )
   {
@@ -22,16 +22,16 @@ module Host {
       && c.myId in c.hostIds
     }
 
-    ghost predicate HasKey(k: Key) {
+    ghost predicate HasKey(k: UniqueKey) {
       && k in myKeys
     }
 
-    ghost predicate HasLiveKey(k: Key) {
+    ghost predicate HasLiveKey(k: UniqueKey) {
       && k in myKeys
       && myKeys[k].live
     }
 
-    ghost predicate HasLiveKeySet(ks: set<Key>) {
+    ghost predicate HasLiveKeySet(ks: set<UniqueKey>) {
       && 0 < |ks|
       && (forall k | k in ks
           :: 
@@ -59,14 +59,14 @@ module Host {
     && GroupWF(grp_c, grp_v)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
     // Hosts have disjoint live keys
-    && (forall k: Key, i, j | 
+    && (forall k: UniqueKey, i, j | 
           && 0 <= i < |grp_c|
           && 0 <= j < |grp_c|
           && grp_v[i].HasLiveKey(k) 
           && grp_v[j].HasLiveKey(k) 
         :: i == j)
     // Each host have every key
-    && (forall k: Key, i: HostId | 0 <= i < |grp_c| ::
+    && (forall k: UniqueKey, i: HostId | 0 <= i < |grp_c| ::
           grp_v[i].HasKey(k))
   }
 
@@ -106,7 +106,7 @@ module Host {
     && v.HasLiveKeySet(v.nextKeysToSend)
     && v.nextDst in c.hostIds
     // Construct message
-    && var vks := (map k: Key | k in v.nextKeysToSend :: (v.myKeys[k].version + 1) as nat);  // increment version
+    && var vks := (map k: UniqueKey | k in v.nextKeysToSend :: (v.myKeys[k].version + 1) as nat);  // increment version
     && msg == Reconf(c.myId, v.nextDst, vks)
     // Update v'
     && v'.myKeys == 
@@ -125,10 +125,14 @@ module Host {
     && v' == v.(
       myKeys := (map k | k in v.myKeys
           :: if k in msg.vks && v.myKeys[k].version < msg.vks[k] // in-flight definition
-              then v.myKeys[k]
+              then Entry(true, msg.vks[k])
               else Entry(false, v.myKeys[k].version))
     )
   }
+
+  // ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
+
+  // }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {

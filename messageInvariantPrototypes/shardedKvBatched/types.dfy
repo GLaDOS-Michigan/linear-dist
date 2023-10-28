@@ -4,9 +4,9 @@ module Types {
   import opened UtilitiesLibrary
 
   type HostId = nat
-  type Key = int
+  type UniqueKey = int
   datatype Entry = Entry(live: bool, version: nat)
-  type VersionedKeys = map<Key, nat>
+  type VersionedKeys = map<UniqueKey, nat>
 
   datatype Message = Reconf(src: nat, dst: nat, vks: VersionedKeys) {
     ghost function Src() : nat {

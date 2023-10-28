@@ -9,7 +9,7 @@ module Obligations {
     requires c.WF()
     requires v.WF(c)
   {
-  forall idx1, idx2, k: Key | 
+  forall idx1, idx2, k: UniqueKey | 
     && c.ValidIdx(idx1) 
     && c.ValidIdx(idx2) 
     && v.Last().hosts[idx1].HasLiveKey(k)
