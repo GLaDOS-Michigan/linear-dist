@@ -19,17 +19,16 @@ module ShardedKVProof {
   ghost predicate KeyInFlight(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
-      exists msg :: KeyInFlightByMessage(c, v, msg, k)
+    exists msg :: KeyInFlightByMessage(c, v, msg, k)
   }
 
   ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey) 
     requires v.WF(c)
   {
-      && msg in v.network.sentMsgs
-      && k in msg.vks
-      && c.ValidIdx(msg.dst)
-      && v.Last().hosts[msg.dst].HasKey(k)
-      && v.Last().hosts[msg.dst].myKeys[k].version < msg.vks[k]
+    && msg in v.network.sentMsgs
+    && (0 <= msg.Dst() < |c.hosts| ==>
+      Host.UniqueKeyInFlight(c.hosts[msg.Dst()], v.Last().hosts[msg.Dst()], k, msg)
+    )
   }
 
   ghost predicate AtMostOneInFlight(c: Constants, v: Variables)
