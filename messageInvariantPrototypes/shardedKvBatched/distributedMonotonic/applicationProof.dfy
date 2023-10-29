@@ -1,5 +1,5 @@
 include "messageInvariants.dfy"
-include "uniquenessInvariants.dfy"
+include "ownershipInvariants.dfy"
 
 module ShardedKVProof {
   import opened Types
@@ -7,12 +7,12 @@ module ShardedKVProof {
   import opened DistributedSystem
   import opened Obligations
   import opened MessageInvariants
-  import opened UniquenessInvariants
+  import opened OwnershipInvariants
 
   ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
    requires v.WF(c)
   {
-    forall i:int, idx, k: UniqueKey | 
+    forall i:int, idx, k: OwnedKey | 
       && v.ValidHistoryIdx(i)
       && c.ValidIdx(idx)
     :: v.History(i).hosts[idx].HasKey(k)
@@ -28,7 +28,7 @@ module ShardedKVProof {
   {
     && v.WF(c)
     && MessageInv(c, v)
-    && UniquenessInv(c, v)
+    && OwnershipInv(c, v)
     && ApplicationInv(c, v)
     && Safety(c, v)
   }
@@ -43,7 +43,7 @@ module ShardedKVProof {
     ensures Inv(c, v)
   {
     InitImpliesMessageInv(c, v);
-    InitImpliesUniquenessInv(c, v);
+    InitImpliesOwnershipInv(c, v);
   }
 
   lemma InvInductive(c: Constants, v: Variables, v': Variables)
@@ -52,7 +52,7 @@ module ShardedKVProof {
     ensures Inv(c, v')
   {
     MessageInvInductive(c, v, v');
-    UniquenessInvInductive(c, v, v');
+    OwnershipInvInductive(c, v, v');
     InvNextHostsCompleteKeys(c, v, v');
     InvNextSafety(c, v, v');
   }
@@ -68,7 +68,7 @@ lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures HostsCompleteKeys(c, v')
 {
-  forall i:int, idx, k: UniqueKey | 
+  forall i:int, idx, k: OwnedKey | 
     && v'.ValidHistoryIdx(i)
     && c.ValidIdx(idx)
   ensures v'.History(i).hosts[idx].HasKey(k)
@@ -91,7 +91,7 @@ lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Safety(c, v')
 {
-  forall idx1, idx2, k: UniqueKey | 
+  forall idx1, idx2, k: OwnedKey | 
     && c.ValidIdx(idx1) 
     && c.ValidIdx(idx2) 
     && v'.Last().hosts[idx1].HasLiveKey(k)
@@ -109,7 +109,7 @@ lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: UniqueKey, idx: HostId, other: HostId)
+lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: OwnedKey, idx: HostId, other: HostId)
   requires v.WF(c) && v'.WF(c)
   requires Inv(c, v)
   requires c.ValidIdx(idx)

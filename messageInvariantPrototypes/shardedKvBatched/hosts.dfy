@@ -13,8 +13,8 @@ module Host {
   }
 
   datatype Variables = Variables(
-    myKeys: map<UniqueKey, Entry>,   // is the key live, and the version number
-    nextKeysToSend: set<UniqueKey>,  // next keys to transfer to dest
+    myKeys: map<OwnedKey, Entry>,   // is the key live, and the version number
+    nextKeysToSend: set<OwnedKey>,  // next keys to transfer to dest
     nextDst: HostId
   )
   {
@@ -22,16 +22,16 @@ module Host {
       && c.myId in c.hostIds
     }
 
-    ghost predicate HasKey(k: UniqueKey) {
+    ghost predicate HasKey(k: OwnedKey) {
       && k in myKeys
     }
 
-    ghost predicate HasLiveKey(k: UniqueKey) {
+    ghost predicate HasLiveKey(k: OwnedKey) {
       && k in myKeys
       && myKeys[k].live
     }
 
-    ghost predicate HasLiveKeySet(ks: set<UniqueKey>) {
+    ghost predicate HasLiveKeySet(ks: set<OwnedKey>) {
       && 0 < |ks|
       && (forall k | k in ks
           :: 
@@ -59,14 +59,14 @@ module Host {
     && GroupWF(grp_c, grp_v)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
     // Hosts have disjoint live keys
-    && (forall k: UniqueKey, i, j | 
+    && (forall k: OwnedKey, i, j | 
           && 0 <= i < |grp_c|
           && 0 <= j < |grp_c|
           && grp_v[i].HasLiveKey(k) 
           && grp_v[j].HasLiveKey(k) 
         :: i == j)
     // Each host have every key
-    && (forall k: UniqueKey, i: HostId | 0 <= i < |grp_c| ::
+    && (forall k: OwnedKey, i: HostId | 0 <= i < |grp_c| ::
           grp_v[i].HasKey(k))
   }
 
@@ -106,7 +106,7 @@ module Host {
     && v.HasLiveKeySet(v.nextKeysToSend)
     && v.nextDst in c.hostIds
     // Construct message
-    && var vks := (map k: UniqueKey | k in v.nextKeysToSend :: (v.myKeys[k].version + 1) as nat);  // increment version
+    && var vks := (map k: OwnedKey | k in v.nextKeysToSend :: (v.myKeys[k].version + 1) as nat);  // increment version
     && msg == Reconf(c.myId, v.nextDst, vks)
     // Update v'
     && v'.myKeys == 
@@ -124,21 +124,21 @@ module Host {
     && (forall k | k in msg.vks :: v.HasKey(k))
     && v' == v.(
       myKeys := (map k | k in v.myKeys
-          :: if UniqueKeyInFlight(c, v, k, msg)
+          :: if OwnedKeyInFlight(c, v, k, msg)
               then Entry(true, msg.vks[k])
               else Entry(false, v.myKeys[k].version))
     )
   }
 
-  // Uniqueness in-flight definition
-  ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
+  // Owned key in-flight definition
+  ghost predicate OwnedKeyInFlight(c: Constants, v: Variables, key: OwnedKey, msg: Message) {
     && key in v.myKeys
     && key in msg.vks 
     && v.myKeys[key].version < msg.vks[key]
   }
 
-  // Uniqueness owned by host definition
-  ghost predicate HostOwnsKey(c: Constants, v: Variables, key: UniqueKey) {
+  // Key owned by host definition
+  ghost predicate HostOwnsKey(c: Constants, v: Variables, key: OwnedKey) {
     && v.HasLiveKey(key)
   }
 

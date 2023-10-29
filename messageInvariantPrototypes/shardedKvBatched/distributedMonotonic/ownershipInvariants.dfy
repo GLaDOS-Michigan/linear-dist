@@ -1,22 +1,22 @@
 include "spec.dfy"
 
-module UniquenessInvariants {
+module OwnershipInvariants {
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem
 
-  ghost predicate KeyInFlight(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate KeyInFlight(c: Constants, v: Variables, k: OwnedKey) 
     requires v.WF(c)
   {
     exists msg :: KeyInFlightByMessage(c, v, msg, k)
   }
 
-  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey) 
+  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: OwnedKey) 
     requires v.WF(c)
   {
     && msg in v.network.sentMsgs
     && (0 <= msg.Dst() < |c.hosts| ==>
-      Host.UniqueKeyInFlight(c.hosts[msg.Dst()], v.Last().hosts[msg.Dst()], k, msg)
+      Host.OwnedKeyInFlight(c.hosts[msg.Dst()], v.Last().hosts[msg.Dst()], k, msg)
     )
   }
 
@@ -27,7 +27,7 @@ module UniquenessInvariants {
     :: m1 == m2
   }
 
-  ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: OwnedKey) 
     requires v.WF(c)
   {
     forall idx | c.ValidIdx(idx) :: !Host.HostOwnsKey(c.hosts[idx], v.Last().hosts[idx], k)
@@ -42,28 +42,22 @@ module UniquenessInvariants {
   }
 
   
-  ghost predicate UniquenessInv(c: Constants, v: Variables)
-    requires v.WF(c)
+  ghost predicate OwnershipInv(c: Constants, v: Variables)
   {
+    && v.WF(c)
     && AtMostOneInFlight(c, v)
     && HostOwnsKeyImpliesNoneInFlight(c, v)
   }
 
-  ghost predicate Inv(c: Constants, v: Variables)
-  {
-    && v.WF(c)
-    && UniquenessInv(c, v)
-  }
-
-  lemma InitImpliesUniquenessInv(c: Constants, v: Variables)
+  lemma InitImpliesOwnershipInv(c: Constants, v: Variables)
     requires Init(c, v)
-    ensures Inv(c, v)
+    ensures OwnershipInv(c, v)
   {}
 
-  lemma UniquenessInvInductive(c: Constants, v: Variables, v': Variables)
-    requires Inv(c, v)
+  lemma OwnershipInvInductive(c: Constants, v: Variables, v': Variables)
+    requires OwnershipInv(c, v)
     requires Next(c, v, v')
-    ensures Inv(c, v')
+    ensures OwnershipInv(c, v')
   {
     InvNextAtMostOneInFlight(c, v, v');
     InvNextLiveKeyImpliesNoneInFlight(c, v, v');
@@ -77,7 +71,7 @@ module UniquenessInvariants {
 
 lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
-  requires Inv(c, v)
+  requires OwnershipInv(c, v)
   requires Next(c, v, v')
   ensures AtMostOneInFlight(c, v')
 {
@@ -94,9 +88,9 @@ lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: UniqueKey)
+lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: OwnedKey)
   requires v'.WF(c)
-  requires Inv(c, v)
+  requires OwnershipInv(c, v)
   requires Next(c, v, v')
   // input constraints
   requires m1 != m2
@@ -110,7 +104,7 @@ lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, 
 
 lemma InvNextLiveKeyImpliesNoneInFlight(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
-  requires Inv(c, v)
+  requires OwnershipInv(c, v)
   requires Next(c, v, v')
   ensures HostOwnsKeyImpliesNoneInFlight(c, v')
 {

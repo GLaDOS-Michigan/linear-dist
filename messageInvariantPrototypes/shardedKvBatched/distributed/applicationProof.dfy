@@ -19,17 +19,17 @@ module ShardedKVProof {
   ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
    requires v.WF(c)
   {
-    forall i, k: Key | c.ValidIdx(i)
+    forall i, k: OwnedKey | c.ValidIdx(i)
     :: v.hosts[i].HasKey(k)
   }
 
-  ghost predicate KeyInFlight(c: Constants, v: Variables, k: Key) 
+  ghost predicate KeyInFlight(c: Constants, v: Variables, k: OwnedKey) 
     requires v.WF(c)
   {
       exists msg :: KeyInFlightByMessage(c, v, msg, k)
   }
 
-  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: Key) 
+  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: OwnedKey) 
     requires v.WF(c)
   {
       && msg in v.network.sentMsgs
@@ -46,7 +46,7 @@ module ShardedKVProof {
     :: m1 == m2
   }
 
-  ghost predicate NoneHasLiveKey(c: Constants, v: Variables, k: Key) 
+  ghost predicate NoneHasLiveKey(c: Constants, v: Variables, k: OwnedKey) 
     requires v.WF(c)
   {
     forall idx | c.ValidIdx(idx) :: !v.hosts[idx].HasLiveKey(k)
@@ -111,7 +111,7 @@ lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures HostsCompleteKeys(c, v')
 {
-  forall i, k: Key | c.ValidIdx(i)
+  forall i, k: OwnedKey | c.ValidIdx(i)
   ensures v'.hosts[i].HasKey(k)
   {
     var dsStep :| NextStep(c, v, v', dsStep);
@@ -141,7 +141,7 @@ lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: Key)
+lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: OwnedKey)
   requires v'.WF(c)
   requires Inv(c, v)
   requires Next(c, v, v')
@@ -193,7 +193,7 @@ lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Safety(c, v')
 {
-  forall idx1, idx2, k: Key | 
+  forall idx1, idx2, k: OwnedKey | 
     && c.ValidIdx(idx1) 
     && c.ValidIdx(idx2) 
     && v'.hosts[idx1].HasLiveKey(k)
@@ -211,7 +211,7 @@ lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: Key, idx: HostId, other: HostId)
+lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: OwnedKey, idx: HostId, other: HostId)
   requires v.WF(c) && v'.WF(c)
   requires Inv(c, v)
   requires c.ValidIdx(idx)
