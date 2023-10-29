@@ -13,8 +13,8 @@ module Host {
   }
 
   datatype Variables = Variables(
-    myKeys: map<Key, Entry>,   // is the key live, and the version number
-    nextKeyToSend: Key,        // next key to transfer to dest
+    myKeys: map<OwnedKey, Entry>,   // is the key live, and the version number
+    nextKeyToSend: OwnedKey,        // next key to transfer to dest
     nextDst: HostId
   )
   {
@@ -22,11 +22,11 @@ module Host {
       && c.myId in c.hostIds
     }
 
-    ghost predicate HasKey(k: Key) {
+    ghost predicate HasKey(k: OwnedKey) {
       && k in myKeys
     }
 
-    ghost predicate HasLiveKey(k: Key) {
+    ghost predicate HasLiveKey(k: OwnedKey) {
       && k in myKeys
       && myKeys[k].live
     }
@@ -51,14 +51,14 @@ module Host {
     && GroupWF(grp_c, grp_v)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
     // Hosts have disjoint live keys
-    && (forall k: Key, i, j | 
+    && (forall k: OwnedKey, i, j | 
           && 0 <= i < |grp_c|
           && 0 <= j < |grp_c|
           && grp_v[i].HasLiveKey(k) 
           && grp_v[j].HasLiveKey(k) 
         :: i == j)
     // Each host have every key
-    && (forall k: Key, i: HostId | 0 <= i < |grp_c| ::
+    && (forall k: OwnedKey, i: HostId | 0 <= i < |grp_c| ::
           grp_v[i].HasKey(k))
   }
 
