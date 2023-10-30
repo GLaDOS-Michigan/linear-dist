@@ -21,5 +21,5 @@ namespace Microsoft.Dafny
     public List<MonotonicityInvariant> GetInvariants() {
       return monotonicityInvariants;
     }
-  } // end class MessageInvariantsFile
+  } // end class MonotonicityInvariantsFile
 }

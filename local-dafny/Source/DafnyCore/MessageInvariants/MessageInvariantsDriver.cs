@@ -12,6 +12,7 @@ public class MessageInvariantsDriver {
   public Program program;
   public MessageInvariantsFile msgInvFile;
   public MonotonicityInvariantsFile monoInvFile;
+  public OwnershipInvariantsFile ownerInvFile;
 
   // Constructor
   public MessageInvariantsDriver(DafnyOptions options, Program program)
@@ -20,10 +21,11 @@ public class MessageInvariantsDriver {
     this.program = program;
     msgInvFile = new MessageInvariantsFile();
     monoInvFile = new MonotonicityInvariantsFile();
+    ownerInvFile = new OwnershipInvariantsFile();
   }
 
   public void Resolve() {
-    Console.WriteLine(String.Format("Resolving message invariants for {0}\n", program.FullName));
+    Console.WriteLine(String.Format("Resolving invariants for {0}\n", program.FullName));
 
     // Find distributedSystem.Hosts
     DatatypeDecl dsHosts = null;
@@ -43,7 +45,7 @@ public class MessageInvariantsDriver {
       ResolveReceiveInvariants(dsHosts, program);
     } 
     if (options.ownershipInvs) {
-      // TODO
+      // Nothing to do here actually
     }
   } // end method Resolve()
 
@@ -116,8 +118,13 @@ public class MessageInvariantsDriver {
       string msgInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/messageInvariantsAutogen.dfy";
       Console.WriteLine(string.Format("Writing message invariants to {0}", msgInvOutputFullname));
       File.WriteAllText(msgInvOutputFullname, msgInvString);
-    } if (options.ownershipInvs) {
-      
+    } 
+    if (options.ownershipInvs) {
+      // Write ownership invariants
+      string ownerInvString = MsgInvPrinter.PrintOwnershipInvariants(ownerInvFile);
+      string ownerInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/ownershipInvariantsAutogen.dfy";
+      Console.WriteLine(string.Format("Writing ownership invariants to {0}", ownerInvOutputFullname));
+      File.WriteAllText(ownerInvOutputFullname, ownerInvString);
     }
   }
 }  // end class MessageInvariantsDriver
