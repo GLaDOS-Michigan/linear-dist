@@ -35,12 +35,16 @@ module OwnershipInvariants {
 *                                    Invariants                                        *
 ***************************************************************************************/
 
-
-  ghost predicate AtMostOneInFlightMessagePerKey(c: Constants, v: Variables)
+  ghost predicate AtMostOwnerPerKey(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall k, m1, m2 | KeyInFlightByMessage(c, v, m1, k) && KeyInFlightByMessage(c, v, m2, k) 
-    :: m1 == m2
+    forall h1, h2, k | 
+      && c.ValidIdx(h1) 
+      && c.ValidIdx(h2)
+      && Host.HostOwnsUniqueKey(c.hosts[h1], v.Last().hosts[h1], k) 
+      && Host.HostOwnsUniqueKey(c.hosts[h2], v.Last().hosts[h2], k) 
+    ::
+     h1 == h2
   }
 
   ghost predicate HostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables)
@@ -51,12 +55,19 @@ module OwnershipInvariants {
     !UniqueKeyInFlight(c, v, k)
   }
 
+  ghost predicate AtMostOneInFlightMessagePerKey(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    forall k, m1, m2 | KeyInFlightByMessage(c, v, m1, k) && KeyInFlightByMessage(c, v, m2, k) 
+    :: m1 == m2
+  }
   
   ghost predicate OwnershipInv(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && AtMostOneInFlightMessagePerKey(c, v)
+    && AtMostOwnerPerKey(c, v)
     && HostOwnsKeyImpliesNotInFlight(c, v)
+    && AtMostOneInFlightMessagePerKey(c, v)
   }
 
   lemma InitImpliesOwnershipInv(c: Constants, v: Variables)
@@ -69,8 +80,9 @@ module OwnershipInvariants {
     requires Next(c, v, v')
     ensures OwnershipInv(c, v')
   {
-    InvNextAtMostOneInFlightMessagePerKey(c, v, v');
+    InvNextAtMostOwnerPerKey(c, v, v');
     InvNextHostOwnsKeyImpliesNotInFlight(c, v, v');
+    InvNextAtMostOneInFlightMessagePerKey(c, v, v');
   }
 
 
@@ -78,6 +90,83 @@ module OwnershipInvariants {
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
+
+lemma InvNextAtMostOwnerPerKey(c: Constants, v: Variables, v': Variables) 
+  requires v'.WF(c)
+  requires OwnershipInv(c, v)
+  requires Next(c, v, v')
+  ensures AtMostOwnerPerKey(c, v')
+{
+  forall h1, h2, k | 
+      && c.ValidIdx(h1) 
+      && c.ValidIdx(h2)
+      && Host.HostOwnsUniqueKey(c.hosts[h1], v'.Last().hosts[h1], k) 
+      && Host.HostOwnsUniqueKey(c.hosts[h2], v'.Last().hosts[h2], k) 
+  ensures
+     h1 == h2
+  {
+    if h1 != h2 {
+      if v.Last().hosts[h1].HasLiveKey(k) {
+        AtMostOneHostOwnsKey(c, v, v', k, h1, h2);
+      } else if v.Last().hosts[h2].HasLiveKey(k) {
+        AtMostOneHostOwnsKey(c, v, v', k, h2, h1);
+      }
+    }
+  }
+}
+
+lemma AtMostOneHostOwnsKey(c: Constants, v: Variables, v': Variables, k: UniqueKey, idx: HostId, other: HostId)
+  requires v.WF(c) && v'.WF(c)
+  requires OwnershipInv(c, v)
+  requires c.ValidIdx(idx)
+  requires c.ValidIdx(other)
+  requires idx != other
+  requires Host.HostOwnsUniqueKey(c.hosts[idx], v.Last().hosts[idx], k) 
+  requires !Host.HostOwnsUniqueKey(c.hosts[other], v.Last().hosts[other], k) 
+  requires Next(c, v, v')
+  ensures !Host.HostOwnsUniqueKey(c.hosts[other], v'.Last().hosts[other], k) 
+{
+  var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+  var actor, msgOps := dsStep.actor, dsStep.msgOps;
+  if actor == other {
+    var cs, s, s' := c.hosts[other], v.Last().hosts[other], v'.Last().hosts[other];
+    var step :| Host.NextStep(cs, s, s', step, msgOps);
+    if step.ReceiveStep? && Host.HostOwnsUniqueKey(c.hosts[other], v'.Last().hosts[other], k) {
+      // triggers
+      assert KeyInFlightByMessage(c, v, msgOps.recv.value, k);  
+      assert UniqueKeyInFlight(c, v, k);
+      assert false;
+    }    
+  }
+}
+
+lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Variables)
+  requires v'.WF(c)
+  requires OwnershipInv(c, v)
+  requires Next(c, v, v')
+  ensures HostOwnsKeyImpliesNotInFlight(c, v')
+{
+  forall k | !NoHostOwnsKey(c, v', k)
+  ensures !UniqueKeyInFlight(c, v', k)
+  {
+    forall msg | msg in v'.network.sentMsgs
+    ensures !KeyInFlightByMessage(c, v', msg, k) {
+      var idx :| c.ValidIdx(idx) && Host.HostOwnsUniqueKey(c.hosts[idx], v'.Last().hosts[idx], k);
+      if Host.HostOwnsUniqueKey(c.hosts[idx], v.Last().hosts[idx], k) {
+        // triggers
+        assert !UniqueKeyInFlight(c, v, k);
+        assert !KeyInFlightByMessage(c, v, msg, k);
+      } else {
+        if msg in v.network.sentMsgs && KeyInFlightByMessage(c, v, msg, k){
+          var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+          // triggers
+          assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
+          assert UniqueKeyInFlight(c, v, k);
+        }
+      }
+    }
+  }
+}
 
 lemma InvNextAtMostOneInFlightMessagePerKey(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
@@ -110,35 +199,5 @@ lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, 
   ensures !KeyInFlightByMessage(c, v', m2, k)
 {
   assert UniqueKeyInFlight(c, v, k);
-}
-
-
-// TODO: Something is wrong here. This proof should not pass
-lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Variables)
-  requires v'.WF(c)
-  requires OwnershipInv(c, v)
-  requires Next(c, v, v')
-  ensures HostOwnsKeyImpliesNotInFlight(c, v')
-{
-  forall k | !NoHostOwnsKey(c, v', k)
-  ensures !UniqueKeyInFlight(c, v', k)
-  {
-    forall msg | msg in v'.network.sentMsgs
-    ensures !KeyInFlightByMessage(c, v', msg, k) {
-      var idx :| c.ValidIdx(idx) && Host.HostOwnsUniqueKey(c.hosts[idx], v'.Last().hosts[idx], k);
-      if Host.HostOwnsUniqueKey(c.hosts[idx], v.Last().hosts[idx], k){
-        // triggers
-        assert !UniqueKeyInFlight(c, v, k);
-        assert !KeyInFlightByMessage(c, v, msg, k);
-      } else {
-        if msg in v.network.sentMsgs && KeyInFlightByMessage(c, v, msg, k){
-          var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-          // triggers
-          assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-          assert UniqueKeyInFlight(c, v, k);
-        }
-      }
-    }
-  }
 }
 } // end module ShardedKVProof

@@ -113,7 +113,7 @@ module Host {
         (map k | k in v.myKeys
           :: if k !in v.nextKeysToSend then v.myKeys[k] else Entry(false, v.myKeys[k].version))
     && v'.nextDst in c.hostIds
-    && v'.HasLiveKeySet(v.nextKeysToSend)
+    && v'.HasLiveKeySet(v'.nextKeysToSend)
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
