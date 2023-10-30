@@ -8,13 +8,15 @@ namespace Microsoft.Dafny
 {
 public class MessageInvariantsDriver {
 
+  public DafnyOptions options;
   public Program program;
   public MessageInvariantsFile msgInvFile;
   public MonotonicityInvariantsFile monoInvFile;
 
   // Constructor
-  public MessageInvariantsDriver(Program program)
+  public MessageInvariantsDriver(DafnyOptions options, Program program)
   {
+    this.options = options;
     this.program = program;
     msgInvFile = new MessageInvariantsFile();
     monoInvFile = new MonotonicityInvariantsFile();
@@ -35,10 +37,14 @@ public class MessageInvariantsDriver {
     }
     Debug.Assert(dsHosts != null, "dsHosts should not be null");
 
-    ResolveMonotonicityInvariants(dsHosts, program);
-    ResolveSendInvariants(dsHosts, program);
-    ResolveReceiveInvariants(dsHosts, program);
-    
+    if (options.msgInvs) {
+      ResolveMonotonicityInvariants(dsHosts, program);
+      ResolveSendInvariants(dsHosts, program);
+      ResolveReceiveInvariants(dsHosts, program);
+    } 
+    if (options.ownershipInvs) {
+      // TODO
+    }
   } // end method Resolve()
 
   private void ResolveMonotonicityInvariants(DatatypeDecl dsHosts, Program program) {
@@ -98,17 +104,21 @@ public class MessageInvariantsDriver {
   }
 
   public void WriteToFile() {
-    // Write monotonicity invariants
-    string monoInvString = MsgInvPrinter.PrintMonotonicityInvariants(monoInvFile);
-    string monoInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/monotonicityInvariantsAutogen.dfy";
-    Console.WriteLine(string.Format("Writing monotonicity invariants to {0}", monoInvOutputFullname));
-    File.WriteAllText(monoInvOutputFullname, monoInvString);
+    if (options.msgInvs) {
+      // Write monotonicity invariants
+      string monoInvString = MsgInvPrinter.PrintMonotonicityInvariants(monoInvFile);
+      string monoInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/monotonicityInvariantsAutogen.dfy";
+      Console.WriteLine(string.Format("Writing monotonicity invariants to {0}", monoInvOutputFullname));
+      File.WriteAllText(monoInvOutputFullname, monoInvString);
 
-    // Write message invariants
-    string msgInvString = MsgInvPrinter.PrintMessageInvariants(msgInvFile);
-    string msgInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/messageInvariantsAutogen.dfy";
-    Console.WriteLine(string.Format("Writing message invariants to {0}", msgInvOutputFullname));
-    File.WriteAllText(msgInvOutputFullname, msgInvString);
+      // Write message invariants
+      string msgInvString = MsgInvPrinter.PrintMessageInvariants(msgInvFile);
+      string msgInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/messageInvariantsAutogen.dfy";
+      Console.WriteLine(string.Format("Writing message invariants to {0}", msgInvOutputFullname));
+      File.WriteAllText(msgInvOutputFullname, msgInvString);
+    } if (options.ownershipInvs) {
+      
+    }
   }
 }  // end class MessageInvariantsDriver
 } // end namespace Microsoft.Dafny

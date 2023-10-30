@@ -336,6 +336,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
     public ContractTestingMode TestContracts = ContractTestingMode.None;
 
     public bool msgInvs = false;
+    public bool ownershipInvs = false;
 
     public bool ForbidNondeterminism { get; set; }
 
@@ -795,6 +796,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
 
         case "msgInvs":
           msgInvs = true;
+          return true;
+
+        case "ownerInvs":
+          ownershipInvs = true;
           return true;
       }
 

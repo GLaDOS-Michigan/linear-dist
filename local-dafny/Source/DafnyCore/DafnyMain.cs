@@ -52,12 +52,12 @@ namespace Microsoft.Dafny {
       }
       var res = Resolve(program);
 
-      if (options.msgInvs) {
+      if (options.msgInvs || options.ownershipInvs) {
         // Don't verify or compile when generating msgInvs
         options.DafnyVerify = false;
         options.Compile = false;
 
-        var msgInvDriver = new MessageInvariantsDriver(program);
+        var msgInvDriver = new MessageInvariantsDriver(options, program);
         msgInvDriver.Resolve();
         msgInvDriver.WriteToFile();
       }
