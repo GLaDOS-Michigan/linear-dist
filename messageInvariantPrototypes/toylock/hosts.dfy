@@ -1,15 +1,4 @@
-include "../lib/UtilitiesLibrary.dfy"
-
-module Types {
-  import opened UtilitiesLibrary
-
-  type HostId = nat
-
-  datatype Message = Grant(epoch: nat, dst: HostId) 
-
-  datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
-} // end module Types
-
+include "types.dfy"
 
 module Host {
   import opened UtilitiesLibrary
@@ -78,13 +67,18 @@ module Host {
   ghost predicate NextTransmissionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) 
     requires v.WF(c)
   {
-    if v.hasLock then 
-      && msgOps.recv.None?
-      && msgOps.send == Some(Grant(v.myEpoch + 1, Successor(c.numParticipants, c.hostId)))
-      && v' == v.(hasLock := false)
-    else
-      && msgOps.send == msgOps.recv == None 
-      && v == v'
+    && msgOps.send.Some?
+    && msgOps.recv.None?
+    && SendGrant(c, v, v', msgOps.send.value)
+  }
+
+  // Send predicate
+  ghost predicate SendGrant(c: Constants, v: Variables, v': Variables, msg: Message) 
+    requires v.WF(c)
+  {
+    && v.hasLock
+    && msg == Grant(c.hostId, Successor(c.numParticipants, c.hostId), v.myEpoch + 1)
+    && v' == v.(hasLock := false)
   }
 
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {

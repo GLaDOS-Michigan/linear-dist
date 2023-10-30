@@ -1,8 +1,6 @@
-// User level proofs of application invariants
-
 include "spec.dfy"
 
-module ConventionalToylockProof {
+module ToylockProof {
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem
