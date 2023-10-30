@@ -128,7 +128,7 @@ lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: Uniq
     if step.ReceiveStep? && v'.Last().hosts[other].HasLiveKey(k) {
       // triggers
       assert KeyInFlightByMessage(c, v, msgOps.recv.value, k);  
-      assert KeyInFlight(c, v, k);
+      assert UniqueKeyInFlight(c, v, k);
       assert false;
     }    
   }

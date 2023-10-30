@@ -124,21 +124,21 @@ module Host {
     && (forall k | k in msg.vks :: v.HasKey(k))
     && v' == v.(
       myKeys := (map k | k in v.myKeys
-          :: if OwnedKeyInFlight(c, v, k, msg)
+          :: if UniqueKeyInFlight(c, v, k, msg)
               then Entry(true, msg.vks[k])
               else Entry(false, v.myKeys[k].version))
     )
   }
 
-  // Owned key in-flight definition
-  ghost predicate OwnedKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
+  // Key in-flight definition
+  ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
     && key in v.myKeys
     && key in msg.vks 
     && v.myKeys[key].version < msg.vks[key]
   }
 
   // Key owned by host definition
-  ghost predicate HostOwnsKey(c: Constants, v: Variables, key: UniqueKey) {
+  ghost predicate HostOwnsUniqueKey(c: Constants, v: Variables, key: UniqueKey) {
     && v.HasLiveKey(key)
   }
 

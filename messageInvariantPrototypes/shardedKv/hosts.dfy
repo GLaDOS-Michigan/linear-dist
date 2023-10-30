@@ -117,7 +117,7 @@ module Host {
     )
   }
 
-  // Owned key in-flight definition
+  // Key in-flight definition
   ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
     && key in v.myKeys
     && key == msg.key
