@@ -106,9 +106,9 @@ lemma InvNextAtMostOwnerPerKey(c: Constants, v: Variables, v': Variables)
      h1 == h2
   {
     if h1 != h2 {
-      if v.Last().hosts[h1].HasLiveKey(k) {
+      if Host.HostOwnsUniqueKey(c.hosts[h1], v.Last().hosts[h1], k) {
         AtMostOneHostOwnsKey(c, v, v', k, h1, h2);
-      } else if v.Last().hosts[h2].HasLiveKey(k) {
+      } else if Host.HostOwnsUniqueKey(c.hosts[h2], v.Last().hosts[h2], k) {
         AtMostOneHostOwnsKey(c, v, v', k, h2, h1);
       }
     }
