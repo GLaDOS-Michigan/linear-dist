@@ -94,7 +94,7 @@ module Host {
   {
     // Enabling conditions
     && 0 < |v.myKeys| 
-    && v.HasLiveKey(v.nextKeyToSend)
+    && HostOwnsKey(c, v, v.nextKeyToSend)
     && v.nextDst in c.hostIds
     // Construct message
     && msg == Reconf(c.myId, v.nextDst, v.nextKeyToSend, v.myKeys[v.nextKeyToSend].version+1) // increment version
@@ -111,11 +111,22 @@ module Host {
     && msgOps.recv.Some?
     && var msg := msgOps.recv.value;
     && msg.dst == c.myId
-    && v.HasKey(msg.key)
-    && msg.version > v.myKeys[msg.key].version
+    && OwnedKeyInFlight(c, v, msg.key, msg)
     && v' == v.(
       myKeys := v.myKeys[msg.key := Entry(true, msg.version)]
     )
+  }
+
+  // Owned key in-flight definition
+  ghost predicate OwnedKeyInFlight(c: Constants, v: Variables, key: OwnedKey, msg: Message) {
+    && key in v.myKeys
+    && key == msg.key
+    && v.myKeys[key].version < msg.version
+  }
+
+  // Key owned by host definition
+  ghost predicate HostOwnsKey(c: Constants, v: Variables, key: OwnedKey) {
+    && v.HasLiveKey(key)
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)

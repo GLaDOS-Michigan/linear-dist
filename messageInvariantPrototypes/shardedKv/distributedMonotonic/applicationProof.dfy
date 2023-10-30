@@ -1,20 +1,14 @@
-// User level proofs of application invariants
-
-include "spec.dfy"
+include "messageInvariants.dfy"
+include "ownershipInvariants.dfy"
 
 module ShardedKVProof {
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem
   import opened Obligations
+  import opened MessageInvariants
+  import opened OwnershipInvariants
 
-  ghost predicate MessagesValid(c: Constants, v: Variables)
-   requires v.WF(c)
-  {
-    forall m | m in v.network.sentMsgs
-    :: && c.ValidIdx(m.src)
-       && c.ValidIdx(m.dst)
-  }
 
   ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
    requires v.WF(c)
@@ -24,58 +18,17 @@ module ShardedKVProof {
       && c.ValidIdx(idx)
     :: v.History(i).hosts[idx].HasKey(k)
   }
-
-  ghost predicate KeyInFlight(c: Constants, v: Variables, k: OwnedKey) 
-    requires v.WF(c)
-  {
-      exists msg :: KeyInFlightByMessage(c, v, msg, k)
-  }
-
-  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: OwnedKey) 
-    requires v.WF(c)
-  {
-      && msg in v.network.sentMsgs
-      && msg.key == k
-      && c.ValidIdx(msg.dst)
-      && v.Last().hosts[msg.dst].HasKey(k)
-      && v.Last().hosts[msg.dst].myKeys[k].version < msg.version
-  }
-
-  ghost predicate AtMostOneInFlight(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    forall k, m1, m2 | KeyInFlightByMessage(c, v, m1, k) && KeyInFlightByMessage(c, v, m2, k) 
-    :: m1 == m2
-  }
-
-  ghost predicate NoneHasLiveKey(c: Constants, v: Variables, k: OwnedKey) 
-    requires v.WF(c)
-  {
-    forall idx | c.ValidIdx(idx) :: !v.Last().hosts[idx].HasLiveKey(k)
-  }
-  
-
-  ghost predicate LiveKeyImpliesNoneInFlight(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    forall k | !NoneHasLiveKey(c, v, k)
-    ::
-    !KeyInFlight(c, v, k)
-  }
-
   
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && MessagesValid(c, v)
     && HostsCompleteKeys (c, v)
-    && AtMostOneInFlight(c, v)
-    && LiveKeyImpliesNoneInFlight(c, v)
   }
 
   ghost predicate Inv(c: Constants, v: Variables)
   {
-    && v.WF(c)
+    && MessageInv(c, v)
+    && OwnershipInv(c, v)
     && ApplicationInv(c, v)
     && Safety(c, v)
   }
@@ -88,17 +41,18 @@ module ShardedKVProof {
   lemma InitImpliesInv(c: Constants, v: Variables)
     requires Init(c, v)
     ensures Inv(c, v)
-  {}
+  {
+    InitImpliesMessageInv(c, v);
+  }
 
   lemma InvInductive(c: Constants, v: Variables, v': Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
     ensures Inv(c, v')
   {
-    assert v'.WF(c);
+    MessageInvInductive(c, v, v');
+    OwnershipInvInductive(c, v, v');
     InvNextHostsCompleteKeys(c, v, v');
-    InvNextAtMostOneInFlight(c, v, v');
-    InvNextLiveKeyImpliesNoneInFlight(c, v, v');
     InvNextSafety(c, v, v');
   }
 
@@ -130,70 +84,6 @@ lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
-  requires v'.WF(c)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures AtMostOneInFlight(c, v')
-{
-  forall k, m1, m2 | KeyInFlightByMessage(c, v', m1, k) && KeyInFlightByMessage(c, v', m2, k) 
-  ensures m1 == m2
-  {
-    if m1 != m2 {
-      if KeyInFlightByMessage(c, v, m1, k) {
-        InvNextAtMostOneInFlightHelper(c, v, v', m1, m2, k);
-      } else {
-        InvNextAtMostOneInFlightHelper(c, v, v', m2, m1, k);
-      }
-    }
-  }
-}
-
-lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: OwnedKey)
-  requires v'.WF(c)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  // input constraints
-  requires m1 != m2
-  requires KeyInFlightByMessage(c, v, m1, k)
-  requires !KeyInFlightByMessage(c, v, m2, k)
-  // postcondition
-  ensures !KeyInFlightByMessage(c, v', m2, k)
-{
-  assert KeyInFlight(c, v, k);
-}
-
-lemma InvNextLiveKeyImpliesNoneInFlight(c: Constants, v: Variables, v': Variables)
-  requires v'.WF(c)
-  requires HostsCompleteKeys(c, v')
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures LiveKeyImpliesNoneInFlight(c, v')
-{
-  forall k | !NoneHasLiveKey(c, v', k)
-  ensures !KeyInFlight(c, v', k)
-  {
-    forall msg | msg in v'.network.sentMsgs && msg.key == k
-    ensures !KeyInFlightByMessage(c, v', msg, k) {
-      var idx :| c.ValidIdx(idx) && v'.Last().hosts[idx].HasLiveKey(k);
-      if v.Last().hosts[idx].HasLiveKey(k) {
-        // triggers
-        assert !KeyInFlight(c, v, k);
-        assert !KeyInFlightByMessage(c, v, msg, k);
-      } else {
-        if msg in v.network.sentMsgs {
-          if KeyInFlightByMessage(c, v, msg, k) {
-            var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-            var actor, msgOps := dsStep.actor, dsStep.msgOps;
-            // triggers
-            assert KeyInFlightByMessage(c, v, msgOps.recv.value, k);
-            assert KeyInFlight(c, v, k);
-          }
-        }
-      }
-    }
-  }
-}
 
 lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
@@ -243,6 +133,4 @@ lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: Owne
     }    
   }
 }
-
-
 } // end module ShardedKVProof
