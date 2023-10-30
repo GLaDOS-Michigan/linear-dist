@@ -1,0 +1,49 @@
+#!/bin/sh
+
+echo "Verifying clientServer"
+cd clientServer/automate
+./verify-auto
+cd - > /dev/null
+echo ""
+
+echo "Verifying ringLeaderElection"
+cd ringLeaderElection/automate
+./verify-auto
+cd - > /dev/null
+echo ""
+
+echo "Verifying toyLeaderElection"
+cd toyLeaderElection/automate
+./verify-auto
+cd - > /dev/null
+echo ""
+
+echo "Verifying twoPhaseCommit"
+cd twoPhaseCommit/automate
+./verify-auto
+cd - > /dev/null
+echo ""
+
+echo "Verifying paxos"
+cd paxos/automate
+./verify-auto
+cd - > /dev/null
+echo ""
+
+echo "Verifying flexPaxos"
+cd flexPaxos/automate
+./verify-auto
+cd - > /dev/null
+echo ""
+
+# echo "Verifying decentralizedMonotonic"
+# cd decentralizedMonotonic_globalHistory
+# ./verify
+# cd - > /dev/null
+# echo ""
+
+# echo "Verifying automate"
+# cd automate
+# ./verify-auto
+# cd - > /dev/null
+# echo ""
