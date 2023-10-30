@@ -102,6 +102,8 @@ lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, 
   assert KeyInFlight(c, v, k);
 }
 
+
+// TODO: Something is wrong here. This proof should not pass
 lemma InvNextLiveKeyImpliesNoneInFlight(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
   requires OwnershipInv(c, v)
