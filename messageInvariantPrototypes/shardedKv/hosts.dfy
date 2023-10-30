@@ -13,8 +13,8 @@ module Host {
   }
 
   datatype Variables = Variables(
-    myKeys: map<OwnedKey, Entry>,   // is the key live, and the version number
-    nextKeyToSend: OwnedKey,        // next key to transfer to dest
+    myKeys: map<UniqueKey, Entry>,   // is the key live, and the version number
+    nextKeyToSend: UniqueKey,        // next key to transfer to dest
     nextDst: HostId
   )
   {
@@ -22,11 +22,11 @@ module Host {
       && c.myId in c.hostIds
     }
 
-    ghost predicate HasKey(k: OwnedKey) {
+    ghost predicate HasKey(k: UniqueKey) {
       && k in myKeys
     }
 
-    ghost predicate HasLiveKey(k: OwnedKey) {
+    ghost predicate HasLiveKey(k: UniqueKey) {
       && k in myKeys
       && myKeys[k].live
     }
@@ -51,14 +51,14 @@ module Host {
     && GroupWF(grp_c, grp_v)
     && (forall i | 0 <= i < |grp_c| :: Init(grp_c[i], grp_v[i]))
     // Hosts have disjoint live keys
-    && (forall k: OwnedKey, i, j | 
+    && (forall k: UniqueKey, i, j | 
           && 0 <= i < |grp_c|
           && 0 <= j < |grp_c|
           && grp_v[i].HasLiveKey(k) 
           && grp_v[j].HasLiveKey(k) 
         :: i == j)
     // Each host have every key
-    && (forall k: OwnedKey, i: HostId | 0 <= i < |grp_c| ::
+    && (forall k: UniqueKey, i: HostId | 0 <= i < |grp_c| ::
           grp_v[i].HasKey(k))
   }
 
@@ -94,7 +94,7 @@ module Host {
   {
     // Enabling conditions
     && 0 < |v.myKeys| 
-    && HostOwnsKey(c, v, v.nextKeyToSend)
+    && HostOwnsUniqueKey(c, v, v.nextKeyToSend)
     && v.nextDst in c.hostIds
     // Construct message
     && msg == Reconf(c.myId, v.nextDst, v.nextKeyToSend, v.myKeys[v.nextKeyToSend].version+1) // increment version
@@ -111,21 +111,21 @@ module Host {
     && msgOps.recv.Some?
     && var msg := msgOps.recv.value;
     && msg.dst == c.myId
-    && OwnedKeyInFlight(c, v, msg.key, msg)
+    && UniqueKeyInFlight(c, v, msg.key, msg)
     && v' == v.(
       myKeys := v.myKeys[msg.key := Entry(true, msg.version)]
     )
   }
 
   // Owned key in-flight definition
-  ghost predicate OwnedKeyInFlight(c: Constants, v: Variables, key: OwnedKey, msg: Message) {
+  ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
     && key in v.myKeys
     && key == msg.key
     && v.myKeys[key].version < msg.version
   }
 
   // Key owned by host definition
-  ghost predicate HostOwnsKey(c: Constants, v: Variables, key: OwnedKey) {
+  ghost predicate HostOwnsUniqueKey(c: Constants, v: Variables, key: UniqueKey) {
     && v.HasLiveKey(key)
   }
 

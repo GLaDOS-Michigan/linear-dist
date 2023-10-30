@@ -5,13 +5,13 @@ module OwnershipInvariants {
   import opened UtilitiesLibrary
   import opened DistributedSystem
 
-  ghost predicate KeyInFlight(c: Constants, v: Variables, k: OwnedKey) 
+  ghost predicate KeyInFlight(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
     exists msg :: KeyInFlightByMessage(c, v, msg, k)
   }
 
-  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: OwnedKey) 
+  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey) 
     requires v.WF(c)
   {
     && msg in v.network.sentMsgs
@@ -27,7 +27,7 @@ module OwnershipInvariants {
     :: m1 == m2
   }
 
-  ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: OwnedKey) 
+  ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
     forall idx | c.ValidIdx(idx) :: !Host.HostOwnsKey(c.hosts[idx], v.Last().hosts[idx], k)
@@ -88,7 +88,7 @@ lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: OwnedKey)
+lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: UniqueKey)
   requires v'.WF(c)
   requires OwnershipInv(c, v)
   requires Next(c, v, v')

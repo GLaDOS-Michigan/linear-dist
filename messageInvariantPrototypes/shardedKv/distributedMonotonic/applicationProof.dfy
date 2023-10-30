@@ -13,7 +13,7 @@ module ShardedKVProof {
   ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
    requires v.WF(c)
   {
-    forall i:int, idx, k: OwnedKey | 
+    forall i:int, idx, k: UniqueKey | 
       && v.ValidHistoryIdx(i)
       && c.ValidIdx(idx)
     :: v.History(i).hosts[idx].HasKey(k)
@@ -67,7 +67,7 @@ lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures HostsCompleteKeys(c, v')
 {
-  forall i:int, idx, k: OwnedKey | 
+  forall i:int, idx, k: UniqueKey | 
     && v'.ValidHistoryIdx(i)
     && c.ValidIdx(idx)
   ensures v'.History(i).hosts[idx].HasKey(k)
@@ -91,7 +91,7 @@ lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Safety(c, v')
 {
-  forall idx1, idx2, k: OwnedKey | 
+  forall idx1, idx2, k: UniqueKey | 
     && c.ValidIdx(idx1) 
     && c.ValidIdx(idx2) 
     && v'.Last().hosts[idx1].HasLiveKey(k)
@@ -109,7 +109,7 @@ lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: OwnedKey, idx: HostId, other: HostId)
+lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: UniqueKey, idx: HostId, other: HostId)
   requires v.WF(c) && v'.WF(c)
   requires Inv(c, v)
   requires c.ValidIdx(idx)
@@ -128,7 +128,7 @@ lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: Owne
     if step.ReceiveStep? && v'.Last().hosts[other].HasLiveKey(k) {
       // triggers
       assert KeyInFlightByMessage(c, v, msgOps.recv.value, k);  
-      assert KeyInFlight(c, v, k);
+      assert UniqueKeyInFlight(c, v, k);
       assert false;
     }    
   }
