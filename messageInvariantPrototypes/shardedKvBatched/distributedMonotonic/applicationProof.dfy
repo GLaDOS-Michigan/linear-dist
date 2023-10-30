@@ -54,7 +54,7 @@ module ShardedKVProof {
     MessageInvInductive(c, v, v');
     OwnershipInvInductive(c, v, v');
     InvNextHostsCompleteKeys(c, v, v');
-    InvNextSafety(c, v, v');
+    AtMostOwnerPerKeyImpliesSafety(c, v');
   }
 
 
@@ -85,53 +85,22 @@ lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
   }
 }
 
-lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
-  requires v'.WF(c)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures Safety(c, v')
+lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires AtMostOwnerPerKey(c, v)
+  ensures Safety(c, v)
 {
   forall idx1, idx2, k: UniqueKey | 
     && c.ValidIdx(idx1) 
     && c.ValidIdx(idx2) 
-    && v'.Last().hosts[idx1].HasLiveKey(k)
-    && v'.Last().hosts[idx2].HasLiveKey(k)
+    && v.Last().hosts[idx1].HasLiveKey(k)
+    && v.Last().hosts[idx2].HasLiveKey(k)
   ensures
      idx1 == idx2
   {
-    if idx1 != idx2 {
-      if v.Last().hosts[idx1].HasLiveKey(k) {
-        AtMostOneHostHasLiveKey(c, v, v', k, idx1, idx2);
-      } else if v.Last().hosts[idx2].HasLiveKey(k) {
-        AtMostOneHostHasLiveKey(c, v, v', k, idx2, idx1);
-      }
-    }
+    // triggers
+    assert Host.HostOwnsUniqueKey(c.hosts[idx1], v.Last().hosts[idx1], k);
+    assert Host.HostOwnsUniqueKey(c.hosts[idx1], v.Last().hosts[idx1], k);
   }
 }
-
-lemma AtMostOneHostHasLiveKey(c: Constants, v: Variables, v': Variables, k: UniqueKey, idx: HostId, other: HostId)
-  requires v.WF(c) && v'.WF(c)
-  requires Inv(c, v)
-  requires c.ValidIdx(idx)
-  requires c.ValidIdx(other)
-  requires idx != other
-  requires v.Last().hosts[idx].HasLiveKey(k)
-  requires !v.Last().hosts[other].HasLiveKey(k)
-  requires Next(c, v, v')
-  ensures !v'.Last().hosts[other].HasLiveKey(k)
-{
-  var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-  var actor, msgOps := dsStep.actor, dsStep.msgOps;
-  if actor == other {
-    var cs, s, s' := c.hosts[other], v.Last().hosts[other], v'.Last().hosts[other];
-    var step :| Host.NextStep(cs, s, s', step, msgOps);
-    if step.ReceiveStep? && v'.Last().hosts[other].HasLiveKey(k) {
-      // triggers
-      assert KeyInFlightByMessage(c, v, msgOps.recv.value, k);  
-      assert UniqueKeyInFlight(c, v, k);
-      assert false;
-    }    
-  }
-}
-
 } // end module ShardedKVProof
