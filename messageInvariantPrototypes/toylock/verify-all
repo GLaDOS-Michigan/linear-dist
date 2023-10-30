@@ -1,0 +1,19 @@
+#!/bin/sh
+
+echo "Verifying distributed"
+cd distributed
+./verify
+cd - > /dev/null
+echo ""
+
+echo "Verifying distributedMonotonic"
+cd distributedMonotonic
+./verify
+cd - > /dev/null
+echo ""
+
+# echo "Verifying automate"
+# cd automate
+# ./verify-auto
+# cd - > /dev/null
+# echo ""

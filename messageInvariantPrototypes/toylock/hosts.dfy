@@ -84,14 +84,13 @@ module Host {
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
     && msgOps.recv.Some?
-    && UniqueKeyInFlight(c, v, 0, msgOps.recv.value)   // the 0 literal is a useless dummy value
+    && UniqueKeyInFlightForHost(c, v, 0, msgOps.recv.value)   // the 0 literal is a useless dummy value
     && v' == v.(hasLock := true, myEpoch := msgOps.recv.value.epoch)
   }
 
   // Key in-flight definition
-  ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
+  ghost predicate UniqueKeyInFlightForHost(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
     && msg.dst == c.hostId
-    && !v.hasLock
     && v.myEpoch < msg.epoch
   }
 

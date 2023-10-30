@@ -32,7 +32,7 @@ module DistributedSystem {
     }
 
     ghost predicate UniqueIds() {
-      forall i, j | ValidIdx(i) && ValidIdx(j) && hosts[i].myId == hosts[j].myId :: i == j
+      forall i, j | ValidIdx(i) && ValidIdx(j) && hosts[i].hostId == hosts[j].hostId :: i == j
     }
 
     ghost predicate WF() {
