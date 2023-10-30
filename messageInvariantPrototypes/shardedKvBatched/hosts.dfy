@@ -120,7 +120,6 @@ module Host {
     && msgOps.send.None?
     && msgOps.recv.Some?
     && var msg := msgOps.recv.value;
-    && msg.dst == c.myId
     && (forall k | k in msg.vks :: v.HasKey(k))
     && v' == v.(
       myKeys := (map k | k in v.myKeys
@@ -132,6 +131,7 @@ module Host {
 
   // Key in-flight definition
   ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
+    && msg.dst == c.myId
     && key in v.myKeys
     && key in msg.vks 
     && v.myKeys[key].version < msg.vks[key]
