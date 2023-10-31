@@ -196,7 +196,7 @@ module OwnershipInvariants {
   {
     && msg in v.network.sentMsgs
     && (0 <= msg.Dst() < |c.hosts| ==>
-      Host.UniqueKeyInFlight(c.hosts[msg.Dst()], v.Last().hosts[msg.Dst()], k, msg)
+      Host.UniqueKeyInFlightForHost(c.hosts[msg.Dst()], v.Last().hosts[msg.Dst()], k, msg)
     )
   }
 
