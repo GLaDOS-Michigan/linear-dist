@@ -147,6 +147,8 @@ lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Varia
             assert !KeyInFlightByMessage(c, v, m', k);
           }
         }
+      } else {
+        assert !(NoHostOwnsKey(c, v, k));
       }
     }
   }

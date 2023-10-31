@@ -81,7 +81,7 @@ module OwnershipInvariants {
       && ClientHost.HostOwnsUniqueKey(c.clients[h2], v.Last().clients[h2], k) 
     ::
       && h1 == h2
-      && (forall s1 | 0 <= s1 < |c.server| :: !ServerHost.HostOwnsUniqueKey(c.server[s1], v.Last().server[s1], k))
+      && NoServerOwnsKey(c, v, k)
   }
 
   ghost predicate AtMostOwnerPerKeyServers(c: Constants, v: Variables)
@@ -94,7 +94,7 @@ module OwnershipInvariants {
       && ServerHost.HostOwnsUniqueKey(c.server[h2], v.Last().server[h2], k) 
     ::
       && h1 == h2
-      && (forall s1 | 0 <= s1 < |c.clients| :: !ClientHost.HostOwnsUniqueKey(c.clients[s1], v.Last().clients[s1], k))
+      && NoClientOwnsKey(c, v, k)
   }
   
   
@@ -185,6 +185,8 @@ lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Varia
             assert !KeyInFlightByMessage(c, v, m', k);
           }
         }
+      } else {
+        assert !(NoServerOwnsKey(c, v, k) && NoClientOwnsKey(c, v, k));
       }
     }
   }
@@ -197,6 +199,24 @@ lemma InvNextAtMostOwnerPerKeyClients(c: Constants, v: Variables, v': Variables)
   ensures AtMostOwnerPerKeyClients(c, v')
 {
   assume false;
+  var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+  forall h1, h2, k | 
+      && 0 <= h1 < |c.clients|
+      && 0 <= h2 < |c.clients|
+      && ClientHost.HostOwnsUniqueKey(c.clients[h1], v'.Last().clients[h1], k) 
+      && ClientHost.HostOwnsUniqueKey(c.clients[h2], v'.Last().clients[h2], k) 
+  ensures
+     && h1 == h2
+     && (forall s1 | 0 <= s1 < |c.server| :: !ServerHost.HostOwnsUniqueKey(c.server[s1], v.Last().server[s1], k))
+  {
+    // if h1 != h2 {
+    //   if ClientHost.HostOwnsUniqueKey(c.hosts[h1], v.Last().hosts[h1], k) {
+    //     AtMostOneHostOwnsKey(c, v, v', k, h1, h2);
+    //   } else if Host.HostOwnsUniqueKey(c.hosts[h2], v.Last().hosts[h2], k) {
+    //     AtMostOneHostOwnsKey(c, v, v', k, h2, h1);
+    //   }
+    // }
+  }
 }
 
 lemma InvNextAtMostOwnerPerKeyServers(c: Constants, v: Variables, v': Variables) 
