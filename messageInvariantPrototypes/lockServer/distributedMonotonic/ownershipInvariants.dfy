@@ -28,13 +28,27 @@ module OwnershipInvariants {
     )
   }
 
+  ghost predicate NoClientOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
+    requires v.WF(c)
+  {
+    forall idx | 0 <= idx < |c.clients| 
+    :: 
+    !ClientHost.HostOwnsUniqueKey(c.clients[idx], v.Last().clients[idx], k)
+  }
+
+  ghost predicate NoServerOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
+    requires v.WF(c)
+  {
+    forall idx | 0 <= idx < |c.server|
+    :: 
+    !ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k)
+  }
+
   ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
-    && (forall idx | 0 <= idx < |c.clients| :: 
-         !ClientHost.HostOwnsUniqueKey(c.clients[idx], v.Last().clients[idx], k))
-    && (forall idx | 0 <= idx < |c.server| :: 
-         !ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k))
+    && NoClientOwnsKey(c, v, k)
+    && NoServerOwnsKey(c, v, k)
   }
 
 /***************************************************************************************
@@ -161,37 +175,19 @@ lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Varia
   {
     forall msg | msg in v'.network.sentMsgs
     ensures !KeyInFlightByMessage(c, v', msg, k) {
-      if !(forall idx | 0 <= idx < |c.clients| :: 
-         !ClientHost.HostOwnsUniqueKey(c.clients[idx], v'.Last().clients[idx], k)) {
-        var idx :| c.ValidClientIdx(idx) && ClientHost.HostOwnsUniqueKey(c.clients[idx], v'.Last().clients[idx], k);
+      if !NoClientOwnsKey(c, v', k) {
+        var idx :| 0 <= idx < |c.clients| && ClientHost.HostOwnsUniqueKey(c.clients[idx], v'.Last().clients[idx], k);
         if ClientHost.HostOwnsUniqueKey(c.clients[idx], v.Last().clients[idx], k){
           // triggers
           assert !UniqueKeyInFlight(c, v, k);
           assert !KeyInFlightByMessage(c, v, msg, k);
-        } else {
-          if msg in v.network.sentMsgs && KeyInFlightByMessage(c, v, msg, k){
-            var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-            // triggers
-            assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-            assert UniqueKeyInFlight(c, v, k);
-          }
-          assert !KeyInFlightByMessage(c, v', msg, k);
         }
-      } else if !(forall idx | 0 <= idx < |c.server| :: 
-         !ServerHost.HostOwnsUniqueKey(c.server[idx], v'.Last().server[idx], k)) {
+      } else if !NoServerOwnsKey(c, v', k) {
         var idx :| 0 <= idx < |c.server| && ServerHost.HostOwnsUniqueKey(c.server[idx], v'.Last().server[idx], k);
-        if ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k){
+        if ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k) {
           // triggers
           assert !UniqueKeyInFlight(c, v, k);
           assert !KeyInFlightByMessage(c, v, msg, k);
-        } else {
-          if msg in v.network.sentMsgs && KeyInFlightByMessage(c, v, msg, k){
-            var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-            // triggers
-            assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-            assert UniqueKeyInFlight(c, v, k);
-          }
-          assert !KeyInFlightByMessage(c, v', msg, k);
         }
       }
     }
