@@ -51,7 +51,7 @@ module ToylockProof {
 
 lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
-  requires AtMostOwnerPerKey(c, v)
+  requires AtMostOwnerPerKeyHosts(c, v)
   ensures Safety(c, v)
 {
   forall idx1, idx2 | 

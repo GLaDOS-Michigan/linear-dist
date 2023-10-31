@@ -81,7 +81,8 @@ module ClientHost {
     && var msg := msgOps.recv.value;
     && UniqueKeyInFlightForHost(c, v, 0, msg)  // 0 is a dummy value
     && v' == v.(
-      epoch := msg.epoch
+      epoch := msg.epoch,
+      hasLock := true
     )
   }
 
@@ -189,7 +190,8 @@ module ServerHost {
     && msg.Release?
     && v.epoch < msg.epoch
     && v' == v.(
-      epoch := msg.epoch
+      epoch := msg.epoch,
+      hasLock := true
     )
   }
 
