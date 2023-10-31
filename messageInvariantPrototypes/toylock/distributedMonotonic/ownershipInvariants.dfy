@@ -170,36 +170,16 @@ lemma InvNextAtMostOwnerPerKeyHosts(c: Constants, v: Variables, v': Variables)
      h1 == h2
   {
     if h1 != h2 {
-      if Host.HostOwnsUniqueKey(c.hosts[h1], v.Last().hosts[h1], k) {
-        AtMostOneHostOwnsKey(c, v, v', k, h1, h2);
-      } else if Host.HostOwnsUniqueKey(c.hosts[h2], v.Last().hosts[h2], k) {
-        AtMostOneHostOwnsKey(c, v, v', k, h2, h1);
+      if Host.HostOwnsUniqueKey(c.hosts[h2], v'.Last().hosts[h2], k) {
+        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
+        assert UniqueKeyInFlight(c, v, k);
+        assert false;
       }
-    }
-  }
-}
-
-lemma AtMostOneHostOwnsKey(c: Constants, v: Variables, v': Variables, k: UniqueKey, idx: HostId, other: HostId)
-  requires v.WF(c) && v'.WF(c)
-  requires OwnershipInv(c, v)
-  requires c.ValidIdx(idx)
-  requires c.ValidIdx(other)
-  requires idx != other
-  requires Host.HostOwnsUniqueKey(c.hosts[idx], v.Last().hosts[idx], k) 
-  requires !Host.HostOwnsUniqueKey(c.hosts[other], v.Last().hosts[other], k) 
-  requires Next(c, v, v')
-  ensures !Host.HostOwnsUniqueKey(c.hosts[other], v'.Last().hosts[other], k) 
-{
-  var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-  var actor, msgOps := dsStep.actor, dsStep.msgOps;
-  if actor == other {
-    var cs, s, s' := c.hosts[other], v.Last().hosts[other], v'.Last().hosts[other];
-    var step :| Host.NextStep(cs, s, s', step, msgOps);
-    if step.ReceiveStep? && Host.HostOwnsUniqueKey(c.hosts[other], v'.Last().hosts[other], k) {
-      // triggers
-      assert KeyInFlightByMessage(c, v, msgOps.recv.value, k);  
-      assert UniqueKeyInFlight(c, v, k);
-      assert false;
+      if Host.HostOwnsUniqueKey(c.hosts[h1], v'.Last().hosts[h1], k) {
+        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
+        assert UniqueKeyInFlight(c, v, k);
+        assert false;
+      }
     }
   }
 }
