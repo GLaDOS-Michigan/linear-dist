@@ -155,7 +155,8 @@ module DistributedSystem {
     requires v.WF(c)
   {
     forall msg | msg in v.network.sentMsgs
-    :: if msg.Release? then c.ValidClientIdx(msg.Src()) else msg.Src() == 0
+    :: && (if msg.Release? then c.ValidClientIdx(msg.Src()) else msg.Src() == 0)
+       && (if msg.Grant? then c.ValidClientIdx(msg.Dst()) else msg.Dst() == 0)
   }
 
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)

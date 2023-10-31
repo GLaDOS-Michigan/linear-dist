@@ -19,10 +19,10 @@ module OwnershipInvariants {
     requires v.WF(c)
   {
     && msg in v.network.sentMsgs
-    && ((0 <= msg.Dst() < |c.clients| ==>
+    && ((0 <= msg.Dst() < |c.clients| &&
           ClientHost.UniqueKeyInFlightForHost(c.clients[msg.Dst()], v.Last().clients[msg.Dst()], k, msg)
         )
-        || (0 <= msg.Dst() < |c.server| ==>
+        || (0 <= msg.Dst() < |c.server| &&
             ServerHost.UniqueKeyInFlightForHost(c.server[msg.Dst()], v.Last().server[msg.Dst()], k, msg)
         )
     )
@@ -170,25 +170,20 @@ lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Varia
   requires Next(c, v, v')
   ensures HostOwnsKeyImpliesNotInFlight(c, v')
 {
-  assume false;
   forall k | !NoHostOwnsKey(c, v', k)
   ensures !UniqueKeyInFlight(c, v', k)
   {
-    forall msg | msg in v'.network.sentMsgs
-    ensures !KeyInFlightByMessage(c, v', msg, k) {
-      if !NoClientOwnsKey(c, v', k) {
-        var idx :| 0 <= idx < |c.clients| && ClientHost.HostOwnsUniqueKey(c.clients[idx], v'.Last().clients[idx], k);
-        if ClientHost.HostOwnsUniqueKey(c.clients[idx], v.Last().clients[idx], k){
-          // triggers
-          assert !UniqueKeyInFlight(c, v, k);
-          assert !KeyInFlightByMessage(c, v, msg, k);
-        }
-      } else if !NoServerOwnsKey(c, v', k) {
-        var idx :| 0 <= idx < |c.server| && ServerHost.HostOwnsUniqueKey(c.server[idx], v'.Last().server[idx], k);
-        if ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k) {
-          // triggers
-          assert !UniqueKeyInFlight(c, v, k);
-          assert !KeyInFlightByMessage(c, v, msg, k);
+    if UniqueKeyInFlight(c, v', k) {
+      var msg :| KeyInFlightByMessage(c, v', msg , k);
+      if msg in v.network.sentMsgs {
+        assert KeyInFlightByMessage(c, v, msg, k);
+        assert NoHostOwnsKey(c, v, k);  
+        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        assert dsStep.msgOps.recv.value == msg by {
+          if dsStep.msgOps.recv.value != msg {
+            var m' := dsStep.msgOps.recv.value;
+            assert !KeyInFlightByMessage(c, v, m', k);
+          }
         }
       }
     }

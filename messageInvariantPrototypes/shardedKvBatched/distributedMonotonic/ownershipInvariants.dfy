@@ -149,19 +149,17 @@ lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Varia
   forall k | !NoHostOwnsKey(c, v', k)
   ensures !UniqueKeyInFlight(c, v', k)
   {
-    forall msg | msg in v'.network.sentMsgs
-    ensures !KeyInFlightByMessage(c, v', msg, k) {
-      var idx :| c.ValidIdx(idx) && Host.HostOwnsUniqueKey(c.hosts[idx], v'.Last().hosts[idx], k);
-      if Host.HostOwnsUniqueKey(c.hosts[idx], v.Last().hosts[idx], k) {
-        // triggers
-        assert !UniqueKeyInFlight(c, v, k);
-        assert !KeyInFlightByMessage(c, v, msg, k);
-      } else {
-        if msg in v.network.sentMsgs && KeyInFlightByMessage(c, v, msg, k){
-          var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-          // triggers
-          assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-          assert UniqueKeyInFlight(c, v, k);
+    if UniqueKeyInFlight(c, v', k) {
+      var msg :| KeyInFlightByMessage(c, v', msg , k);
+      if msg in v.network.sentMsgs {
+        assert KeyInFlightByMessage(c, v, msg, k);
+        assert NoHostOwnsKey(c, v, k);  
+        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        assert dsStep.msgOps.recv.value == msg by {
+          if dsStep.msgOps.recv.value != msg {
+            var m' := dsStep.msgOps.recv.value;
+            assert !KeyInFlightByMessage(c, v, m', k);
+          }
         }
       }
     }

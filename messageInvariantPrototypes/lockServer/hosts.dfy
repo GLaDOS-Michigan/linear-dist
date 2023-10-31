@@ -187,8 +187,7 @@ module ServerHost {
     && msgOps.send.None?
     && msgOps.recv.Some?
     && var msg := msgOps.recv.value;
-    && msg.Release?
-    && v.epoch < msg.epoch
+    && UniqueKeyInFlightForHost(c, v, 0, msg)
     && v' == v.(
       epoch := msg.epoch,
       hasLock := true
