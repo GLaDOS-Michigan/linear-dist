@@ -36,14 +36,20 @@ cd flexPaxos/automate
 cd - > /dev/null
 echo ""
 
-# echo "Verifying decentralizedMonotonic"
-# cd decentralizedMonotonic_globalHistory
-# ./verify
-# cd - > /dev/null
-# echo ""
+echo "Verifying toylock"
+cd toylock/automate
+./verify-auto
+cd - > /dev/null
+echo ""
 
-# echo "Verifying automate"
-# cd automate
-# ./verify-auto
-# cd - > /dev/null
-# echo ""
+echo "Verifying shardedKv"
+cd shardedKv/automate
+./verify-auto
+cd - > /dev/null
+echo ""
+
+echo "Verifying shardedKvBatched"
+cd shardedKvBatched/automate
+./verify-auto
+cd - > /dev/null
+echo ""

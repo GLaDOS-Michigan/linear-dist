@@ -123,14 +123,14 @@ module Host {
     && (forall k | k in msg.vks :: v.HasKey(k))
     && v' == v.(
       myKeys := (map k | k in v.myKeys
-          :: if UniqueKeyInFlight(c, v, k, msg)
+          :: if UniqueKeyInFlightForHost(c, v, k, msg)
               then Entry(true, msg.vks[k])
               else Entry(false, v.myKeys[k].version))
     )
   }
 
   // Key in-flight definition
-  ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
+  ghost predicate UniqueKeyInFlightForHost(c: Constants, v: Variables, key: UniqueKey, msg: Message) {
     && msg.dst == c.myId
     && key in v.myKeys
     && key in msg.vks 

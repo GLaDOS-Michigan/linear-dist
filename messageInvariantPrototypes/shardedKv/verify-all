@@ -12,8 +12,8 @@ cd distributedMonotonic
 cd - > /dev/null
 echo ""
 
-# echo "Verifying automate"
-# cd automate
-# ./verify-auto
-# cd - > /dev/null
-# echo ""
+echo "Verifying automate"
+cd automate
+./verify-auto
+cd - > /dev/null
+echo ""
