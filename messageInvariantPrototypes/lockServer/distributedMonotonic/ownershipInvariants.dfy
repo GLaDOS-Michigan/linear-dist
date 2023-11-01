@@ -272,19 +272,21 @@ lemma InvNextClientsOwnKey(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures ClientsOwnKey(c, v')
 {
-  assume false;
-  // if ClientHost.HostOwnsUniqueKey(c.clients[h1], v.Last().clients[h1], k) {
-  //     assert NoServerOwnsKey(c, v, k);
-  //     assert NoServerOwnsKey(c, v', k);
-  //   } else if ClientHost.HostOwnsUniqueKey(c.clients[h2], v.Last().clients[h2], k) {
-  //     assert NoServerOwnsKey(c, v, k);
-  //     assert NoServerOwnsKey(c, v', k);
-  //   } else {
-  //     var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-  //     assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-  //     assert UniqueKeyInFlight(c, v, k);
-  //     assert NoServerOwnsKey(c, v', k);
-  //   }
+  forall k | !NoClientOwnsKey(c, v', k)
+  ensures NoServerOwnsKey(c, v', k) {
+    var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+    var idx :| 0 <= idx < |c.clients| && ClientHost.HostOwnsUniqueKey(c.clients[idx], v'.Last().clients[idx], k);
+    if ClientHost.HostOwnsUniqueKey(c.clients[idx], v.Last().clients[idx], k) {
+      assert !UniqueKeyInFlight(c, v, k);
+      if !NoServerOwnsKey(c, v', k) {
+        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
+        assert false;
+      }
+    } else {
+      assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
+      assert UniqueKeyInFlight(c, v, k);
+    }
+  }
 }
 
 lemma InvNextServersOwnKey(c: Constants, v: Variables, v': Variables) 
@@ -293,19 +295,21 @@ lemma InvNextServersOwnKey(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures ServersOwnKey(c, v')
 {
-  assume false;
-  // if ClientHost.HostOwnsUniqueKey(c.clients[h1], v.Last().clients[h1], k) {
-  //     assert NoServerOwnsKey(c, v, k);
-  //     assert NoServerOwnsKey(c, v', k);
-  //   } else if ClientHost.HostOwnsUniqueKey(c.clients[h2], v.Last().clients[h2], k) {
-  //     assert NoServerOwnsKey(c, v, k);
-  //     assert NoServerOwnsKey(c, v', k);
-  //   } else {
-  //     var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-  //     assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-  //     assert UniqueKeyInFlight(c, v, k);
-  //     assert NoServerOwnsKey(c, v', k);
-  //   }
+  forall k | !NoServerOwnsKey(c, v', k)
+  ensures NoClientOwnsKey(c, v', k) {
+    var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+    var idx :| 0 <= idx < |c.server| && ServerHost.HostOwnsUniqueKey(c.server[idx], v'.Last().server[idx], k);
+    if ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k) {
+      assert !UniqueKeyInFlight(c, v, k);
+      if !NoClientOwnsKey(c, v', k) {
+        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
+        assert false;
+      }
+    } else {
+      assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
+      assert UniqueKeyInFlight(c, v, k);
+    }
+  }
 }
 
 } // end module ShardedKVProof
