@@ -1,0 +1,7 @@
+#!/bin/sh
+
+echo "Verifying automate"
+cd automate
+./verify-auto
+cd - > /dev/null
+echo ""
