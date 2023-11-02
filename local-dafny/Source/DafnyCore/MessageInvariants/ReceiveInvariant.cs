@@ -8,14 +8,16 @@ namespace Microsoft.Dafny
   public class ReceiveInvariant {
 
     private bool opaque;
-    private string functionName;    // name of the receive predicate
+    private string baseName;        // name of the receive predicate
+    private string id;
     private string module;          // name of the module this function belongs
     private string variableField;   // which field in distributedSystem.Hosts?
     private List<string> args;      // additional arguments to trigger
 
-    public ReceiveInvariant(string functionName, string module, string variableField, List<string> args) {
+    public ReceiveInvariant(string baseName, string id, string module, string variableField, List<string> args) {
       this.opaque = true;
-      this.functionName = functionName;
+      this.baseName = baseName;
+      this.id = id;
       this.module = module;
       this.variableField = variableField;
       this.args = args;
@@ -42,11 +44,12 @@ namespace Microsoft.Dafny
       {
         args.Add(receivePredicateTrigger.Formals[i].Name);
       }
+      var triggerIndex = receivePredicateTrigger.Name.IndexOf("Trigger");
+      var basename = receivePredicateTrigger.Name.Substring(0, triggerIndex);
+      var id = receivePredicateTrigger.Name.Substring(triggerIndex + "Trigger".Length);
+      Console.WriteLine(string.Format("Found recv predicate [{0}] with [{1}] args in module [{2}], in Hosts.[{3}]\n", basename+id, args.Count, module, variableField));
       
-      var baseName = receivePredicateTrigger.Name.Substring(0, receivePredicateTrigger.Name.Length-"Trigger".Length);
-      Console.WriteLine(string.Format("Found recv predicate [{0}] with [{1}] args in module [{2}], in Hosts.[{3}]\n", baseName, args.Count, module, variableField));
-      
-      var recvInv = new ReceiveInvariant(baseName, module, variableField, args);
+      var recvInv = new ReceiveInvariant(basename, id, module, variableField, args);
       return recvInv;
     }
 
@@ -59,20 +62,20 @@ namespace Microsoft.Dafny
       return opaque;
     }
 
-    public string GetName() {
-      return functionName;
+    public string GetActionName() {
+      return baseName;
     }
 
     public string GetTriggerName() {
-      return string.Format("{0}Trigger", functionName);
+      return string.Format("{0}Trigger", baseName) + id;
     }
 
     public string GetPredicateName() {
-      return string.Format("{0}Validity", functionName);
+      return string.Format("{0}Validity", baseName) + id;
     }
 
     public string GetLemmaName() {
-      return string.Format("InvNext{0}Validity", functionName);
+      return string.Format("InvNext{0}Validity", baseName) + id;
     }
 
     public string ToPredicate() {
@@ -95,7 +98,7 @@ namespace Microsoft.Dafny
              "      && msg in v.network.sentMsgs\n" +
              string.Format("      && !{0}.{1}(c.{2}[idx], v.History(j).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
              string.Format("      && {0}.{1}(c.{2}[idx], v.History(j+1).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
-             string.Format("      && {0}.{1}(c.{2}[idx], v.History(j).{2}[idx], v.History(j+1).{2}[idx], msg)\n", module, GetName(), variableField) +
+             string.Format("      && {0}.{1}(c.{2}[idx], v.History(j).{2}[idx], v.History(j+1).{2}[idx], msg)\n", module, GetActionName(), variableField) +
              "    )\n" +
              "}\n";
       return res;
@@ -122,7 +125,7 @@ namespace Microsoft.Dafny
              "      && msg in v.network.sentMsgs\n" +
              string.Format("      && !{0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
              string.Format("      && {0}.{1}(c.{2}[idx], v'.History(j+1).{2}[idx], {3})\n", module, GetTriggerName(), variableField, string.Join(",", args.ToArray())) +
-             string.Format("      && {0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], v'.History(j+1).{2}[idx], msg)\n", module, GetName(), variableField) +
+             string.Format("      && {0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], v'.History(j+1).{2}[idx], msg)\n", module, GetActionName(), variableField) +
              "    )\n" +
              "  {\n" + 
              "    VariableNextProperties(c, v, v');\n" +
@@ -133,7 +136,7 @@ namespace Microsoft.Dafny
              "        var j := |v.history|-1;\n" +
              "        var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);\n" +
              "        var msg := dsStep.msgOps.recv.value;\n" +
-             string.Format("        assert {0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], v'.History(j+1).{2}[idx], msg);\n", module, GetName(), variableField) +
+             string.Format("        assert {0}.{1}(c.{2}[idx], v'.History(j).{2}[idx], v'.History(j+1).{2}[idx], msg);\n", module, GetActionName(), variableField) +
              "      }\n" +
              "    }\n" +
              "  }\n";
@@ -142,7 +145,7 @@ namespace Microsoft.Dafny
     }
 
     public override string ToString(){
-      return string.Format("Receive predicate [{0}] in module [{1}], in DistributedSystem.[Hosts.{3}]", functionName, module, variableField);
+      return string.Format("Receive predicate [{0}] in module [{1}], in DistributedSystem.[Hosts.{3}]", baseName, module, variableField);
     }  
   }
 }

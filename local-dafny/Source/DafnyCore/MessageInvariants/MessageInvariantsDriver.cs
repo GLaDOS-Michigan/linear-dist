@@ -92,7 +92,7 @@ public class MessageInvariantsDriver {
     var receivePredicateTriggers = new List<Function>();
     foreach (var kvp in program.ModuleSigs) {
       foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
-        if (topLevelDecl.Name.StartsWith("Receive") && topLevelDecl.Name.EndsWith("Trigger"))  {  // identifying marker for Receive Predicate
+        if (topLevelDecl.Name.StartsWith("Receive") && topLevelDecl.Name.Contains("Trigger"))  {  // identifying marker for Receive Predicate
           receivePredicateTriggers.Add(topLevelDecl);
         }
       }
