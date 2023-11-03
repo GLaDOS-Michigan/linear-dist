@@ -1,4 +1,4 @@
-include "hosts.dfy"
+include "../hosts.dfy"
 
 module System {
   import opened UtilitiesLibrary
@@ -38,47 +38,51 @@ module System {
 
   datatype Step =
     | HostLocalStep(host: HostId)   // host can be nominated, or declare victory in this step
-    | VoteReqStep(nominee: HostId, receiver: HostId)
-    | VoteStep(voter: HostId, nominee: HostId)
+    | VoteReqStep(nominee: HostId, receiver: HostId, transmit: Transmit)
+    | VoteStep(voter: HostId, nominee: HostId, transmit: Transmit)
     | StutterStep()
 
   
   ghost predicate NextHostLocalStep(c: Constants, v: Variables, v': Variables, host: HostId) 
     requires v.WF(c) && v'.WF(c)
   {
-    && var lbl := Host.InternalLbl();
+    // No transmission in this step
     && c.ValidHostId(host)
-    && Host.Next(c.hostConstants[host], v.hosts[host], v'.hosts[host], lbl)
+    && Host.Next(c.hostConstants[host], v.hosts[host], v'.hosts[host], MessageOps(None, None))
     && (forall idx: HostId | c.ValidHostId(idx) && idx != host
         :: v'.hosts[idx] == v.hosts[idx]
     )
   }
 
-  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, nominee: HostId, receiver: HostId)
+  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, nominee: HostId, receiver: HostId, transmit: Transmit)
     requires v.WF(c) && v'.WF(c)
   {
-    && var nomineeLbl := Host.SendVoteReqLbl(nominee);
-    && var receiverLbl := Host.RecvVoteReqLbl(nominee);
+    // Sender action
     && nominee != receiver  // important to not introduce false
     && c.ValidHostId(nominee)
+    && transmit.m.VoteReq?
+    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], transmit.Send())
+    // Receiver action
     && c.ValidHostId(receiver)
-    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], nomineeLbl)
-    && Host.Next(c.hostConstants[receiver], v.hosts[receiver], v'.hosts[receiver], receiverLbl)
+    && Host.Next(c.hostConstants[receiver], v.hosts[receiver], v'.hosts[receiver], transmit.Recv())
+    // All others unchanged
     && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx != receiver
         :: v'.hosts[idx] == v.hosts[idx]
     )
   }
 
-  ghost predicate NextVoteStep(c: Constants, v: Variables, v': Variables, voter: HostId, nominee: HostId)
+  ghost predicate NextVoteStep(c: Constants, v: Variables, v': Variables, voter: HostId, nominee: HostId, transmit: Transmit)
     requires v.WF(c) && v'.WF(c)
   {
-    && var voterLbl := Host.SendVoteLbl(voter, nominee);
-    && var nomineeLbl := Host.RecvVoteLbl(voter, nominee);
+    // Sender action
     && nominee != voter  // important to not introduce false
     && c.ValidHostId(voter)
+    && transmit.m.Vote?
+    && Host.Next(c.hostConstants[voter], v.hosts[voter], v'.hosts[voter], transmit.Send())
+    // Receiver action
     && c.ValidHostId(nominee)
-    && Host.Next(c.hostConstants[voter], v.hosts[voter], v'.hosts[voter], voterLbl)
-    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], nomineeLbl)
+    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], transmit.Recv())
+    // All others unchanged
     && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx != voter
         :: v'.hosts[idx] == v.hosts[idx]
     )
@@ -89,8 +93,8 @@ module System {
   {
     match step
       case HostLocalStep(host) => NextHostLocalStep(c, v, v', host)
-      case VoteReqStep(nominee, receiver) => NextVoteReqStep(c, v, v', nominee, receiver)
-      case VoteStep(voter, nominee) => NextVoteStep(c, v, v', voter, nominee)
+      case VoteReqStep(nominee, receiver, transmit) => NextVoteReqStep(c, v, v', nominee, receiver, transmit)
+      case VoteStep(voter, nominee, transmit) => NextVoteStep(c, v, v', voter, nominee, transmit)
       case StutterStep => v' == v
   }
 
