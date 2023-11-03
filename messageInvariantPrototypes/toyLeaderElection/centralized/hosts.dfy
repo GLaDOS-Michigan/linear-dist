@@ -1,12 +1,4 @@
-include "../../lib/UtilitiesLibrary.dfy"
-
-module Types {
-  import opened UtilitiesLibrary
-
-  type HostId = nat
-
-} // end module Types
-
+include "../types.dfy"
 
 module Host {
   import opened Types
