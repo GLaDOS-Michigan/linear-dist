@@ -46,6 +46,7 @@ ghost predicate Transmission(c: Constants, v: Variables, v': Variables, actor: n
   // Receiver action
   && var succ := Successor(|c.hostConstants|, actor);
   && Host.Next(c.hostConstants[succ], v.hosts[succ], v'.hosts[succ], transmit.Recv())     // step receiver
+  // All others unchanged
   && forall idx:nat | 
       && c.ValidIdx(idx) 
       && idx != actor

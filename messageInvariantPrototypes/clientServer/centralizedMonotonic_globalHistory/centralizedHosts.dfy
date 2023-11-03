@@ -1,4 +1,4 @@
-include "types.dfy"
+include "../types.dfy"
 
 /* The "client_server_ae protocol sourced from DuoAI (OSDI'22) 
  * Multiple clients can send requests to a server. The server processes each request 

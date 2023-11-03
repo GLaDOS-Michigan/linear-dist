@@ -20,7 +20,7 @@ ghost predicate ServerRequestsValid(c: Constants, v: Variables)
   ==> 
   && var req := v.GetServer(c).currentRequest.value;
   && c.ValidClientIdx(req.clientId)
-  && req.reqId in v.clients[req.clientId].requests
+  && req.reqId in v.clients[req.clientId].requests.s
 }
 
 

@@ -1,4 +1,4 @@
-include "../centralizedHosts.dfy"
+include "../hosts.dfy"
 
 module System {
 import opened UtilitiesLibrary
@@ -50,40 +50,43 @@ ghost predicate Init(c: Constants, v: Variables)
   && ServerHost.GroupInit(c.servers, v.servers)
 }
 
-ghost predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx: nat, req: Request)
+ghost predicate NextClientRequestStep(c: Constants, v: Variables, v': Variables, cidx: nat, transmit: Transmit)
   requires v.WF(c) && v'.WF(c)
 {
-  var clientLbl := ClientHost.RequestLbl(req);
-  var serverLbl := ServerHost.ReceiveLbl(req);
+  // Client action
   && c.ValidClientIdx(cidx)
-  && ClientHost.Next(c.clients[cidx], v.clients[cidx], v'.clients[cidx], clientLbl)    // step client
-  && ServerHost.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), serverLbl)  // step server
+  && transmit.m.RequestMsg?
+  && ClientHost.Next(c.clients[cidx], v.clients[cidx], v'.clients[cidx], transmit.Send())
+  // Server action
+  && ServerHost.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), transmit.Recv())
+  // All others unchanged
   && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != cidx :: v'.clients[otherIdx] == v.clients[otherIdx])
 }
 
-ghost predicate NextServerProcessStep(c: Constants, v: Variables, v': Variables, req: Request)
+ghost predicate NextServerProcessStep(c: Constants, v: Variables, v': Variables, transmit: Transmit)
   requires v.WF(c) && v'.WF(c)
 {
-  && var serverLbl := ServerHost.ProcessLbl(req);
-  && var clientLbl := ClientHost.ReceiveLbl(req);
-  && var cidx := req.clientId;
+  // Server action
+  && transmit.m.ResponseMsg?
+  && ServerHost.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), transmit.Send())
+  // Client action
+  && var cidx := transmit.m.r.clientId;
   && c.ValidClientIdx(cidx)
-  && ServerHost.Next(c.GetServer(), v.GetServer(c), v'.GetServer(c), serverLbl)  // step server
-  && ClientHost.Next(c.clients[cidx], v.clients[cidx], v'.clients[cidx], clientLbl)    // step client
+  && ClientHost.Next(c.clients[cidx], v.clients[cidx], v'.clients[cidx], transmit.Recv())
   && (forall otherIdx:nat | c.ValidClientIdx(otherIdx) && otherIdx != cidx :: v'.clients[otherIdx] == v.clients[otherIdx])
 }
 
 datatype Step =
-  | ClientRequestStep(clientIdx: nat, req: Request) // step where client initializes a request
-  | ServerProcessStep(r: Request)                 // step where server processes a request
+  | ClientRequestStep(clientIdx: nat, transmit: Transmit) // step where client initializes a request
+  | ServerProcessStep(transmit: Transmit)                 // step where server processes a request
   | StutterStep()
 
 ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
 {
   match step
-      case ClientRequestStep(idx, req) => NextClientRequestStep(c, v, v', idx, req)
-      case ServerProcessStep(req) => NextServerProcessStep(c, v, v', req)
+      case ClientRequestStep(idx, transmit) => NextClientRequestStep(c, v, v', idx, transmit)
+      case ServerProcessStep(transmit) => NextServerProcessStep(c, v, v', transmit)
       case StutterStep => && v == v'
 }
 
