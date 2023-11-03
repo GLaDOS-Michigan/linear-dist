@@ -1,4 +1,4 @@
-include "../CentralizedHosts.dfy"
+include "../hosts.dfy"
 
 module System {
 import opened UtilitiesLibrary
@@ -37,15 +37,15 @@ ghost predicate Init(c: Constants, v: Variables)
   && Host.GroupInit(c.hostConstants, v.hosts)
 }
 
-ghost predicate Transmission(c: Constants, v: Variables, v': Variables, actor: nat, payload: int)
+ghost predicate Transmission(c: Constants, v: Variables, v': Variables, actor: nat, transmit: Transmit)
   requires v.WF(c) && v'.WF(c)
 {
-  var senderLbl := Host.SendLbl(payload);
-  var receiverLbl := Host.ReceiveLbl(payload);
+  // Sender action
   && c.ValidIdx(actor)
+  && Host.Next(c.hostConstants[actor], v.hosts[actor], v'.hosts[actor], transmit.Send())
+  // Receiver action
   && var succ := Successor(|c.hostConstants|, actor);
-  && Host.Next(c.hostConstants[actor], v.hosts[actor], v'.hosts[actor], senderLbl)    // step sender
-  && Host.Next(c.hostConstants[succ], v.hosts[succ], v'.hosts[succ], receiverLbl)     // step receiver
+  && Host.Next(c.hostConstants[succ], v.hosts[succ], v'.hosts[succ], transmit.Recv())     // step receiver
   && forall idx:nat | 
       && c.ValidIdx(idx) 
       && idx != actor
@@ -54,13 +54,13 @@ ghost predicate Transmission(c: Constants, v: Variables, v': Variables, actor: n
       v'.hosts[idx] == v.hosts[idx]
 }
 
-datatype Step = TransmissionStep(actor: nat, payload: int)
+datatype Step = TransmissionStep(actor: nat, transmit: Transmit)
 
 ghost predicate NextStep(c:Constants, v: Variables, v': Variables, step: Step) 
   requires v.WF(c) && v'.WF(c)
 {
   match step {
-      case TransmissionStep(actor, payload) => Transmission(c, v, v', actor, payload)
+      case TransmissionStep(actor, transmit) => Transmission(c, v, v', actor, transmit)
   }
 }
 

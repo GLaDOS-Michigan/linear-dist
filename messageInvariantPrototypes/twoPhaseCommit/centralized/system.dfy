@@ -1,4 +1,3 @@
-
 include "../hosts.dfy"
 
 module System {
@@ -82,6 +81,7 @@ module System {
     && ParticipantHost.Next(c.participants[pidx], v.participants[pidx], v'.participants[pidx], transmit.Send())
     // Coordinator action
     && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), transmit.Recv())
+    // All others unchanged
     && (forall x:HostId | c.ValidParticipantId(x) && x!= pidx
         ::  v.participants[x] == v'.participants[x])
   }
@@ -92,7 +92,7 @@ module System {
     // Coordinator action
     && transmit.m.DecideMsg?
     && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), transmit.Send())
-    // Participant action
+    // All others unchanged
     && (forall x:nat | c.ValidParticipantId(x)
         :: ParticipantHost.Next(c.participants[x], v.participants[x], v'.participants[x], transmit.Recv()))
   }
