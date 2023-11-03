@@ -73,7 +73,7 @@ public class MessageInvariantsDriver {
     var sendPredicateDefs = new List<Function>();
     foreach (var kvp in program.ModuleSigs) {
       foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
-        if (topLevelDecl.Name.StartsWith("Send")) {  // identifying marker for Send Predicate
+        if (topLevelDecl.Name.StartsWith("Send") && !topLevelDecl.FullDafnyName.StartsWith("Types.")) {  // identifying marker for Send Predicate
           sendPredicateDefs.Add(topLevelDecl);
         }
       }
