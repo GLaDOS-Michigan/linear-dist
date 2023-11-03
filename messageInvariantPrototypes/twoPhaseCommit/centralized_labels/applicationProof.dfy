@@ -87,7 +87,7 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
     var noVoter: HostId :| c.ValidParticipantId(noVoter) && c.participants[noVoter].preference == No;
     var sysStep :| NextStep(c, v, v', sysStep);
     if sysStep.DecideStep? {
-      var decision := sysStep.transmit.m.decision;
+      var decision := sysStep.decision;
       if decision == Commit {
         YesVotesContainsAllParticipantsWhenFull(c, v);
         assert GetParticipantPreference(c, noVoter) == Yes;  // witness

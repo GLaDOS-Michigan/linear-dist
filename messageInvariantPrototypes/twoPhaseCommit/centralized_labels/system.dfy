@@ -1,5 +1,5 @@
 
-include "../hosts.dfy"
+include "hosts.dfy"
 
 module System {
   import opened UtilitiesLibrary
@@ -53,57 +53,53 @@ module System {
   }
 
   datatype Step =
-    | VoteReqStep(participant: HostId, transmit: Transmit)
-    | SendVoteStep(participant: HostId, transmit: Transmit)
-    | DecideStep(transmit: Transmit)
+    | VoteReqStep(coordinator: HostId)
+    | SendVoteStep(participant: HostId, vote: Vote)
+    | DecideStep(decision: Decision)
     | StutterStep()
 
     
-  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, participant: HostId, transmit: Transmit) 
+  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, pidx: HostId) 
     requires v.WF(c) && v'.WF(c)
   {
-    // Coordinator action
-    && transmit.m.VoteReqMsg?
-    && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), transmit.Send())
-    // Participant action
-    && c.ValidParticipantId(participant)
-    && ParticipantHost.Next(c.participants[participant], v.participants[participant], v'.participants[participant], transmit.Recv())
-    // All others unchanged
-    && (forall x:nat | c.ValidParticipantId(x) && x!= participant
-        ::  v.participants[x] == v'.participants[x])
-  }
-
-  ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, pidx: HostId, transmit: Transmit) 
-    requires v.WF(c) && v'.WF(c)
-  {
-    // Participant action
+    var cLbl := CoordinatorHost.VoteReqLbl();
+    var pLbl := ParticipantHost.VoteReqLbl();
     && c.ValidParticipantId(pidx)
-    && transmit.m.VoteMsg?
-    && ParticipantHost.Next(c.participants[pidx], v.participants[pidx], v'.participants[pidx], transmit.Send())
-    // Coordinator action
-    && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), transmit.Recv())
-    && (forall x:HostId | c.ValidParticipantId(x) && x!= pidx
+    && ParticipantHost.Next(c.participants[pidx], v.participants[pidx], v'.participants[pidx], pLbl)
+    && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), cLbl)
+    && (forall x:nat | c.ValidParticipantId(x)
+        ::  v.participants[pidx] == v'.participants[pidx])
+  }
+
+  ghost predicate NextSendVoteStep(c: Constants, v: Variables, v': Variables, pidx: HostId, vote: Vote) 
+    requires v.WF(c) && v'.WF(c)
+  {
+    var cLbl := CoordinatorHost.ReceiveVoteLbl(vote, pidx);
+    var pLbl := ParticipantHost.SendVoteLbl(vote);
+    && c.ValidParticipantId(pidx)
+    && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), cLbl)
+    && ParticipantHost.Next(c.participants[pidx], v.participants[pidx], v'.participants[pidx], pLbl)
+    && (forall x:HostId | c.ValidParticipantId(x)
         ::  v.participants[x] == v'.participants[x])
   }
 
-  ghost predicate NextDecideStep(c: Constants, v: Variables, v': Variables, transmit: Transmit)
+  ghost predicate NextDecideStep(c: Constants, v: Variables, v': Variables, decision: Decision)
     requires v.WF(c) && v'.WF(c)
   {
-    // Coordinator action
-    && transmit.m.DecideMsg?
-    && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), transmit.Send())
-    // Participant action
+    var cLbl := CoordinatorHost.DecideLbl(decision);
+    var pLbl := ParticipantHost.DecideLbl(decision);
+    && CoordinatorHost.Next(c.GetCoordinator(), v.GetCoordinator(c), v'.GetCoordinator(c), cLbl)
     && (forall x:nat | c.ValidParticipantId(x)
-        :: ParticipantHost.Next(c.participants[x], v.participants[x], v'.participants[x], transmit.Recv()))
+        :: ParticipantHost.Next(c.participants[x], v.participants[x], v'.participants[x], pLbl))
   }
 
   ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
     requires v.WF(c) && v'.WF(c)
   {
     match step
-      case VoteReqStep(pidx, transmit) => NextVoteReqStep(c, v, v', pidx, transmit)
-      case SendVoteStep(pidx, transmit) => NextSendVoteStep(c, v, v', pidx, transmit)
-      case DecideStep(transmit) => NextDecideStep(c, v, v', transmit)
+      case VoteReqStep(pidx) => NextVoteReqStep(c, v, v', pidx)
+      case SendVoteStep(pidx, vote) => NextSendVoteStep(c, v, v', pidx, vote)
+      case DecideStep(decision) => NextDecideStep(c, v, v', decision)
       case StutterStep => v' == v
   }
 
