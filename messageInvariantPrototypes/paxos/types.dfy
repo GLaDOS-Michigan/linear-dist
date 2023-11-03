@@ -24,6 +24,16 @@ datatype Message = Prepare(bal:LeaderId)
 
 datatype MessageOps = MessageOps(recv:Option<Message>, send:Option<Message>)
 
+datatype Transmit = Transmit(m: Message) {
+    function Send() : MessageOps {
+      MessageOps(None, Some(m))
+    }
+
+    function Recv() : MessageOps {
+      MessageOps(Some(m), None)
+    }
+  }
+
 
 
 /// Some custom monotonic datatypes

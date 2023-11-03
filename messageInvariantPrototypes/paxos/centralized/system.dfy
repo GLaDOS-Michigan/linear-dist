@@ -1,4 +1,4 @@
-include "../centralizedHosts.dfy"
+include "../hosts.dfy"
 
 module System {
   import opened UtilitiesLibrary
@@ -82,63 +82,76 @@ ghost predicate Init(c: Constants, v: Variables) {
 }
 
 datatype Step = 
-  | P1aStep(leader: LeaderId, acceptor: AcceptorId)
-  | P1bStep(acceptor: AcceptorId, leader: LeaderId, balOpt:Option<LeaderId>, vbOptOpt:Option<Option<ValBal>>)
-  | P2aStep(leader: LeaderId, acceptor: AcceptorId, val: Value)
-  | P2bStep(acceptor: AcceptorId, learner: LearnerId, acceptedVb: ValBal)
+  | P1aStep(leader: LeaderId, acceptor: AcceptorId, transmit: Transmit)
+  | P1bStep(acceptor: AcceptorId, leader: LeaderId, transmit: Transmit)
+  | P2aStep(leader: LeaderId, acceptor: AcceptorId, transmit: Transmit)
+  | P2bStep(acceptor: AcceptorId, learner: LearnerId, transmit: Transmit)
   | LearnerInternalStep(learner: LearnerId)
   | StutterStep()
 
 
 // Leader sends Prepare message to Acceptor. Acceptor buffers it in its pendingPrepare field 
-ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: LeaderId, acc: AcceptorId) 
+ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: LeaderId, acc: AcceptorId, transmit: Transmit) 
   requires v.WF(c) && v'.WF(c)
 {
-  var ldrLbl := LeaderHost.PrepareLbl();
-  var accLbl := AcceptorHost.ReceivePrepareLbl(ldr);
+  // Leader action
   && c.ValidLeaderIdx(ldr)
+  && transmit.m.Prepare?
+  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
+  // Acceptor action
   && c.ValidAcceptorIdx(acc)
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
+  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
+  // All others unchanged
   && AcceptorsUnchangedExcept(c, v, v', acc)
-  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
   && LeadersUnchangedExcept(c, v, v', ldr)
   && LearnersUnchanged(v, v')
 }
 
 // Acceptor processes its pendingPrepare, and maybe sends a Promise to the leader
 ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables, 
-    ldr: LeaderId, acc: AcceptorId,
-    balOpt: Option<LeaderId>, vbOptOpt: Option<Option<ValBal>>) 
+    ldr: LeaderId, acc: AcceptorId, transmit: Transmit) 
   requires v.WF(c) && v'.WF(c)
 {
-  var accLbl := AcceptorHost.MaybePromiseLbl(balOpt, vbOptOpt);
-  && c.ValidLeaderIdx(ldr)
+  // Decide whether to send promise
   && c.ValidAcceptorIdx(acc)
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
-  && AcceptorsUnchangedExcept(c, v, v', acc)
-  && LearnersUnchanged(v, v')
-  && if balOpt.Some? then
-        // assert vbOptOpt.Some?;
-        && var ldrLbl := LeaderHost.ReceivePromiseLbl(acc, vbOptOpt.value);
-        && ldr == balOpt.value
-        && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
-        && LeadersUnchangedExcept(c, v, v', ldr)
-      else 
-        LeadersUnchanged(v, v')
+  && v.acceptors[acc].pendingPrepare.Some?
+  && var doPromise := v.acceptors[acc].promised.MNSome? ==> v.acceptors[acc].promised.value <  v.acceptors[acc].pendingPrepare.value.bal;
+  && if doPromise then
+      // Acceptor action
+      && transmit.m.Promise?
+      && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Send())
+      // Leader action
+      && c.ValidLeaderIdx(ldr)
+      && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Recv())
+      // All others unchanged
+      && LeadersUnchangedExcept(c, v, v', ldr)
+      && AcceptorsUnchangedExcept(c, v, v', acc)
+      && LearnersUnchanged(v, v')
+  else
+      // Acceptor action
+      && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], MessageOps(None, None))
+      // Leader action
+      && c.ValidLeaderIdx(ldr)
+      && LeadersUnchanged(v, v')
+      // All others unchanged
+      && LeadersUnchangedExcept(c, v, v', ldr)
+      && AcceptorsUnchangedExcept(c, v, v', acc)
+      && LearnersUnchanged(v, v')
 }
 
 // Leader sends Proposal to an acceptor. The acceptor processes the proposal
 ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables, 
-    ldr: LeaderId, acc: AcceptorId,
-    val: Value) 
+    ldr: LeaderId, acc: AcceptorId, transmit: Transmit) 
   requires v.WF(c) && v'.WF(c)
 {
-  var ldrLbl := LeaderHost.ProposeLbl(val);
-  var accLbl := AcceptorHost.MaybeAcceptLbl(ldr, val);
+  // Leader action
   && c.ValidLeaderIdx(ldr)
+  && transmit.m.Propose?
+  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
+  // Acceptor action
   && c.ValidAcceptorIdx(acc)
-  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], ldrLbl)
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
+  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
+  // All others unchanged
   && LeadersUnchangedExcept(c, v, v', ldr)
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LearnersUnchanged(v, v')
@@ -146,29 +159,29 @@ ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables,
 
 // Acceptor sends acceptedVB to some Learner
 ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables, 
-    acc: AcceptorId, lnr: LearnerId,
-    acceptedVb: ValBal)
+    acc: AcceptorId, lnr: LearnerId, transmit: Transmit)
   requires v.WF(c) && v'.WF(c)
 {
-  var accLbl := AcceptorHost.BroadcastAcceptedLbl(acceptedVb);
-  var lnrLbl := LearnerHost.ReceiveAcceptLbl(acceptedVb, acc);
+  // Acceptor action
   && c.ValidAcceptorIdx(acc)
+  && transmit.m.Accept?
+  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Send())
+  // Learner action
   && c.ValidLearnerIdx(lnr)
-  // acceptor simply stutters
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], accLbl)
+  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], transmit.Recv())
+  // All others unchanged
+  && LearnersUnchangedExcept(c, v, v', lnr)
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LeadersUnchanged(v, v')
-  // learner receives accepted vb from acceptor
-  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], lnrLbl)
-  && LearnersUnchangedExcept(c, v, v', lnr)
 }
 
 ghost predicate NextLearnerInternalStep(c: Constants, v: Variables, v': Variables, lnr: LearnerId)
   requires v.WF(c) && v'.WF(c)
 {
-  var lnrLbl := LearnerHost.InternalLbl();
+  // Learner action
   && c.ValidLearnerIdx(lnr)
-  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], lnrLbl)
+  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], MessageOps(None, None))
+  // All others unchanged
   && LearnersUnchangedExcept(c, v, v', lnr)
   && LeadersUnchanged(v, v')
   && AcceptorsUnchanged(v, v')
@@ -178,10 +191,10 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
 {
   match step
-    case P1aStep(ldr, acc) => NextP1aStep(c, v, v', ldr, acc)
-    case P1bStep(acc, ldr, balOpt, vbOptOpt) => NextP1bStep(c, v, v', ldr, acc, balOpt, vbOptOpt)
-    case P2aStep(ldr, acc, val) => NextP2aStep(c, v, v', ldr, acc, val)
-    case P2bStep(acc, lnr, vb) => NextP2bStep(c, v, v', acc, lnr, vb)
+    case P1aStep(ldr, acc, transmit) => NextP1aStep(c, v, v', ldr, acc, transmit)
+    case P1bStep(acc, ldr, transmit) => NextP1bStep(c, v, v', ldr, acc, transmit)
+    case P2aStep(ldr, acc, transmit) => NextP2aStep(c, v, v', ldr, acc, transmit)
+    case P2bStep(acc, lnr, transmit) => NextP2bStep(c, v, v', acc, lnr, transmit)
     case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v, v', lnr)
     case StutterStep => v' == v
 }

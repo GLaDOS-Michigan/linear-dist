@@ -280,7 +280,7 @@ module AcceptorHost {
     && msgOps.recv.None?
     && v.pendingPrepare.Some?
     && var bal := v.pendingPrepare.value.bal;
-    && var doPromise := v.promised.MNNone? || (v.promised.MNSome? && v.promised.value < bal);
+    && var doPromise := v.promised.MNSome? ==> v.promised.value < bal;
     && if doPromise then
           && msgOps.send.Some?
           && SendPromise(c, v, v', msgOps.send.value)
@@ -294,7 +294,7 @@ module AcceptorHost {
     // enabling conditions
     && v.pendingPrepare.Some?
     && var bal := v.pendingPrepare.value.bal;
-    && var doPromise := v.promised.MNNone? || (v.promised.MNSome? && v.promised.value < bal);
+    && var doPromise := v.promised.MNSome? ==> v.promised.value < bal;
     && doPromise
     // send message and update v'
     && v' == v.(
