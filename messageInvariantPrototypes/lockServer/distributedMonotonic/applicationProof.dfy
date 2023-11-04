@@ -1,7 +1,7 @@
 include "messageInvariants.dfy"
 include "ownershipInvariants.dfy"
 
-module ShardedKVProof {
+module LockServerProof {
   import opened Types
   import opened UtilitiesLibrary
   import opened DistributedSystem
@@ -71,4 +71,4 @@ lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
     assert ClientHost.HostOwnsUniqueKey(c.clients[idx1], v.Last().clients[idx1], 0);
   }
 }
-} // end module ShardedKVProof
+} // end module LockServerProof
