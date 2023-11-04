@@ -9,10 +9,18 @@ module LockServerProof {
   import opened MessageInvariants
   import opened OwnershipInvariants
 
+  ghost predicate ServerOwnsLockImpliesNoClientsOwnsLock(c: Constants, v: Variables)
+    requires v.WF(c)
+  {
+    forall i | v.ValidHistoryIdx(i) && v.History(i).server[0].hasLock 
+    ::
+    (forall id | c.ValidClientIdx(id) :: !v.History(i).clients[id].hasLock)
+  }
   
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
+    // && ServerOwnsLockImpliesNoClientsOwnsLock(c, v)
     && true
   }
 
@@ -55,7 +63,6 @@ module LockServerProof {
 lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
   requires AtMostOwnerPerKeyClients(c, v)
-  requires AtMostOwnerPerKeyServers(c, v)
   ensures Safety(c, v)
 {
   forall idx1, idx2 | 
@@ -68,7 +75,7 @@ lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
   {
     // triggers
     assert ClientHost.HostOwnsUniqueKey(c.clients[idx1], v.Last().clients[idx1], 0);
-    assert ClientHost.HostOwnsUniqueKey(c.clients[idx1], v.Last().clients[idx1], 0);
+    assert ClientHost.HostOwnsUniqueKey(c.clients[idx2], v.Last().clients[idx2], 0);
   }
 }
 } // end module LockServerProof
