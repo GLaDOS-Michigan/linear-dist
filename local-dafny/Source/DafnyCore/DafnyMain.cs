@@ -9,6 +9,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,6 +52,13 @@ namespace Microsoft.Dafny {
         return err;
       }
       var res = Resolve(program);
+
+      if (options.genAsync) {
+        // Don't verify or compile when generating async, and don't generate invariants
+        options.DafnyVerify = false;
+        options.Compile = false;
+        Debug.Assert(!options.msgInvs && !options.ownershipInvs);
+      }
 
       if (options.msgInvs || options.ownershipInvs) {
         // Don't verify or compile when generating msgInvs

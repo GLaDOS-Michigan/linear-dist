@@ -335,6 +335,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
     public HashSet<string> LibraryFiles { get; set; } = new();
     public ContractTestingMode TestContracts = ContractTestingMode.None;
 
+    public bool genAsync = false;
     public bool msgInvs = false;
     public bool ownershipInvs = false;
 
@@ -792,6 +793,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
               InvalidArgumentError(name, ps);
             }
           }
+          return true;
+
+        case "genAsync":
+          genAsync = true;
           return true;
 
         case "msgInvs":

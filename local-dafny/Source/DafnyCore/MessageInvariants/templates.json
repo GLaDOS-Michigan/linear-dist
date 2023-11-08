@@ -6,7 +6,7 @@
       "  ensures MonotonicityInv(c, v)",
       "{}"
     ],
-    "InitImpliesMessageInvHeader":
+  "InitImpliesMessageInvHeader":
     [
       "lemma InitImpliesMessageInv(c: Constants, v: Variables)",
       "  requires Init(c, v)",
@@ -14,7 +14,7 @@
       "{",
       "  InitImpliesValidVariables(c, v);"
     ],
-    "MonotonicityInvInductive":
+  "MonotonicityInvInductive":
     [
       "lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)",
       "  requires MonotonicityInv(c, v)",
@@ -24,14 +24,14 @@
       "  VariableNextProperties(c, v, v');",
       "}"
     ],
-    "MessageInvInductiveHeader":
+  "MessageInvInductiveHeader":
     [
       "lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)",
       "  requires MessageInv(c, v)",
       "  requires Next(c, v, v')",
       "  ensures MessageInv(c, v')"
     ],
-    "VariableNextProperties":
+  "VariableNextProperties":
     [
       "lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)", 
       "  requires v.WF(c)",
@@ -44,5 +44,24 @@
       "  assert 0 < |v.history|;",
       "  assert 1 < |v'.history|;",
       "}"
+    ],
+  "NetworkModule":
+    [
+      "module Network {",
+      "  import opened Types",
+      "",
+      "  datatype Variables = Variables(sentMsgs:set<Message>)",
+      "",
+      "  ghost predicate Init(v: Variables) {",
+      "    && v.sentMsgs == {}",
+      "  }",
+      "",
+      "  ghost predicate Next(v: Variables, v': Variables, msgOps: MessageOps)",
+      "  {",
+      "    && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)",
+      "    && v'.sentMsgs ==",
+      "      v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }",
+      "  }",
+      "}  // end module Network"
     ]
 }
