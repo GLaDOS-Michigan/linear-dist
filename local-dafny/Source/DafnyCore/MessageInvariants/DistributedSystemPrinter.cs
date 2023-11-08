@@ -15,12 +15,20 @@ public static class DistributedSystemPrinter {
 
   private static readonly Dictionary<string, string[]> Template = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(File.ReadAllText(TemplatePath));
 
-  private static string GetFromTemplate(string key) {
-    return string.Join("\n", Template[key]) + "\n";
+  private static string GetFromTemplate(string key, int indent) {
+    var lines = Template[key];
+    var res = new StringBuilder();
+    foreach (var l in lines) {
+      res.AppendLine(new string(' ', indent) + l);
+    }
+    return res.ToString();
   }
 
   public static string PrintDistributedSystem(DistributedSystemFile file, DafnyOptions options) {
     var res = new StringBuilder();
+
+    // Header
+    res.AppendLine("/// This file is auto-generated");
 
     // Dafny files to include
     foreach (string i in Includes) {
@@ -29,7 +37,7 @@ public static class DistributedSystemPrinter {
     res.AppendLine();
 
     // Define Network module
-    res.AppendLine(GetFromTemplate("NetworkModule"));
+    res.AppendLine(GetFromTemplate("NetworkModule", 0));
     
     // Define DistributedSystem module
     res.AppendLine("module DistributedSystem {");
@@ -54,7 +62,9 @@ public static class DistributedSystemPrinter {
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
     printer.PrintDatatype(file.GetConstants(), 2, "dummy string");
-    res.AppendLine(StripTriggerAnnotations(wr.ToString()));
+    res.Append(StripTriggerAnnotations(wr.ToString()));
+    res.AppendLine("  // end datatype Constants");
+    res.AppendLine();
 
     // Declare datatype Hosts
     // Hosts is the same as Variables in sync version, with a renaming of the datatype and 
@@ -67,7 +77,12 @@ public static class DistributedSystemPrinter {
         "datatype Variables = Variables", 
         "datatype Hosts = Hosts"
     );  // hacky renaming strategy
-    res.AppendLine(hostsDecl);
+    res.Append(hostsDecl);
+    res.AppendLine("  // end datatype Hosts");
+    res.AppendLine();
+
+    // Declare datatype Variables
+    res.AppendLine(GetFromTemplate("DatatypeVariables", 2));
 
     return res.ToString();
   } // end function PrintDistributedSystemModuleBody
