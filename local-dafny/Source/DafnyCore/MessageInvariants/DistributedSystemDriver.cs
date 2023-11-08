@@ -22,7 +22,25 @@ public class GenAsyncDriver {
 
   public void Resolve() {
     Console.WriteLine(String.Format("Generating asynchronous distributed system for {0}\n", program.FullName));
+    var systemModule = GetModule("System");
+
+    // find imports
+    foreach (var decl in systemModule.TopLevelDecls.Where(x => x.Name.Contains("Host"))) {
+      dsFile.AddHostImport(decl.Name);
+    }
   } // end method Resolve()
+
+  private ModuleDefinition GetModule(string moduleName) {
+    ModuleDefinition res = null;
+    foreach (var kvp in program.ModuleSigs) {
+      var moduleDef = kvp.Value.ModuleDef;
+      if (moduleDef.DafnyName.Equals(moduleName)) {
+        res = moduleDef;
+      }
+    }
+    Debug.Assert(res != null, String.Format("Module {0} not found ", moduleName));
+    return res;
+  } 
 
 
 
