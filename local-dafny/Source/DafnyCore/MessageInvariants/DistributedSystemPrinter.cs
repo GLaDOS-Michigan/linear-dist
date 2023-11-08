@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 
 namespace Microsoft.Dafny
@@ -53,10 +54,18 @@ public static class DistributedSystemPrinter {
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
     printer.PrintDatatype(file.GetConstants(), 2, "dummy string");
-    res.AppendLine(wr.ToString());
+    res.AppendLine(StripAnnotations(wr.ToString()));
 
     return res.ToString();
   } // end function PrintDistributedSystemModuleBody
+
+  private static string StripAnnotations(string input) {
+    // Define the pattern to remove
+    string pattern = @"\{:trigger [^\}]*\} ";
+    // Use Regex.Replace to remove all occurrences of the pattern
+    string resultString = Regex.Replace(input, pattern, "");
+    return resultString;
+  }
 
 } // end class MessageInvariantsFile
 } //end namespace Microsoft.Dafny
