@@ -18,7 +18,7 @@ public static class DistributedSystemPrinter {
     return string.Join("\n", Template[key]) + "\n";
   }
 
-  public static string PrintDistributedSystem(DistributedSystemFile file) {
+  public static string PrintDistributedSystem(DistributedSystemFile file, DafnyOptions options) {
     var res = new StringBuilder();
 
     // Dafny files to include
@@ -32,17 +32,31 @@ public static class DistributedSystemPrinter {
     
     // Define DistributedSystem module
     res.AppendLine("module DistributedSystem {");
+    res.AppendLine(PrintDistributedSystemModuleBody(file, options));
+    res.AppendLine("} // end module DistributedSystem");
+    return res.ToString();
+  } // end function PrintDistributedSystem
+
+  private static string PrintDistributedSystemModuleBody(DistributedSystemFile file, DafnyOptions options) {
+    var res = new StringBuilder();
+
+    // Import dependencies
     foreach (string i in Imports) {
       res.AppendLine(String.Format("  import opened {0}", i));
     }
     foreach (string i in file.GetHostImports()) {
       res.AppendLine(String.Format("  import {0}", i));
     }
+    res.AppendLine();
+    
+    // Declare datatype Constants
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintDatatype(file.GetConstants(), 2, "dummy string");
+    res.AppendLine(wr.ToString());
 
-
-    res.AppendLine("} // end module DistributedSystem");
     return res.ToString();
-  } // end function PrintDistributedSystem
+  } // end function PrintDistributedSystemModuleBody
 
 } // end class MessageInvariantsFile
 } //end namespace Microsoft.Dafny

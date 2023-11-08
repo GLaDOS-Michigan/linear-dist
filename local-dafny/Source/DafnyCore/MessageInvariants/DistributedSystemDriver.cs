@@ -24,12 +24,17 @@ public class GenAsyncDriver {
     Console.WriteLine(String.Format("Generating asynchronous distributed system for {0}\n", program.FullName));
     var systemModule = GetModule("System");
 
-    // find imports
-    foreach (var decl in systemModule.TopLevelDecls.Where(x => x.Name.Contains("Host"))) {
-      dsFile.AddHostImport(decl.Name);
+    // find imports, datatype Constants and and datatype Variables
+    foreach (var decl in systemModule.TopLevelDecls.ToList()) {
+      if (decl.Name.Contains("Host")) {
+        dsFile.AddHostImport(decl.Name);
+      } else if (decl.Name.Equals("Constants")) {
+        dsFile.AddConstants((IndDatatypeDecl) decl);
+      }
     }
   } // end method Resolve()
 
+  // Returns the Dafny module with the given name
   private ModuleDefinition GetModule(string moduleName) {
     ModuleDefinition res = null;
     foreach (var kvp in program.ModuleSigs) {
@@ -42,10 +47,8 @@ public class GenAsyncDriver {
     return res;
   } 
 
-
-
   public void WriteToFile() {
-    string dsString = DistributedSystemPrinter.PrintDistributedSystem(dsFile);
+    string dsString = DistributedSystemPrinter.PrintDistributedSystem(dsFile, options);
     string dsOutputFullname = Path.GetDirectoryName(program.FullName) + "/distributedSystemAutogen.dfy";
     Console.WriteLine(string.Format("Writing distributed system to {0}", dsOutputFullname));
     File.WriteAllText(dsOutputFullname, dsString);
