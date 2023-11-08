@@ -54,12 +54,25 @@ public static class DistributedSystemPrinter {
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
     printer.PrintDatatype(file.GetConstants(), 2, "dummy string");
-    res.AppendLine(StripAnnotations(wr.ToString()));
+    res.AppendLine(StripTriggerAnnotations(wr.ToString()));
+
+    // Declare datatype Hosts
+    // Hosts is the same as Variables in sync version, with a renaming of the datatype and 
+    // datatype constructor
+    wr = new StringWriter();
+    printer = new Printer(wr, options);
+    printer.PrintDatatype(file.GetVariables(), 2, "dummy string");
+    var variablesDecl = wr.ToString();
+    var hostsDecl = variablesDecl.Replace(
+        "datatype Variables = Variables", 
+        "datatype Hosts = Hosts"
+    );  // hacky renaming strategy
+    res.AppendLine(hostsDecl);
 
     return res.ToString();
   } // end function PrintDistributedSystemModuleBody
 
-  private static string StripAnnotations(string input) {
+  private static string StripTriggerAnnotations(string input) {
     // Define the pattern to remove
     string pattern = @"\{:trigger [^\}]*\} ";
     // Use Regex.Replace to remove all occurrences of the pattern

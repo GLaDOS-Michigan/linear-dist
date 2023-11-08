@@ -30,6 +30,8 @@ public class GenAsyncDriver {
         dsFile.AddHostImport(decl.Name);
       } else if (decl.Name.Equals("Constants")) {
         dsFile.AddConstants((IndDatatypeDecl) decl);
+      } else if (decl.Name.Equals("Variables")) {
+        dsFile.AddVariables((IndDatatypeDecl) decl);
       }
     }
   } // end method Resolve()

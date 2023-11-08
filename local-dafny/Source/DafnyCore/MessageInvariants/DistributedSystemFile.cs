@@ -6,8 +6,8 @@ namespace Microsoft.Dafny {
 
 public class DistributedSystemFile {
   private List<string> hostImports;  // host modules to import
-  private DatatypeDecl constants;
-  private DatatypeDecl variables;
+  private IndDatatypeDecl constants;
+  private IndDatatypeDecl variables;
 
   // Constructor
   public DistributedSystemFile()
@@ -24,7 +24,7 @@ public class DistributedSystemFile {
     return hostImports;
   }
 
-  public void AddConstants(DatatypeDecl constants) {
+  public void AddConstants(IndDatatypeDecl constants) {
     Debug.Assert(this.constants == null, "Constants already non-null!");
     this.constants = constants;
   }
@@ -33,6 +33,17 @@ public class DistributedSystemFile {
     Debug.Assert(constants != null, "Constants is null!");
     return constants;
   }
+
+  public void AddVariables(IndDatatypeDecl variables) {
+    Debug.Assert(this.variables == null, "Variables already non-null!");
+    this.variables = variables;
+  }
+
+  public DatatypeDecl GetVariables() {
+    Debug.Assert(variables != null, "Variables is null!");
+    return variables;
+  }
+
 } // end class DistributedSystemFile
 
 
