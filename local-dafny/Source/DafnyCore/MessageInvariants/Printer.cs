@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using Newtonsoft.Json;
 
 namespace Microsoft.Dafny
 {
@@ -6,47 +9,13 @@ namespace Microsoft.Dafny
 
     private static readonly string[] includes = {"spec.dfy"};
     private static readonly string[] imports = {"Types", "UtilitiesLibrary", "MonotonicityLibrary", "DistributedSystem"};
+    private static readonly string templatePath = "/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Source/DafnyCore/MessageInvariants/templates.json";
 
-    private static readonly string InitImpliesMonotonicityInv = 
-      "lemma InitImpliesMonotonicityInv(c: Constants, v: Variables)\n" +
-      "  requires Init(c, v)\n" +
-      "  ensures MonotonicityInv(c, v)\n" +
-      "{}\n";
-    
-    private static readonly string InitImpliesMessageInvHeader = 
-      "lemma InitImpliesMessageInv(c: Constants, v: Variables)\n" +
-      "  requires Init(c, v)\n" +
-      "  ensures MessageInv(c, v)\n" +
-      "{\n" +
-      "  InitImpliesValidVariables(c, v);\n";
-      
-    private static readonly string MonotonicityInvInductive = 
-       "lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)\n" +
-        "  requires MonotonicityInv(c, v)\n" +
-        "  requires Next(c, v, v')\n" +
-        "  ensures MonotonicityInv(c, v')\n" +
-        "{\n" +
-        "  VariableNextProperties(c, v, v');\n" +
-        "}\n";
+    private static readonly Dictionary<string, string[]> template = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(File.ReadAllText(templatePath));
 
-    private static readonly string MessageInvInductiveHeader = 
-      "lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)\n" +
-      "  requires MessageInv(c, v)\n" +
-      "  requires Next(c, v, v')\n" +
-      "  ensures MessageInv(c, v')\n";
-
-    private static readonly string VariableNextProperties =
-    "lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)\n" + 
-    "  requires v.WF(c)\n" +
-    "  requires Next(c, v, v')\n" +
-    "  ensures 1 < |v'.history|\n" +
-    "  ensures |v.history| == |v'.history| - 1\n" +
-    "  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)\n" +
-    "  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)\n" +
-    "{\n" +
-    "  assert 0 < |v.history|;\n" +
-    "  assert 1 < |v'.history|;\n" +
-    "}\n";
+    private static string GetFromTemplate(string key) {
+      return string.Join("\n", template[key]) + "\n";
+    }
 
     public static string PrintMonotonicityInvariants(MonotonicityInvariantsFile file) {
       string res = "";
@@ -77,12 +46,12 @@ namespace Microsoft.Dafny
 
       // Proof obligations
       res += "// Base obligation\n";
-      res += InitImpliesMonotonicityInv;
+      res += GetFromTemplate("InitImpliesMonotonicityInv");
       
       res += "\n";
       res += "// Inductive obligation\n";
 
-      res += MonotonicityInvInductive;
+      res += GetFromTemplate("MonotonicityInvInductive");
       // Footer
       res += "} // end module MonotonicityInvariants";
       return res;
@@ -128,7 +97,7 @@ namespace Microsoft.Dafny
 
       // Proof obligations
       res += "// Base obligation\n";
-      res += InitImpliesMessageInvHeader;
+      res += GetFromTemplate("InitImpliesMessageInvHeader");
       foreach (var ri in file.GetReceiveInvariants()) {
         // reveal opaqued receive invariants
         if (ri.isOpaque()) {
@@ -140,7 +109,7 @@ namespace Microsoft.Dafny
       res += "\n";
       res += "// Inductive obligation\n";
 
-      res += MessageInvInductiveHeader + 
+      res += GetFromTemplate("MessageInvInductiveHeader") + 
             "{\n" + 
             "  InvNextValidVariables(c, v, v');\n";
       foreach (var inv in file.GetSendInvariants()) {

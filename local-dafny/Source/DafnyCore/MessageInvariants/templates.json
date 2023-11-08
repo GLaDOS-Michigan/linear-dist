@@ -1,0 +1,48 @@
+{
+  "InitImpliesMonotonicityInv": 
+    [ 
+      "lemma InitImpliesMonotonicityInv(c: Constants, v: Variables)",
+      "  requires Init(c, v)",
+      "  ensures MonotonicityInv(c, v)",
+      "{}"
+    ],
+    "InitImpliesMessageInvHeader":
+    [
+      "lemma InitImpliesMessageInv(c: Constants, v: Variables)",
+      "  requires Init(c, v)",
+      "  ensures MessageInv(c, v)",
+      "{",
+      "  InitImpliesValidVariables(c, v);"
+    ],
+    "MonotonicityInvInductive":
+    [
+      "lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)",
+      "  requires MonotonicityInv(c, v)",
+      "  requires Next(c, v, v')",
+      "  ensures MonotonicityInv(c, v')",
+      "{",
+      "  VariableNextProperties(c, v, v');",
+      "}"
+    ],
+    "MessageInvInductiveHeader":
+    [
+      "lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)",
+      "  requires MessageInv(c, v)",
+      "  requires Next(c, v, v')",
+      "  ensures MessageInv(c, v')"
+    ],
+    "VariableNextProperties":
+    [
+      "lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)", 
+      "  requires v.WF(c)",
+      "  requires Next(c, v, v')",
+      "  ensures 1 < |v'.history|",
+      "  ensures |v.history| == |v'.history| - 1",
+      "  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)",
+      "  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)",
+      "{",
+      "  assert 0 < |v.history|;",
+      "  assert 1 < |v'.history|;",
+      "}"
+    ]
+}
