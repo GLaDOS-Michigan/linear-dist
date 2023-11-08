@@ -58,6 +58,10 @@ namespace Microsoft.Dafny {
         options.DafnyVerify = false;
         options.Compile = false;
         Debug.Assert(!options.msgInvs && !options.ownershipInvs);
+
+        var genAsyncDriver = new GenAsyncDriver(options, program);
+        genAsyncDriver.Resolve();
+        genAsyncDriver.WriteToFile();
       }
 
       if (options.msgInvs || options.ownershipInvs) {
