@@ -48,9 +48,16 @@ namespace Microsoft.Dafny
       return func.FullDafnyName.Substring(0, func.FullDafnyName.IndexOf('.'));
     }
     
-
     public string GetName() {
       return this.functionName;
+    }
+
+    public string GetMessageType() {
+      return msgType;
+    }
+
+    public string GetHostModule() {
+      return module;
     }
 
     public string GetPredicateName() {

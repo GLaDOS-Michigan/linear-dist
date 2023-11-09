@@ -25,6 +25,7 @@ public class GenAsyncDriver {
     var systemModule = GetModule("System");
 
     // Find imports, datatype Constants, datatype Variables
+    IndDatatypeDecl variablesDecl = null;
     foreach (var decl in systemModule.TopLevelDecls.ToList()) {
       if (decl.Name.Contains("Host")) {
         dsFile.AddHostImport(decl.Name);
@@ -32,8 +33,10 @@ public class GenAsyncDriver {
         dsFile.AddConstants((IndDatatypeDecl) decl);
       } else if (decl.Name.Equals("Variables")) {
         dsFile.AddVariables((IndDatatypeDecl) decl);
+        variablesDecl = (IndDatatypeDecl) decl; // store for later use
       }
     }
+    Debug.Assert(variablesDecl != null, "variablesDecl should not be null");
 
     // Find predicate Init
     foreach (var func in systemModule.DefaultClass.Members.Where(x => x.Name.Equals("Init"))) {

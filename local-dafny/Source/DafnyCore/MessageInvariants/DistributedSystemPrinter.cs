@@ -137,8 +137,18 @@ public static class DistributedSystemPrinter {
     }
 
     // Declare Next relation
-    res.Append(GetFromTemplate("Next", 2));
+    res.AppendLine(GetFromTemplate("Next", 2));
 
+    res.AppendLine(GetFromTemplate("VariablePropertiesSeperator", 0));
+
+    // Declare all variable properties
+    res.AppendLine(GetFromTemplate("ValidHistory", 2));
+    res.AppendLine(GetFromTemplate("ValidVariables", 2));
+    res.AppendLine(GetFromTemplate("InitImpliesValidVariables", 2));
+    res.AppendLine(GetFromTemplate("InvNextValidVariables", 2));
+    res.Append(GetFromTemplate("VariableNextProperties", 2));
+
+    // Done
     return res.ToString();
   } // end function PrintDistributedSystemModuleBody
 

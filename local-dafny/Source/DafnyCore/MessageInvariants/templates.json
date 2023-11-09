@@ -31,20 +31,6 @@
       "  requires Next(c, v, v')",
       "  ensures MessageInv(c, v')"
     ],
-  "VariableNextProperties":
-    [
-      "lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)", 
-      "  requires v.WF(c)",
-      "  requires Next(c, v, v')",
-      "  ensures 1 < |v'.history|",
-      "  ensures |v.history| == |v'.history| - 1",
-      "  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)",
-      "  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)",
-      "{",
-      "  assert 0 < |v.history|;",
-      "  assert 1 < |v'.history|;",
-      "}"
-    ],
   "NetworkModule":
     [
       "module Network {",
@@ -133,6 +119,64 @@
       "  && v'.WF(c)",
       "  && IsSeqExtension(v.history, v'.history)",
       "  && exists step :: NextStep(c, v.Last(), v'.Last(), v.network, v'.network, step)",
+      "}"
+    ],
+  "VariablePropertiesSeperator":
+    [
+      "/***************************************************************************************",
+      "*                                Variable properties                                   *",
+      "***************************************************************************************/"
+    ],
+  "ValidHistory":
+    [
+      "ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)",
+      "  requires v.WF(c)",
+      "{",
+      "  InitHosts(c, v.History(0))",
+      "}"
+    ],
+  "ValidVariables":
+    [  
+      "// Bundle of Variable properties",
+      "ghost predicate ValidVariables(c: Constants, v: Variables)",
+      "  requires v.WF(c)",
+      "{",
+      "  && ValidHistory(c, v)",
+      "}"
+    ],
+  "InitImpliesValidVariables":
+    [
+      "lemma InitImpliesValidVariables(c: Constants, v: Variables)",
+      "  requires Init(c, v)",
+      "  ensures ValidHistory(c, v)",
+      "{",
+      "  reveal_ValidHistory();",
+      "}"
+    ],
+  "InvNextValidVariables":
+    [
+      "lemma InvNextValidVariables(c: Constants, v: Variables, v': Variables)",
+      "  requires v.WF(c)",
+      "  requires ValidHistory(c, v)",
+      "  requires Next(c, v, v')",
+      "  ensures ValidHistory(c, v')",
+      "{",
+      "  reveal_ValidHistory();",
+      "  VariableNextProperties(c, v, v');",
+      "}"
+    ],
+  "VariableNextProperties":
+    [
+      "lemma VariableNextProperties(c: Constants, v: Variables, v': Variables)", 
+      "  requires v.WF(c)",
+      "  requires Next(c, v, v')",
+      "  ensures 1 < |v'.history|",
+      "  ensures |v.history| == |v'.history| - 1",
+      "  ensures v.Last() == v.History(|v'.history|-2) == v'.History(|v'.history|-2)",
+      "  ensures forall i | 0 <= i < |v'.history|-1 :: v.History(i) == v'.History(i)",
+      "{",
+      "  assert 0 < |v.history|;",
+      "  assert 1 < |v'.history|;",
       "}"
     ]
 }

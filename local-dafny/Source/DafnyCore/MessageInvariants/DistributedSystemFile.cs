@@ -68,7 +68,6 @@ public class DistributedSystemFile {
     Debug.Assert(initRelation != null, "Init is null!");
     return initRelation;
   }
-
 } // end class DistributedSystemFile
 
 
