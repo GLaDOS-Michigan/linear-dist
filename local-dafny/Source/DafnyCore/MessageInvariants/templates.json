@@ -116,5 +116,13 @@
       "  && InitHosts(c, v.History(0))",
       "  && Network.Init(v.network)",
       "}"
+    ],
+  "NextStepHeader":
+    [
+      "ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)",
+      "  requires h.WF(c) && h'.WF(c)",
+      "{",
+      "  && Network.Next(n, n', step.msgOps)",
+      "  && match step"
     ]
 }

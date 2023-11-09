@@ -98,11 +98,47 @@ public static class DistributedSystemPrinter {
     }
     res.AppendLine("  }");
     res.AppendLine();
-    res.Append(GetFromTemplate("Init", 2));
+    res.AppendLine(GetFromTemplate("Init", 2));
+
+    // Declare datatype Step
+    res.AppendLine("  datatype Step = ");
+    foreach (var kvp in file.ExtractHosts()) {
+      var line = string.Format("    | {0}Step(actor: nat, msgOps: MessageOps)", kvp.Key);
+      res.AppendLine(line);
+    }
+    res.AppendLine();
+
+    // Declare NextStep relation
+    res.Append(GetFromTemplate("NextStepHeader", 2));
+    foreach (var kvp in file.ExtractHosts()) {
+      var line = string.Format("      case {0}Step(actor, msgOps) => Next{0}Step(c, h, h', actor, msgOps)", kvp.Key);
+      res.AppendLine(line);
+    }
+    res.AppendLine("  }");
+    res.AppendLine();
+
+    // Declare NextHostStep relations
+    foreach (var kvp in file.ExtractHosts()) {
+
+      res.AppendLine(string.Format("  ghost predicate Next{0}Step(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)", kvp.Key));
+      res.AppendLine("    requires h.WF(c) && h'.WF(c)");
+      res.AppendLine("  {");
+      res.AppendLine(string.Format("    && 0 <= actor < |h.{0}|", kvp.Value));
+      res.AppendLine(string.Format("    && {0}.Next(c.{1}[actor], h.{1}[actor], h'.{1}[actor], msgOps)", kvp.Key, kvp.Value));
+      res.AppendLine("    // all other hosts UNCHANGED");
+
+
+      // TODO
+
+
+      res.AppendLine("  }");
+      res.AppendLine();
+    }
 
 
     return res.ToString();
   } // end function PrintDistributedSystemModuleBody
+
 
   private static string StripTriggerAnnotations(string input) {
     // Define the pattern to remove
