@@ -119,22 +119,25 @@ public static class DistributedSystemPrinter {
 
     // Declare NextHostStep relations
     foreach (var kvp in file.ExtractHosts()) {
-
       res.AppendLine(string.Format("  ghost predicate Next{0}Step(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)", kvp.Key));
       res.AppendLine("    requires h.WF(c) && h'.WF(c)");
       res.AppendLine("  {");
-      res.AppendLine(string.Format("    && 0 <= actor < |h.{0}|", kvp.Value));
+      res.AppendLine("    && " + ValidActorIdx("actor", kvp.Value));
       res.AppendLine(string.Format("    && {0}.Next(c.{1}[actor], h.{1}[actor], h'.{1}[actor], msgOps)", kvp.Key, kvp.Value));
       res.AppendLine("    // all other hosts UNCHANGED");
-
-
-      // TODO
-
-
+      foreach (var kvp2 in file.ExtractHosts()) {
+        if (kvp2.Key == kvp.Key) {
+          res.AppendLine(string.Format("    && (forall other| {0} && other != actor :: h'.{1}[other] == h.{1}[other])", ValidActorIdx("other", kvp.Value), kvp.Value));
+        } else {
+          res.AppendLine(string.Format("    && h'.{0} == h.{0}", kvp2.Value));
+        }
+      }
       res.AppendLine("  }");
       res.AppendLine();
     }
 
+    // Declare Next relation
+    res.Append(GetFromTemplate("Next", 2));
 
     return res.ToString();
   } // end function PrintDistributedSystemModuleBody
@@ -146,6 +149,10 @@ public static class DistributedSystemPrinter {
     // Use Regex.Replace to remove all occurrences of the pattern
     string resultString = Regex.Replace(input, pattern, "");
     return resultString;
+  }
+
+  private static string ValidActorIdx(string actor, string field) {
+    return string.Format("0 <= {0} < |h.{1}|", actor, field);
   }
 } // end class MessageInvariantsFile
 } //end namespace Microsoft.Dafny

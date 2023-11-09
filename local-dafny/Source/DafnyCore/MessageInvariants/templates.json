@@ -124,5 +124,15 @@
       "{",
       "  && Network.Next(n, n', step.msgOps)",
       "  && match step"
+    ],
+  "Next":
+    [
+      "ghost predicate Next(c: Constants, v: Variables, v': Variables)",
+      "{",
+      "  && v.WF(c)",
+      "  && v'.WF(c)",
+      "  && IsSeqExtension(v.history, v'.history)",
+      "  && exists step :: NextStep(c, v.Last(), v'.Last(), v.network, v'.network, step)",
+      "}"
     ]
 }
