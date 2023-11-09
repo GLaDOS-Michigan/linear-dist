@@ -1,146 +1,145 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using Newtonsoft.Json;
 
 namespace Microsoft.Dafny
 {
-  public class MsgInvPrinter {
+  public static class MsgInvPrinter {
 
     private static readonly string[] includes = {"spec.dfy"};
     private static readonly string[] imports = {"Types", "UtilitiesLibrary", "MonotonicityLibrary", "DistributedSystem"};
     private static readonly string templatePath = "/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Source/DafnyCore/MessageInvariants/templates.json";
 
-    private static readonly Dictionary<string, string[]> template = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(File.ReadAllText(templatePath));
+    private static readonly Dictionary<string, string[]> Template = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(File.ReadAllText(templatePath));
 
-    private static string GetFromTemplate(string key) {
-      return string.Join("\n", template[key]) + "\n";
+    private static string GetFromTemplate(string key, int indent) {
+    var lines = Template[key];
+    var res = new StringBuilder();
+    foreach (var l in lines) {
+      res.AppendLine(new string(' ', indent) + l);
     }
+    return res.ToString();
+  }
 
     public static string PrintMonotonicityInvariants(MonotonicityInvariantsFile file) {
-      string res = "";
+      var res = new StringBuilder();
 
       // Module preamble 
       foreach (string i in includes) {
-        res += String.Format("include \"{0}\"\n", i);
+        res.AppendLine(String.Format("include \"{0}\"", i));
       }
-      res += "\n";
-      res += "module MonotonicityInvariants {\n"; // begin MonotinicityInvariants module
+      res.AppendLine();
+      res.AppendLine("module MonotonicityInvariants {"); // begin MonotinicityInvariants module
       foreach (string i in imports) {
-        res += String.Format("import opened {0}\n", i);
+        res.AppendLine(String.Format("import opened {0}", i));
       }
-      res += "\n";
+      res.AppendLine();
 
       foreach (var monoInv in file.GetInvariants()) {
-        res += monoInv.ToPredicate() + "\n";
+        res.AppendLine(monoInv.ToPredicate());
       }
 
       // Main monotonicity invariant
-      res += "ghost predicate MonotonicityInv(c: Constants, v: Variables)\n" +
-             "{\n" +
-             "  && v.WF(c)\n";
+      res.AppendLine("ghost predicate MonotonicityInv(c: Constants, v: Variables)");
+      res.AppendLine("{");
+      res.AppendLine("  && v.WF(c)");
       foreach (var inv in file.GetInvariants()) {
-        res += String.Format("  && {0}(c, v)\n", inv.GetPredicateName());
+        res.AppendLine(String.Format("  && {0}(c, v)", inv.GetPredicateName()));
       }
-      res += "}\n\n";
+      res.AppendLine("}");
+      res.AppendLine();
 
       // Proof obligations
-      res += "// Base obligation\n";
-      res += GetFromTemplate("InitImpliesMonotonicityInv");
+      res.AppendLine("// Base obligation");
+      res.AppendLine(GetFromTemplate("InitImpliesMonotonicityInv", 0));
       
-      res += "\n";
-      res += "// Inductive obligation\n";
-
-      res += GetFromTemplate("MonotonicityInvInductive");
+      res.AppendLine("// Inductive obligation");
+      res.AppendLine(GetFromTemplate("MonotonicityInvInductive", 0));
       // Footer
-      res += "} // end module MonotonicityInvariants";
-      return res;
-    }
+      res.AppendLine("} // end module MonotonicityInvariants");
+      return res.ToString();
+    } // end function PrintMonotonicityInvariants
     
 
     public static string PrintMessageInvariants(MessageInvariantsFile file) {
-      string res = "";
+      var res = new StringBuilder();
 
       // Module preamble 
       foreach (string i in includes) {
-        res += String.Format("include \"{0}\"\n", i);
+        res.AppendLine(String.Format("include \"{0}\"", i));
       }
-      res += "\n";
-      res += "module MessageInvariants {\n"; // begin MessageInvariants module
+      res.AppendLine();
+      res.AppendLine("module MessageInvariants {"); // begin MessageInvariants module
       foreach (string i in imports) {
-        res += String.Format("import opened {0}\n", i);
+        res.AppendLine(String.Format("import opened {0}", i));
       }
-      res += "\n";
+      res.AppendLine();
 
       // List Send Invariants
       foreach (var sendInv in file.GetSendInvariants()) {
-        res += sendInv.ToPredicate() + "\n";
+        res.AppendLine(sendInv.ToPredicate());
       }
 
       // List Receive Invariants
       foreach (var recvInv in file.GetReceiveInvariants()) {
-        res += recvInv.ToPredicate() + "\n";
+        res.AppendLine(recvInv.ToPredicate());
       }
 
       // Main message invariant
-      res += "ghost predicate MessageInv(c: Constants, v: Variables)\n" +
-             "{\n" +
-             "  && v.WF(c)\n" +
-             "  && ValidVariables(c, v)\n";
+      res.AppendLine("ghost predicate MessageInv(c: Constants, v: Variables)");
+      res.AppendLine("{");
+      res.AppendLine("  && v.WF(c)");
+      res.AppendLine("  && ValidVariables(c, v)");
       foreach (var inv in file.GetSendInvariants()) {
-        res += String.Format("  && {0}(c, v)\n", inv.GetPredicateName());
+        res.AppendLine(String.Format("  && {0}(c, v)", inv.GetPredicateName()));
       }
       foreach (var inv in file.GetReceiveInvariants()) {
-        res += String.Format("  && {0}(c, v)\n", inv.GetPredicateName());
+        res.AppendLine(String.Format("  && {0}(c, v)", inv.GetPredicateName()));
       }
-      res += "}\n\n";
+      res.AppendLine("}");
+      res.AppendLine();
 
       // Proof obligations
-      res += "// Base obligation\n";
-      res += GetFromTemplate("InitImpliesMessageInvHeader");
-      foreach (var ri in file.GetReceiveInvariants()) {
+      res.AppendLine("// Base obligation");
+      res.Append(GetFromTemplate("InitImpliesMessageInvHeader", 0));
+      foreach (var ri in file.GetReceiveInvariants().Where(x => x.isOpaque())) {
         // reveal opaqued receive invariants
-        if (ri.isOpaque()) {
-          res += string.Format("  reveal_{0}();\n", ri.GetPredicateName());
-        }
+        res.AppendLine(string.Format("  reveal_{0}();", ri.GetPredicateName()));
       }
-      res += "}\n";
-      
-      res += "\n";
-      res += "// Inductive obligation\n";
+      res.AppendLine("}");
+      res.AppendLine();
 
-      res += GetFromTemplate("MessageInvInductiveHeader") + 
-            "{\n" + 
-            "  InvNextValidVariables(c, v, v');\n";
+      res.AppendLine("// Inductive obligation");
+      res.AppendLine(GetFromTemplate("MessageInvInductiveHeader", 0)); 
+      res.AppendLine("{");
+      res.AppendLine("  InvNextValidVariables(c, v, v');");
       foreach (var inv in file.GetSendInvariants()) {
-        res += String.Format("  {0}(c, v, v');\n", inv.GetLemmaName());
+        res.AppendLine(String.Format("  {0}(c, v, v');", inv.GetLemmaName()));
       }
       foreach (var inv in file.GetReceiveInvariants()) {
-        res += String.Format("  {0}(c, v, v');\n", inv.GetLemmaName());
+        res.AppendLine(String.Format("  {0}(c, v, v');", inv.GetLemmaName()));
       }
-      res += "}\n";
+      res.AppendLine("}");
+      res.AppendLine();
 
-      res += "\n" +
-@"/***************************************************************************************
-*                                     Aux Proofs                                       *
-***************************************************************************************/";
-      res += "\n\n\n";
+      // Begin proofs section
+      res.AppendLine(GetFromTemplate("AuxProofsSeparator", 0));
 
       // InvNextProofs
       foreach (var pred in file.GetSendInvariants()) {
-        res += pred.ToLemma();
-        res += "\n";
+        res.AppendLine(pred.ToLemma());
       }
       foreach (var pred in file.GetReceiveInvariants()) {
-        res += pred.ToLemma();
-        res += "\n";
+        res.AppendLine(pred.ToLemma());
       }
 
       // Footer
-      // res += VariableNextProperties + "\n";
-      res += "} // end module MessageInvariants";
-      return res;
-    } // end function Print
+      res.AppendLine("} // end module MessageInvariants");
+      return res.ToString();
+    } // end function PrintMessageInvariants
 
     public static string PrintOwnershipInvariants(OwnershipInvariantsFile file) {
       return @"include ""spec.dfy""
