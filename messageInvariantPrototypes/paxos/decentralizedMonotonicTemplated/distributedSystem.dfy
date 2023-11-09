@@ -29,9 +29,9 @@ module DistributedSystem {
 
   datatype Constants = Constants(
     f: nat,
-    leaderConstants: seq<LeaderHost.Constants>,
-    acceptorConstants: seq<AcceptorHost.Constants>,
-    learnerConstants: seq<LearnerHost.Constants>)
+    leaders: seq<LeaderHost.Constants>,
+    acceptors: seq<AcceptorHost.Constants>,
+    learners: seq<LearnerHost.Constants>)
   {
     ghost predicate WF() {
       && 0 < f
@@ -45,27 +45,27 @@ module DistributedSystem {
     }
 
     ghost predicate ValidLeaderIdx(id: int) {
-      0 <= id < |leaderConstants|
+      0 <= id < |leaders|
     }
 
     ghost predicate ValidAcceptorIdx(id: int) {
-      0 <= id < |acceptorConstants|
+      0 <= id < |acceptors|
     }
 
     ghost predicate ValidLearnerIdx(id: int) {
-      0 <= id < |learnerConstants|
+      0 <= id < |learners|
     }
     
     ghost predicate UniqueLeaderIds() {
-      forall i, j | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaderConstants[i].id == leaderConstants[j].id :: i == j
+      forall i, j | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaders[i].id == leaders[j].id :: i == j
     }
 
     ghost predicate UniqueAcceptorIds() {
-      forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptorConstants[i].id == acceptorConstants[j].id :: i == j
+      forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptors[i].id == acceptors[j].id :: i == j
     }
 
     ghost predicate UniqueLearnerIds() {
-      forall i, j | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learnerConstants[i].id == learnerConstants[j].id :: i == j
+      forall i, j | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learners[i].id == learners[j].id :: i == j
     }
   }
 
@@ -76,16 +76,16 @@ module DistributedSystem {
   ) {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && LeaderHost.GroupWF(c.leaderConstants, leaders, c.f)
-      && AcceptorHost.GroupWF(c.acceptorConstants, acceptors, c.f)
-      && LearnerHost.GroupWF(c.learnerConstants, learners, c.f)
+      && LeaderHost.GroupWF(c.leaders, leaders, c.f)
+      && AcceptorHost.GroupWF(c.acceptors, acceptors, c.f)
+      && LearnerHost.GroupWF(c.learners, learners, c.f)
     }
 
     ghost predicate LeaderCanPropose(c: Constants, ldr: LeaderId) 
       requires WF(c)
       requires c.ValidLeaderIdx(ldr)
     {
-      leaders[ldr].CanProposeV(c.leaderConstants[ldr], leaders[ldr].receivedPromisesAndValue.value)
+      leaders[ldr].CanPropose(c.leaders[ldr])
     }
   }
 
@@ -122,15 +122,6 @@ module DistributedSystem {
     {
       history[i]
     }
-
-    ghost function Truncate(c: Constants, i: int) : (v : Variables)
-      requires WF(c)
-      requires ValidHistoryIdx(i)
-      ensures v.WF(c)
-      ensures v.Last() == History(i)
-    {
-      Variables.Variables(history[..i+1], network)
-    }
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -144,9 +135,9 @@ module DistributedSystem {
   ghost predicate InitHosts(c: Constants, h: Hosts) 
     requires h.WF(c)
   {
-    && LeaderHost.GroupInit(c.leaderConstants, h.leaders, c.f)
-    && AcceptorHost.GroupInit(c.acceptorConstants, h.acceptors, c.f)
-    && LearnerHost.GroupInit(c.learnerConstants, h.learners, c.f)
+    && LeaderHost.GroupInit(c.leaders, h.leaders, c.f)
+    && AcceptorHost.GroupInit(c.acceptors, h.acceptors, c.f)
+    && LearnerHost.GroupInit(c.learners, h.learners, c.f)
   }
   
   datatype Step = 
@@ -168,7 +159,7 @@ module DistributedSystem {
     requires h.WF(c) && h'.WF(c)
   {
     && c.ValidLeaderIdx(actor)
-    && LeaderHost.Next(c.leaderConstants[actor], h.leaders[actor], h'.leaders[actor], msgOps)
+    && LeaderHost.Next(c.leaders[actor], h.leaders[actor], h'.leaders[actor], msgOps)
     // all other hosts UNCHANGED
     && (forall other| c.ValidLeaderIdx(other) && other != actor :: h'.leaders[other] == h.leaders[other])
     && h'.acceptors == h.acceptors
@@ -179,7 +170,7 @@ module DistributedSystem {
     requires h.WF(c) && h'.WF(c)
   {
     && c.ValidAcceptorIdx(actor)
-    && AcceptorHost.Next(c.acceptorConstants[actor], h.acceptors[actor], h'.acceptors[actor], msgOps)
+    && AcceptorHost.Next(c.acceptors[actor], h.acceptors[actor], h'.acceptors[actor], msgOps)
     // all other hosts UNCHANGED
     && h'.leaders == h.leaders
     && (forall other| c.ValidAcceptorIdx(other) && other != actor :: h'.acceptors[other] == h.acceptors[other])
@@ -190,7 +181,7 @@ module DistributedSystem {
     requires h.WF(c) && h'.WF(c)
   {
     && c.ValidLearnerIdx(actor)
-    && LearnerHost.Next(c.learnerConstants[actor], h.learners[actor], h'.learners[actor], msgOps)
+    && LearnerHost.Next(c.learners[actor], h.learners[actor], h'.learners[actor], msgOps)
     // all other hosts UNCHANGED
     && h'.leaders == h.leaders
     && h'.acceptors == h.acceptors
@@ -207,23 +198,44 @@ module DistributedSystem {
 
 
 /***************************************************************************************
-*                                 History properties                                   *
+*                                Variable properties                                   *
 ***************************************************************************************/
+
+  // All msg have a valid source
+  ghost predicate ValidMessages(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    forall msg | msg in v.network.sentMsgs 
+    :: 
+    match msg 
+      case Prepare(bal) => c.ValidLeaderIdx(msg.Src())
+      case Promise(_, acc, _) => c.ValidAcceptorIdx(msg.Src())
+      case Propose(bal, _) => c.ValidLeaderIdx(msg.Src())
+      case Accept(_, acc) => c.ValidAcceptorIdx(msg.Src())
+  }
 
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && InitHosts(c, v.History(0))
+    InitHosts(c, v.History(0))
+  }
+  
+  ghost predicate ValidVariables(c: Constants, v: Variables) 
+    requires v.WF(c)
+  {
+    && ValidMessages(c, v)
+    && ValidHistory(c, v)
   }
 
-  lemma InitImpliesValidHistory(c: Constants, v: Variables)
+  lemma InitImpliesValidVariables(c: Constants, v: Variables)
     requires Init(c, v)
     ensures ValidHistory(c, v)
   {
     reveal_ValidHistory();
   }
 
-  lemma InvNextValidHistory(c: Constants, v: Variables, v': Variables)
+
+  lemma InvNextValidVariables(c: Constants, v: Variables, v': Variables)
     requires v.WF(c)
     requires ValidHistory(c, v)
     requires Next(c, v, v')

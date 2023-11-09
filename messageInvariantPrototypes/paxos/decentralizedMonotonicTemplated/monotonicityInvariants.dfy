@@ -6,78 +6,74 @@ import opened UtilitiesLibrary
 import opened MonotonicityLibrary
 import opened DistributedSystem
 
-/***************************************************************************************
-*                               Monotonicity Invariants                                *
-***************************************************************************************/
-
-ghost predicate LeaderReceivedPromisesAndValueMonotonic(c: Constants, v: Variables)
+ghost predicate LeaderHostReceivedPromisesAndValueMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall i, j, ldr |
+  forall idx, i, j |
+    0 <= idx < |c.leaders|
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
-    && i <= j
-    && c.ValidLeaderIdx(ldr)
-  :: 
-    v.History(j).leaders[ldr].receivedPromisesAndValue.SatisfiesMonotonic(v.History(i).leaders[ldr].receivedPromisesAndValue)
-}
-
-ghost predicate LeaderHighestHeardMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, ldr |
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && c.ValidLeaderIdx(ldr)
-  :: 
-    v.History(j).leaders[ldr].highestHeardBallot.SatisfiesMonotonic(v.History(i).leaders[ldr].highestHeardBallot)
-}
-
-ghost predicate AcceptorAcceptedMonotonic(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall i, j, acc | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && c.ValidAcceptorIdx(acc)
     && i <= j
   ::
-    v.History(j).acceptors[acc].acceptedVB.SatisfiesMonotonic(v.History(i).acceptors[acc].acceptedVB)
+    v.History(j).leaders[idx].receivedPromisesAndValue.SatisfiesMonotonic(v.History(i).leaders[idx].receivedPromisesAndValue)
 }
 
-ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
+ghost predicate LeaderHostHighestHeardBallotMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall i, j, acc | 
+  forall idx, i, j |
+    0 <= idx < |c.leaders|
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
-    && c.ValidAcceptorIdx(acc)
     && i <= j
   ::
-    v.History(j).acceptors[acc].promised.SatisfiesMonotonic(v.History(i).acceptors[acc].promised)
+    v.History(j).leaders[idx].highestHeardBallot.SatisfiesMonotonic(v.History(i).leaders[idx].highestHeardBallot)
 }
 
-ghost predicate LearnerReceivedAcceptsMonotonic(c: Constants, v: Variables)
+ghost predicate AcceptorHostPromisedMonotonic(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall i, j, lnr | 
+  forall idx, i, j |
+    0 <= idx < |c.acceptors|
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
-    && c.ValidLearnerIdx(lnr)
     && i <= j
   ::
-    v.History(j).learners[lnr].receivedAccepts.SatisfiesMonotonic(v.History(i).learners[lnr].receivedAccepts)
+    v.History(j).acceptors[idx].promised.SatisfiesMonotonic(v.History(i).acceptors[idx].promised)
 }
 
-ghost predicate MonotonicityInv(c: Constants, v: Variables) 
+ghost predicate AcceptorHostAcceptedVBMonotonic(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, i, j |
+    0 <= idx < |c.acceptors|
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && i <= j
+  ::
+    v.History(j).acceptors[idx].acceptedVB.SatisfiesMonotonic(v.History(i).acceptors[idx].acceptedVB)
+}
+
+ghost predicate LearnerHostReceivedAcceptsMonotonic(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, i, j |
+    0 <= idx < |c.learners|
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && i <= j
+  ::
+    v.History(j).learners[idx].receivedAccepts.SatisfiesMonotonic(v.History(i).learners[idx].receivedAccepts)
+}
+
+ghost predicate MonotonicityInv(c: Constants, v: Variables)
 {
   && v.WF(c)
-  && LeaderHighestHeardMonotonic(c, v)
-  && LeaderReceivedPromisesAndValueMonotonic(c, v)
-  && AcceptorAcceptedMonotonic(c, v)
-  && AcceptorPromisedMonotonic(c, v)
-  && LearnerReceivedAcceptsMonotonic(c, v)
+  && LeaderHostReceivedPromisesAndValueMonotonic(c, v)
+  && LeaderHostHighestHeardBallotMonotonic(c, v)
+  && AcceptorHostPromisedMonotonic(c, v)
+  && AcceptorHostAcceptedVBMonotonic(c, v)
+  && LearnerHostReceivedAcceptsMonotonic(c, v)
 }
 
 // Base obligation
@@ -94,6 +90,4 @@ lemma MonotonicityInvInductive(c: Constants, v: Variables, v': Variables)
 {
   VariableNextProperties(c, v, v');
 }
-
 } // end module MonotonicityInvariants
-
