@@ -100,5 +100,21 @@
       "    history[i]",
       "  }",
       "}  // end datatype Variables"
+    ],
+  "InitHostsHeader":
+    [
+      "ghost predicate InitHosts(c: Constants, h: Hosts)",
+      "  requires h.WF(c)",
+      "{"
+    ],
+  "Init":
+    [
+      "ghost predicate Init(c: Constants, v: Variables)",
+      "{",
+      "  && v.WF(c)",
+      " && |v.history| == 1",
+      "  && InitHosts(c, v.History(0))",
+      "  && Network.Init(v.network)",
+      "}"
     ]
 }

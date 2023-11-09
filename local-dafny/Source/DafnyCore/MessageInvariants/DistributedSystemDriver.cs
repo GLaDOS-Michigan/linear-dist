@@ -24,7 +24,7 @@ public class GenAsyncDriver {
     Console.WriteLine(String.Format("Generating asynchronous distributed system for {0}\n", program.FullName));
     var systemModule = GetModule("System");
 
-    // find imports, datatype Constants and and datatype Variables
+    // Find imports, datatype Constants, datatype Variables
     foreach (var decl in systemModule.TopLevelDecls.ToList()) {
       if (decl.Name.Contains("Host")) {
         dsFile.AddHostImport(decl.Name);
@@ -33,6 +33,11 @@ public class GenAsyncDriver {
       } else if (decl.Name.Equals("Variables")) {
         dsFile.AddVariables((IndDatatypeDecl) decl);
       }
+    }
+
+    // Find predicate Init
+    foreach (var func in systemModule.DefaultClass.Members.Where(x => x.Name.Equals("Init"))) {
+      dsFile.AddInitRelation((Function) func);
     }
   } // end method Resolve()
 

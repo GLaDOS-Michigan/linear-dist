@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
@@ -83,6 +84,22 @@ public static class DistributedSystemPrinter {
 
     // Declare datatype Variables
     res.AppendLine(GetFromTemplate("DatatypeVariables", 2));
+    res.AppendLine();
+
+    // Declare Init relations
+    res.Append(GetFromTemplate("InitHostsHeader", 2));
+    var initConjuncts = Expression.Conjuncts(file.GetInitRelation().Body).ToList();
+    foreach (var expr in initConjuncts) {
+      var exprStr = expr.ToString();
+      if (exprStr.Contains("GroupInit")) {
+        exprStr = exprStr.Replace("v.", "h.");  // hacky, but works for now
+        res.AppendLine("    && " + exprStr);
+      }
+    }
+    res.AppendLine("  }");
+    res.AppendLine();
+    res.Append(GetFromTemplate("Init", 2));
+
 
     return res.ToString();
   } // end function PrintDistributedSystemModuleBody
@@ -94,6 +111,5 @@ public static class DistributedSystemPrinter {
     string resultString = Regex.Replace(input, pattern, "");
     return resultString;
   }
-
 } // end class MessageInvariantsFile
 } //end namespace Microsoft.Dafny
