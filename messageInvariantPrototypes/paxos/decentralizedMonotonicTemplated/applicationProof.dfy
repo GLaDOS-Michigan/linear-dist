@@ -1059,8 +1059,6 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
   requires dsStep.LeaderStep?
   requires ValidMessages(c, v)
-  // requires ValidPromiseMessage(c, v)
-  // requires Inv(c, v)
   requires LeaderValidReceivedPromises(c, v)
   requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
