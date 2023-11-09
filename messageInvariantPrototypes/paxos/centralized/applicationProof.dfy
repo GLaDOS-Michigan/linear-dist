@@ -742,8 +742,8 @@ returns (accSet: set<AcceptorId>)
   ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
   ensures |accSet| == 2 * c.f + 1
 {
-  accSet := set a |  0 <= a < |c.acceptorConstants|;
-  SetComprehensionSize(|c.acceptorConstants|);
+  accSet := set a |  0 <= a < |c.acceptors|;
+  SetComprehensionSize(|c.acceptors|);
 }
 
 } // end module PaxosProof
