@@ -167,14 +167,6 @@ module DistributedSystem {
 *                                Variable properties                                   *
 ***************************************************************************************/
 
-  // All msg have a valid source
-  ghost predicate ValidMessages(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    forall req | req in v.network.sentMsgs && req.RequestMsg?
-  :: c.ValidClientIdx(req.r.clientId)
-  }
-
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -184,7 +176,6 @@ module DistributedSystem {
   ghost predicate ValidVariables(c: Constants, v: Variables) 
     requires v.WF(c)
   {
-    && ValidMessages(c, v)
     && ValidHistory(c, v)
   }
 
