@@ -529,6 +529,7 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
           // witnesses and triggers
           var acc2 :| acc2 in v'.History(i).learners[l].receivedAccepts.m[vb2];
           var accMsg := Accept(vb2, acc2);
+          assert c.ValidAcceptorIdx(accMsg.acc);
           assert IsAcceptMessage(v, accMsg);
           var j :| v.ValidHistoryIdx(j) && v.History(j).acceptors[acc2].HasAccepted(vb2);
           assert false;
@@ -653,7 +654,7 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
 }
  
 lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
+  requires v.WF(c) && v'.WF(c)
   requires ValidMessages(c, v)
   requires SendAcceptValidity(c, v)
   requires LeaderHostReceivedPromisesAndValueMonotonic(c, v)
@@ -665,7 +666,24 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
   requires LearnerValidReceivedAcceptsKeys(c, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
 {
-  VariableNextProperties(c, v, v');
+  forall lnr:LearnerId, vb:ValBal, i |
+    && v'.ValidHistoryIdx(i)
+    && c.ValidLearnerIdx(lnr)
+    && vb in v'.History(i).learners[lnr].receivedAccepts.m
+  ensures
+    && v'.History(i).LeaderCanPropose(c, vb.b)
+    && v'.History(i).leaders[vb.b].Value() == vb.v
+  {
+    VariableNextProperties(c, v, v');
+    if i == |v'.history|-1 {
+      if vb !in v.Last().learners[lnr].receivedAccepts.m {
+        // witness and triggers
+        var msg :| msg in v.network.sentMsgs && msg.Accept? && msg.vb == vb;
+        assert v'.History(i).LeaderCanPropose(c, vb.b);
+        assert v'.History(i).leaders[vb.b].Value() == vb.v;
+      }
+    }
+  }
 }
 
 lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Variables)
