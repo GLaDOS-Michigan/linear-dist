@@ -78,6 +78,24 @@ namespace Microsoft.Dafny
       }
       res.AppendLine();
 
+      // Declar ValidMessges
+      res.AppendLine("// All msg have a valid source");
+      res.AppendLine("ghost predicate ValidMessages(c: Constants, v: Variables)");
+      res.AppendLine("  requires v.WF(c)");
+      res.AppendLine("{");
+      res.AppendLine("  forall msg | msg in v.network.sentMsgs");
+      res.AppendLine("  ::");
+      res.Append("  ");
+      foreach (var si in file.GetSendInvariants()) {
+        res.Append("if ");
+        res.Append($"msg.{si.GetMessageType()}? ");
+        res.AppendLine($"then 0 <= msg.Src() < |c.{si.GetVariableField()}|");
+        res.Append("  else ");
+      } 
+      res.AppendLine("true");
+      res.AppendLine("}");
+      res.AppendLine();
+
       // List Send Invariants
       foreach (var sendInv in file.GetSendInvariants()) {
         res.AppendLine(sendInv.ToPredicate());
@@ -93,6 +111,7 @@ namespace Microsoft.Dafny
       res.AppendLine("{");
       res.AppendLine("  && v.WF(c)");
       res.AppendLine("  && ValidVariables(c, v)");
+      res.AppendLine("  && ValidMessages(c, v)");
       foreach (var inv in file.GetSendInvariants()) {
         res.AppendLine(String.Format("  && {0}(c, v)", inv.GetPredicateName()));
       }

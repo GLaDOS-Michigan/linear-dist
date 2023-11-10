@@ -56,6 +56,10 @@ namespace Microsoft.Dafny
       return msgType;
     }
 
+    public string GetVariableField() {
+      return variableField;
+    }
+
     public string GetHostModule() {
       return module;
     }
