@@ -47,7 +47,7 @@ ghost predicate OneValuePerBallotLearners(c: Constants, v: Variables)
     && c.ValidLearnerIdx(l1)
     && c.ValidLearnerIdx(l2)
     && vb1 in v.History(i).learners[l1].receivedAccepts.m
-    && vb2 in v.History(i).learners[l1].receivedAccepts.m
+    && vb2 in v.History(i).learners[l2].receivedAccepts.m
     && vb1.b == vb2.b
   ::
     vb1.v == vb2.v
@@ -461,26 +461,40 @@ lemma InvNextOneValuePerBallotAcceptors(c: Constants, v: Variables, v': Variable
 
 lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables)
   requires v.WF(c) && v'.WF(c)
-  requires Inv(c, v)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires OneValuePerBallot(c, v)
+  requires  && LearnerValidReceivedAcceptsKeys(c, v)
+            && AcceptorValidPromisedAndAccepted(c, v)
+            && AcceptorAcceptedImpliesProposed(c, v)
+            && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
   requires Next(c, v, v')
   ensures OneValuePerBallotLearners(c, v')
 {
-  VariableNextProperties(c, v, v');
   forall l1, l2, vb1, vb2, i|
     && v'.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(l1)
     && c.ValidLearnerIdx(l2)
     && vb1 in v'.History(i).learners[l1].receivedAccepts.m
-    && vb2 in v'.History(i).learners[l1].receivedAccepts.m
+    && vb2 in v'.History(i).learners[l2].receivedAccepts.m
     && vb1.b == vb2.b
   ensures
     vb1.v == vb2.v
   {
+    VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      VariableNextProperties(c, v, v');
       if dsStep.LearnerStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
+        if vb1 !in v.Last().learners[l1].receivedAccepts.m {
+          var msg1 :| msg1 in v.network.sentMsgs && msg1.Accept? && msg1.vb == vb1;
+          var msg2 :| msg2 in v.network.sentMsgs && msg2.Accept? && msg2.vb == vb2;
+          assert vb1.v == vb2.v;
+        } else if vb2 !in v.Last().learners[l2].receivedAccepts.m {
+          var msg1 :| msg1 in v.network.sentMsgs && msg1.Accept? && msg1.vb == vb1;
+          var msg2 :| msg2 in v.network.sentMsgs && msg2.Accept? && msg2.vb == vb2;
+          assert vb1.v == vb2.v;
+        }
         assert vb1.v == vb2.v;
       } else {
         assert vb1.v == vb2.v;

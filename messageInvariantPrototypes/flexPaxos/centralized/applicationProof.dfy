@@ -42,7 +42,7 @@ ghost predicate OneValuePerBallotLearners(c: Constants, v: Variables)
     && c.ValidLearnerIdx(l1)
     && c.ValidLearnerIdx(l2)
     && vb1 in v.learners[l1].receivedAccepts.m
-    && vb2 in v.learners[l1].receivedAccepts.m
+    && vb2 in v.learners[l2].receivedAccepts.m
     && vb1.b == vb2.b
   ::
     vb1.v == vb2.v
