@@ -1,3 +1,4 @@
+/// This file is auto-generated
 include "../hosts.dfy"
 
 module Network {
@@ -15,109 +16,115 @@ module Network {
     && v'.sentMsgs ==
       v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }
   }
-} // end module Network
-
+}  // end module Network
 
 module DistributedSystem {
-  import opened UtilitiesLibrary
   import opened Types
-  import Network
+  import opened UtilitiesLibrary
+  import opened Network
   import Host
 
-  datatype Constants = Constants(hosts: seq<Host.Constants>)
-  {
-    ghost predicate ValidHostId(id: int) {
-      0 <= id < |hosts|
+  datatype Constants = Constants(hosts: seq<Host.Constants>) {
+    ghost predicate WF()
+      decreases this
+    {
+      Host.GroupWFConstants(hosts)
     }
 
-    ghost predicate UniqueIds() {
-      forall i, j | ValidHostId(i) && ValidHostId(j) && hosts[i].hostId == hosts[j].hostId :: i == j
-    }
-
-    ghost predicate WF() {
-      && 0 < |hosts|
-      && UniqueIds()
+    ghost predicate ValidHostId(id: HostId)
+      decreases this, id
+    {
+      id < |hosts|
     }
   }
+  // end datatype Constants
 
-  datatype Hosts = Hosts(
-    hosts: seq<Host.Variables>
-  ) {
-    ghost predicate WF(c: Constants) {
-      && c.WF()
-      && Host.GroupWF(c.hosts, hosts)
+  datatype Hosts = Hosts(hosts: seq<Host.Variables>) {
+    ghost predicate WF(c: Constants)
+      decreases this, c
+    {
+      c.WF() &&
+      Host.GroupWF(c.hosts, hosts)
     }
 
-    ghost predicate IsLeader(c: Constants, h: HostId) 
+    ghost predicate IsLeader(c: Constants, h: HostId)
       requires WF(c)
       requires c.ValidHostId(h)
+      decreases this, c, h
     {
       hosts[h].isLeader
     }
-  } // end datatype Hosts
+  }
+  // end datatype Hosts
 
   datatype Variables = Variables(
     history: seq<Hosts>,
-    network: Network.Variables)
-  {
+    network: Network.Variables
+  ) {
+  
     ghost predicate ValidHistoryIdx(i: int) {
       0 <= i < |history|
     }
-
+  
     ghost predicate ValidHistoryIdxStrict(i: int) {
       0 <= i < |history|-1
     }
-
+  
     ghost predicate WF(c: Constants) {
       && c.WF()
       && 0 < |history|
       && (forall i | ValidHistoryIdx(i) :: history[i].WF(c))
     }
-
+  
+    ghost function Last() : (h: Hosts)
+      requires 0 < |history|
+      ensures h == history[|history|-1]
+      ensures h == History(|history|-1)
+   {
+      UtilitiesLibrary.Last(history)
+    }
+  
     ghost function History(i: int) : (h: Hosts)
       requires ValidHistoryIdx(i)
       ensures h == history[i]
     {
       history[i]
     }
+  }  // end datatype Variables
 
-    ghost function Last() : (h: Hosts) 
-      requires 0 < |history|
-      ensures h == history[|history|-1]
-    {
-      UtilitiesLibrary.Last(history)
-    }
-  } // end datatype Variables
 
   ghost predicate InitHosts(c: Constants, h: Hosts)
+    requires h.WF(c)
   {
-    Host.GroupInit(c.hosts, h.hosts)
+    && Host.GroupInit(c.hosts, h.hosts)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && |v.history| == 1
+   && |v.history| == 1
     && InitHosts(c, v.History(0))
     && Network.Init(v.network)
   }
 
-  ghost predicate HostAction(c: Constants, h: Hosts, h': Hosts, actorIdx: int, msgOps: MessageOps)
-    requires h.WF(c) && h'.WF(c)
-  {
-    && c.ValidHostId(actorIdx)
-    && Host.Next(c.hosts[actorIdx], h.hosts[actorIdx], h'.hosts[actorIdx], msgOps)
-    // all other hosts UNCHANGED
-    && (forall otherHostIdx | c.ValidHostId(otherHostIdx) && otherHostIdx != actorIdx :: h'.hosts[otherHostIdx] == h.hosts[otherHostIdx])
-  }
-
-  datatype Step = HostActionStep(actor: int, msgOps: MessageOps)
+  datatype Step = 
+    | HostStep(actor: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
-    && HostAction(c, h, h', step.actor, step.msgOps)
     && Network.Next(n, n', step.msgOps)
+    && match step
+      case HostStep(actor, msgOps) => NextHostStep(c, h, h', actor, msgOps)
+  }
+
+  ghost predicate NextHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+    requires h.WF(c) && h'.WF(c)
+  {
+    && 0 <= actor < |h.hosts|
+    && Host.Next(c.hosts[actor], h.hosts[actor], h'.hosts[actor], msgOps)
+    // all other hosts UNCHANGED
+    && (forall other| 0 <= other < |h.hosts| && other != actor :: h'.hosts[other] == h.hosts[other])
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)
@@ -128,18 +135,18 @@ module DistributedSystem {
     && exists step :: NextStep(c, v.Last(), v'.Last(), v.network, v'.network, step)
   }
 
-
 /***************************************************************************************
-*                                 History properties                                   *
+*                                Variable properties                                   *
 ***************************************************************************************/
 
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && InitHosts(c, v.History(0))
+    InitHosts(c, v.History(0))
   }
 
-  ghost predicate ValidVariables(c: Constants, v: Variables) 
+  // Bundle of Variable properties
+  ghost predicate ValidVariables(c: Constants, v: Variables)
     requires v.WF(c)
   {
     && ValidHistory(c, v)
@@ -151,7 +158,6 @@ module DistributedSystem {
   {
     reveal_ValidHistory();
   }
-
 
   lemma InvNextValidVariables(c: Constants, v: Variables, v': Variables)
     requires v.WF(c)
@@ -174,4 +180,5 @@ module DistributedSystem {
     assert 0 < |v.history|;
     assert 1 < |v'.history|;
   }
-}  // end module DistributedSystem
+
+} // end module DistributedSystem

@@ -27,14 +27,14 @@ ghost predicate ReceivedVotesValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall h: nat | c.ValidHostId(h)
-  :: v.hosts[h].receivedVotes <= (set x | 0 <= x < |c.hostConstants|)
+  :: v.hosts[h].receivedVotes <= (set x | 0 <= x < |c.hosts|)
 }
 
 ghost predicate IsLeaderImpliesHasQuorum(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall h: nat | c.ValidHostId(h) && v.IsLeader(c, h)
-  :: SetIsQuorum(c.hostConstants[h].clusterSize, v.hosts[h].receivedVotes)
+  :: SetIsQuorum(c.hosts[h].clusterSize, v.hosts[h].receivedVotes)
 }
 
 // Application bundle
@@ -89,10 +89,10 @@ lemma IsLeaderImpliesHasQuorumInductive(c: Constants, v: Variables, v': Variable
   requires ReceivedVotesValid(c, v')
   ensures IsLeaderImpliesHasQuorum(c, v')
 {
-  var allHosts := (set x | 0 <= x < |c.hostConstants|);
+  var allHosts := (set x | 0 <= x < |c.hosts|);
   forall h: nat | c.ValidHostId(h) && v'.IsLeader(c, h)
   ensures
-    && SetIsQuorum(c.hostConstants[h].clusterSize, v'.hosts[h].receivedVotes)
+    && SetIsQuorum(c.hosts[h].clusterSize, v'.hosts[h].receivedVotes)
   {
     var step :| NextStep(c, v, v', step);
     // Some very strange triggers
@@ -100,7 +100,7 @@ lemma IsLeaderImpliesHasQuorumInductive(c: Constants, v: Variables, v': Variable
     {} 
     else if step.VoteStep? {
       // trigger
-      assert SetIsQuorum(c.hostConstants[h].clusterSize, v'.hosts[h].receivedVotes);
+      assert SetIsQuorum(c.hosts[h].clusterSize, v'.hosts[h].receivedVotes);
     }
   }
 }
@@ -119,9 +119,9 @@ lemma SafetyProof(c: Constants, v': Variables)
   if !Safety(c, v') {
     var l1: nat :| c.ValidHostId(l1) && v'.IsLeader(c, l1);
     var l2: nat :| c.ValidHostId(l2) && v'.IsLeader(c, l2) && l2 != l1;
-    var clusterSize := |c.hostConstants|;
-    var allHosts := (set x | 0 <= x < |c.hostConstants|);
-    SetComprehensionSize(|c.hostConstants|);
+    var clusterSize := |c.hosts|;
+    var allHosts := (set x | 0 <= x < |c.hosts|);
+    SetComprehensionSize(|c.hosts|);
 
     var rv1, rv2 :=  v'.hosts[l1].receivedVotes, v'.hosts[l2].receivedVotes;
     var rogueId := QuorumIntersection(allHosts, rv1, rv2);  // witness

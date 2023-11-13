@@ -5,13 +5,13 @@ module System {
   import opened Types
   import Host
 
-  datatype Constants = Constants(hostConstants: seq<Host.Constants>)
+  datatype Constants = Constants(hosts: seq<Host.Constants>)
   {
     ghost predicate WF() {
-      Host.GroupWFConstants(hostConstants)
+      Host.GroupWFConstants(hosts)
     }
     ghost predicate ValidHostId(id: HostId) {
-      id < |hostConstants|
+      id < |hosts|
     }
   }
 
@@ -19,7 +19,7 @@ module System {
   {
     ghost predicate WF(c: Constants) {
       && c.WF()
-      && Host.GroupWF(c.hostConstants, hosts)
+      && Host.GroupWF(c.hosts, hosts)
     }
 
     ghost predicate IsLeader(c: Constants, h: HostId) 
@@ -33,7 +33,7 @@ module System {
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && Host.GroupInit(c.hostConstants, v.hosts)
+    && Host.GroupInit(c.hosts, v.hosts)
   }
 
   datatype Step =
@@ -48,7 +48,7 @@ module System {
   {
     // No transmission in this step
     && c.ValidHostId(host)
-    && Host.Next(c.hostConstants[host], v.hosts[host], v'.hosts[host], MessageOps(None, None))
+    && Host.Next(c.hosts[host], v.hosts[host], v'.hosts[host], MessageOps(None, None))
     && (forall idx: HostId | c.ValidHostId(idx) && idx != host
         :: v'.hosts[idx] == v.hosts[idx]
     )
@@ -61,10 +61,10 @@ module System {
     && nominee != receiver  // important to not introduce false
     && c.ValidHostId(nominee)
     && transmit.m.VoteReq?
-    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], transmit.Send())
+    && Host.Next(c.hosts[nominee], v.hosts[nominee], v'.hosts[nominee], transmit.Send())
     // Receiver action
     && c.ValidHostId(receiver)
-    && Host.Next(c.hostConstants[receiver], v.hosts[receiver], v'.hosts[receiver], transmit.Recv())
+    && Host.Next(c.hosts[receiver], v.hosts[receiver], v'.hosts[receiver], transmit.Recv())
     // All others unchanged
     && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx != receiver
         :: v'.hosts[idx] == v.hosts[idx]
@@ -78,10 +78,10 @@ module System {
     && nominee != voter  // important to not introduce false
     && c.ValidHostId(voter)
     && transmit.m.Vote?
-    && Host.Next(c.hostConstants[voter], v.hosts[voter], v'.hosts[voter], transmit.Send())
+    && Host.Next(c.hosts[voter], v.hosts[voter], v'.hosts[voter], transmit.Send())
     // Receiver action
     && c.ValidHostId(nominee)
-    && Host.Next(c.hostConstants[nominee], v.hosts[nominee], v'.hosts[nominee], transmit.Recv())
+    && Host.Next(c.hosts[nominee], v.hosts[nominee], v'.hosts[nominee], transmit.Recv())
     // All others unchanged
     && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx != voter
         :: v'.hosts[idx] == v.hosts[idx]
