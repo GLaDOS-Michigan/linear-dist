@@ -484,20 +484,15 @@ lemma InvNextOneValuePerBallotLearners(c: Constants, v: Variables, v': Variables
     VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.LearnerStep? {
+      if dsStep.LearnerHostStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
-        if vb1 !in v.Last().learners[l1].receivedAccepts.m {
+        if vb1 !in v.Last().learners[l1].receivedAccepts.m || vb2 !in v.Last().learners[l2].receivedAccepts.m {
           var msg1 :| msg1 in v.network.sentMsgs && msg1.Accept? && msg1.vb == vb1;
           var msg2 :| msg2 in v.network.sentMsgs && msg2.Accept? && msg2.vb == vb2;
-          assert vb1.v == vb2.v;
-        } else if vb2 !in v.Last().learners[l2].receivedAccepts.m {
-          var msg1 :| msg1 in v.network.sentMsgs && msg1.Accept? && msg1.vb == vb1;
-          var msg2 :| msg2 in v.network.sentMsgs && msg2.Accept? && msg2.vb == vb2;
+          assert IsAcceptMessage(v, msg1);
+          assert IsAcceptMessage(v, msg2);
           assert vb1.v == vb2.v;
         }
-        assert vb1.v == vb2.v;
-      } else {
-        assert vb1.v == vb2.v;
       }
     }
   }
@@ -528,7 +523,7 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
     VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.AcceptorStep? {
+      if dsStep.AcceptorHostStep? {
         NotLeaderStepImpliesNoPrepareOrPropose(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
         if dsStep.actor == a && !v.Last().acceptors[a].HasAccepted(vb1) {
           var ac, ah, ah' := c.acceptors[a], v.Last().acceptors[a], v'.Last().acceptors[a];
@@ -537,7 +532,7 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
           var step :| AcceptorHost.NextStep(ac, ah, ah', step, msgOps);  
           assert step.MaybeAcceptStep?;
         }
-      } else if dsStep.LearnerStep? {
+      } else if dsStep.LearnerHostStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
         if vb1.v != vb2.v {
           // witnesses and triggers
@@ -554,9 +549,15 @@ lemma InvNextOneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables, v
 }
 
 lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v) && v'.WF(c)
-  requires ValidMessages(c, v) && ValidMessages(c, v')
-  requires LeaderHostReceivedPromisesAndValueMonotonic(c, v')
+  requires v.WF(c) && v'.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires OneValuePerBallot(c, v)
+  requires  && LearnerValidReceivedAccepts(c, v)
+            && LearnerValidReceivedAcceptsKeys(c, v)
+            && LearnerReceivedAcceptImpliesProposed(c, v)
+            && AcceptorValidPromisedAndAccepted(c, v)
+            && AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')
   ensures OneValuePerBallotLeaderAndLearners(c, v')
 {
@@ -569,7 +570,16 @@ lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': 
     acceptedVal == v'.History(i).leaders[ldr].Value()
   {
     VariableNextProperties(c, v, v');
-    assert acceptedVal == v'.History(i).leaders[ldr].Value();
+    if i == |v'.history| - 1 {
+      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+      if dsStep.LearnerHostStep? {
+        var vb := VB(acceptedVal, ldr);
+        if vb !in v.Last().learners[lnr].receivedAccepts.m {
+          var msg :| msg in v.network.sentMsgs && msg.Accept? && msg.vb == vb;
+          assert c.ValidAcceptorIdx(msg.acc);
+        }
+      }
+    }
   }
 }
 
@@ -595,7 +605,7 @@ lemma InvNextOneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables, v':
     VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.AcceptorStep? {
+      if dsStep.AcceptorHostStep? {
         NotLeaderStepImpliesNoPrepareOrPropose(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
         if dsStep.actor == acc && !v.Last().acceptors[acc].HasAccepted(VB(acceptedVal, ldr)) {
           var ac, ah, ah' := c.acceptors[acc], v.Last().acceptors[acc], v'.Last().acceptors[acc];
@@ -604,7 +614,7 @@ lemma InvNextOneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables, v':
           var step :| AcceptorHost.NextStep(ac, ah, ah', step, msgOps);  
           assert step.MaybeAcceptStep?;
         }
-      } else if dsStep.LeaderStep? {
+      } else if dsStep.LeaderHostStep? {
         NotAcceptorStepImpliesNoPromiseOrAccept(c,  v.Last(), v'.Last(), v.network, v'.network, dsStep);
       }
     }
@@ -650,7 +660,7 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
-      if  && dsStep.LearnerStep?
+      if  && dsStep.LearnerHostStep?
           && actor == lnr 
       {
         var lc, l, l' := c.learners[actor], v.Last().learners[actor], v'.Last().learners[actor];
@@ -693,8 +703,7 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
       if vb !in v.Last().learners[lnr].receivedAccepts.m {
         // witness and triggers
         var msg :| msg in v.network.sentMsgs && msg.Accept? && msg.vb == vb;
-        assert v'.History(i).LeaderCanPropose(c, vb.b);
-        assert v'.History(i).leaders[vb.b].Value() == vb.v;
+        assert c.ValidAcceptorIdx(msg.acc);
       }
     }
   }
@@ -770,7 +779,7 @@ lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variab
     VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.LeaderStep? {
+      if dsStep.LeaderHostStep? {
         var actor, msgOps := dsStep.actor, dsStep.msgOps;
         var lc, l, l' := c.leaders[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
         var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
@@ -802,12 +811,13 @@ lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variabl
     VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.LeaderStep? {
+      if dsStep.LeaderHostStep? {
         var actor, msgOps := dsStep.actor, dsStep.msgOps;
         var lc, l, l' := c.leaders[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
         var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
         if step.ReceiveStep? {
           assert IsPromiseMessage(v, msgOps.recv.value);  // trigger
+          assert c.ValidAcceptorIdx(msgOps.recv.value.acc);  // trigger
         } 
       }
     }
@@ -834,7 +844,7 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
     VariableNextProperties(c, v, v');
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.LeaderStep? {
+      if dsStep.LeaderHostStep? {
         var actor, msgOps := dsStep.actor, dsStep.msgOps;
         var lc, l, l' := c.leaders[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
         var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
@@ -983,10 +993,10 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
     if i == |v'.history| - 1 {
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
-      if dsStep.LeaderStep? {
+      if dsStep.LeaderHostStep? {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
       } else if 
-        && dsStep.AcceptorStep?
+        && dsStep.AcceptorHostStep?
         && actor == acc 
       {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
@@ -1034,10 +1044,10 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       var lc, l, l' := c.leaders[ldrBal], v.Last().leaders[ldrBal], v'.Last().leaders[ldrBal];
-      if dsStep.LeaderStep? {
+      if dsStep.LeaderHostStep? {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
         reveal_ChosenAtHistory();
-      } else if dsStep.AcceptorStep? {
+      } else if dsStep.AcceptorHostStep? {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
       } else {
         if v'.History(i).leaders[ldrBal].Value() != vb.v {
@@ -1072,9 +1082,9 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Vari
       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
       var lc, l, l' := c.leaders[ldr], v.Last().leaders[ldr], v'.Last().leaders[ldr];
-      if dsStep.LeaderStep? {
+      if dsStep.LeaderHostStep? {
         InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(c, v, v', dsStep, vb, ldr);
-      } else if dsStep.AcceptorStep? {
+      } else if dsStep.AcceptorHostStep? {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
       } else {
         InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(c, v, v', dsStep, vb, ldr);
@@ -1089,7 +1099,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
   requires v.WF(c)
   requires Next(c, v, v')
   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
-  requires dsStep.LeaderStep?
+  requires dsStep.LeaderHostStep?
   requires ValidMessages(c, v)
   requires LeaderValidReceivedPromises(c, v)
   requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
@@ -1134,7 +1144,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
   requires v.WF(c)
   requires Next(c, v, v')
   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
-  requires dsStep.LearnerStep?
+  requires dsStep.LearnerHostStep?
   requires LeaderValidReceivedPromises(c, v)
   requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -1308,7 +1318,7 @@ lemma NewChosenOnlyInLearnerStep(c: Constants, v: Variables, v': Variables, dsSt
   requires v.WF(c)
   requires Next(c, v, v')
   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
-  requires !dsStep.LearnerStep?
+  requires !dsStep.LearnerHostStep?
   ensures forall vb | Chosen(c, v', vb) :: Chosen(c, v, vb)
   ensures forall vb | ChosenAtHistory(c, v'.history[|v'.history|-1], vb) 
       :: && ChosenAtHistory(c, v'.history[|v'.history|-2], vb)
@@ -1363,7 +1373,7 @@ lemma NotLeaderStepImpliesNoPrepareOrPropose(c: Constants, h: Hosts, h': Hosts,
 )
   requires h.WF(c) && h'.WF(c)
   requires NextStep(c, h, h', n, n', dsStep)
-  requires !dsStep.LeaderStep?
+  requires !dsStep.LeaderHostStep?
   ensures forall p | 
     && p in n'.sentMsgs
     && (p.Propose? || p.Prepare?)
@@ -1376,7 +1386,7 @@ lemma NotAcceptorStepImpliesNoPromiseOrAccept(c: Constants, h: Hosts, h': Hosts,
 )
   requires h.WF(c) && h'.WF(c)
   requires NextStep(c, h, h', n, n', dsStep)
-  requires !dsStep.AcceptorStep?
+  requires !dsStep.AcceptorHostStep?
   ensures forall p | 
     && p in n'.sentMsgs
     && (p.Promise? || p.Accept?)

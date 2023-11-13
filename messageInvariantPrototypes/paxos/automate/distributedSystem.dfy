@@ -1,3 +1,4 @@
+/// This file is auto-generated
 include "../hosts.dfy"
 
 module Network {
@@ -5,8 +6,7 @@ module Network {
 
   datatype Variables = Variables(sentMsgs:set<Message>)
 
-  ghost predicate Init(v: Variables)
-  {
+  ghost predicate Init(v: Variables) {
     && v.sentMsgs == {}
   }
 
@@ -16,176 +16,191 @@ module Network {
     && v'.sentMsgs ==
       v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }
   }
-} // end module Network
-
+}  // end module Network
 
 module DistributedSystem {
-  import opened UtilitiesLibrary
   import opened Types
+  import opened UtilitiesLibrary
   import opened Network
   import LeaderHost
   import AcceptorHost
   import LearnerHost
 
-  datatype Constants = Constants(
-    f: nat,
-    leaders: seq<LeaderHost.Constants>,
-    acceptors: seq<AcceptorHost.Constants>,
-    learners: seq<LearnerHost.Constants>)
-  {
-    ghost predicate WF() {
-      && 0 < f
-      && UniqueIds()
+  datatype Constants = Constants(f: nat, leaders: seq<LeaderHost.Constants>, acceptors: seq<AcceptorHost.Constants>, learners: seq<LearnerHost.Constants>) {
+    ghost predicate WF()
+      decreases this
+    {
+      0 < f &&
+      UniqueIds()
     }
 
-    ghost predicate UniqueIds() {
-      && UniqueLeaderIds()
-      && UniqueAcceptorIds()
-      && UniqueLearnerIds()
+    ghost predicate UniqueIds()
+      decreases this
+    {
+      UniqueLeaderIds() &&
+      UniqueAcceptorIds() &&
+      UniqueLearnerIds()
     }
 
-    ghost predicate ValidLeaderIdx(id: int) {
+    ghost predicate ValidLeaderIdx(id: int)
+      decreases this, id
+    {
       0 <= id < |leaders|
     }
 
-    ghost predicate ValidAcceptorIdx(id: int) {
+    ghost predicate ValidAcceptorIdx(id: int)
+      decreases this, id
+    {
       0 <= id < |acceptors|
     }
 
-    ghost predicate ValidLearnerIdx(id: int) {
+    ghost predicate ValidLearnerIdx(id: int)
+      decreases this, id
+    {
       0 <= id < |learners|
     }
-    
-    ghost predicate UniqueLeaderIds() {
-      forall i, j | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaders[i].id == leaders[j].id :: i == j
+
+    ghost predicate UniqueLeaderIds()
+      decreases this
+    {
+      forall i: int, j: int | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaders[i].id == leaders[j].id :: 
+        i == j
     }
 
-    ghost predicate UniqueAcceptorIds() {
-      forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptors[i].id == acceptors[j].id :: i == j
+    ghost predicate UniqueAcceptorIds()
+      decreases this
+    {
+      forall i: int, j: int | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptors[i].id == acceptors[j].id :: 
+        i == j
     }
 
-    ghost predicate UniqueLearnerIds() {
-      forall i, j | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learners[i].id == learners[j].id :: i == j
+    ghost predicate UniqueLearnerIds()
+      decreases this
+    {
+      forall i: int, j: int | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learners[i].id == learners[j].id :: 
+        i == j
     }
   }
+  // end datatype Constants
 
-  datatype Hosts = Hosts(
-    leaders: seq<LeaderHost.Variables>,
-    acceptors: seq<AcceptorHost.Variables>,
-    learners: seq<LearnerHost.Variables>
-  ) {
-    ghost predicate WF(c: Constants) {
-      && c.WF()
-      && LeaderHost.GroupWF(c.leaders, leaders, c.f)
-      && AcceptorHost.GroupWF(c.acceptors, acceptors, c.f)
-      && LearnerHost.GroupWF(c.learners, learners, c.f)
+  datatype Hosts = Hosts(leaders: seq<LeaderHost.Variables>, acceptors: seq<AcceptorHost.Variables>, learners: seq<LearnerHost.Variables>) {
+    ghost predicate WF(c: Constants)
+      decreases this, c
+    {
+      c.WF() &&
+      LeaderHost.GroupWF(c.leaders, leaders, c.f) &&
+      AcceptorHost.GroupWF(c.acceptors, acceptors, c.f) &&
+      LearnerHost.GroupWF(c.learners, learners, c.f)
     }
 
-    ghost predicate LeaderCanPropose(c: Constants, ldr: LeaderId) 
+    ghost predicate LeaderCanPropose(c: Constants, ldr: LeaderId)
       requires WF(c)
       requires c.ValidLeaderIdx(ldr)
+      decreases this, c, ldr
     {
       leaders[ldr].CanPropose(c.leaders[ldr])
     }
   }
+  // end datatype Hosts
 
   datatype Variables = Variables(
     history: seq<Hosts>,
     network: Network.Variables
   ) {
-
+  
     ghost predicate ValidHistoryIdx(i: int) {
       0 <= i < |history|
     }
-
+  
     ghost predicate ValidHistoryIdxStrict(i: int) {
       0 <= i < |history|-1
     }
-
+  
     ghost predicate WF(c: Constants) {
       && c.WF()
       && 0 < |history|
       && (forall i | ValidHistoryIdx(i) :: history[i].WF(c))
     }
-
+  
     ghost function Last() : (h: Hosts)
       requires 0 < |history|
       ensures h == history[|history|-1]
       ensures h == History(|history|-1)
-    {
+   {
       UtilitiesLibrary.Last(history)
     }
-
+  
     ghost function History(i: int) : (h: Hosts)
       requires ValidHistoryIdx(i)
       ensures h == history[i]
     {
       history[i]
     }
-  }
+  }  // end datatype Variables
 
-  ghost predicate Init(c: Constants, v: Variables)
-  {
-    && v.WF(c)
-    && |v.history| == 1
-    && InitHosts(c, v.History(0))
-    && Network.Init(v.network)
-  }
 
-  ghost predicate InitHosts(c: Constants, h: Hosts) 
+  ghost predicate InitHosts(c: Constants, h: Hosts)
     requires h.WF(c)
   {
     && LeaderHost.GroupInit(c.leaders, h.leaders, c.f)
     && AcceptorHost.GroupInit(c.acceptors, h.acceptors, c.f)
     && LearnerHost.GroupInit(c.learners, h.learners, c.f)
   }
-  
+
+  ghost predicate Init(c: Constants, v: Variables)
+  {
+    && v.WF(c)
+   && |v.history| == 1
+    && InitHosts(c, v.History(0))
+    && Network.Init(v.network)
+  }
+
   datatype Step = 
-    LeaderStep(actor: nat, msgOps: MessageOps)
-    | AcceptorStep(actor: nat, msgOps: MessageOps)
-    | LearnerStep(actor: nat, msgOps: MessageOps)
+    | LeaderHostStep(actor: nat, msgOps: MessageOps)
+    | AcceptorHostStep(actor: nat, msgOps: MessageOps)
+    | LearnerHostStep(actor: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
     && Network.Next(n, n', step.msgOps)
-    && match step 
-      case LeaderStep(actor, msgOps) => NextLeaderStep(c, h, h', actor, msgOps)
-      case AcceptorStep(actor, msgOps) => NextAcceptorStep(c, h, h', actor, msgOps)
-      case LearnerStep(actor, msgOps) => NextLearnerStep(c, h, h', actor, msgOps)
+    && match step
+      case LeaderHostStep(actor, msgOps) => NextLeaderHostStep(c, h, h', actor, msgOps)
+      case AcceptorHostStep(actor, msgOps) => NextAcceptorHostStep(c, h, h', actor, msgOps)
+      case LearnerHostStep(actor, msgOps) => NextLearnerHostStep(c, h, h', actor, msgOps)
   }
 
-  ghost predicate NextLeaderStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps) 
+  ghost predicate NextLeaderHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && c.ValidLeaderIdx(actor)
+    && 0 <= actor < |h.leaders|
     && LeaderHost.Next(c.leaders[actor], h.leaders[actor], h'.leaders[actor], msgOps)
     // all other hosts UNCHANGED
-    && (forall other| c.ValidLeaderIdx(other) && other != actor :: h'.leaders[other] == h.leaders[other])
+    && (forall other| 0 <= other < |h.leaders| && other != actor :: h'.leaders[other] == h.leaders[other])
     && h'.acceptors == h.acceptors
     && h'.learners == h.learners
   }
 
-  ghost predicate NextAcceptorStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps) 
+  ghost predicate NextAcceptorHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && c.ValidAcceptorIdx(actor)
+    && 0 <= actor < |h.acceptors|
     && AcceptorHost.Next(c.acceptors[actor], h.acceptors[actor], h'.acceptors[actor], msgOps)
     // all other hosts UNCHANGED
     && h'.leaders == h.leaders
-    && (forall other| c.ValidAcceptorIdx(other) && other != actor :: h'.acceptors[other] == h.acceptors[other])
+    && (forall other| 0 <= other < |h.acceptors| && other != actor :: h'.acceptors[other] == h.acceptors[other])
     && h'.learners == h.learners
   }
 
-  ghost predicate NextLearnerStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps) 
+  ghost predicate NextLearnerHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && c.ValidLearnerIdx(actor)
+    && 0 <= actor < |h.learners|
     && LearnerHost.Next(c.learners[actor], h.learners[actor], h'.learners[actor], msgOps)
     // all other hosts UNCHANGED
     && h'.leaders == h.leaders
     && h'.acceptors == h.acceptors
-    && (forall other| c.ValidLearnerIdx(other) && other != actor :: h'.learners[other] == h.learners[other])
+    && (forall other| 0 <= other < |h.learners| && other != actor :: h'.learners[other] == h.learners[other])
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)
@@ -196,7 +211,6 @@ module DistributedSystem {
     && exists step :: NextStep(c, v.Last(), v'.Last(), v.network, v'.network, step)
   }
 
-
 /***************************************************************************************
 *                                Variable properties                                   *
 ***************************************************************************************/
@@ -206,8 +220,9 @@ module DistributedSystem {
   {
     InitHosts(c, v.History(0))
   }
-  
-  ghost predicate ValidVariables(c: Constants, v: Variables) 
+
+  // Bundle of Variable properties
+  ghost predicate ValidVariables(c: Constants, v: Variables)
     requires v.WF(c)
   {
     && ValidHistory(c, v)
@@ -219,7 +234,6 @@ module DistributedSystem {
   {
     reveal_ValidHistory();
   }
-
 
   lemma InvNextValidVariables(c: Constants, v: Variables, v': Variables)
     requires v.WF(c)
@@ -242,4 +256,5 @@ module DistributedSystem {
     assert 0 < |v.history|;
     assert 1 < |v'.history|;
   }
-}  // end module DistributedSystem
+
+} // end module DistributedSystem
