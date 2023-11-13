@@ -6,18 +6,18 @@ import opened Types
 import Host
 
 datatype Constants = Constants(
-  hostConstants: seq<Host.Constants>)
+  hosts: seq<Host.Constants>)
 {
   ghost predicate ValidIdx(id: int) {
-    0 <= id < |hostConstants|
+    0 <= id < |hosts|
   }
 
   ghost predicate UniqueIds() {
-    forall i, j | ValidIdx(i) && ValidIdx(j) && hostConstants[i].hostId == hostConstants[j].hostId :: i == j
+    forall i, j | ValidIdx(i) && ValidIdx(j) && hosts[i].hostId == hosts[j].hostId :: i == j
   }
 
   ghost predicate WF() {
-    && 0 < |hostConstants|
+    && 0 < |hosts|
     && UniqueIds()
   }
 }
@@ -27,14 +27,14 @@ datatype Variables = Variables(
 {
   ghost predicate WF(c: Constants) {
     && c.WF()
-    && Host.GroupWF(c.hostConstants, hosts)
+    && Host.GroupWF(c.hosts, hosts)
   }
 }
 
 ghost predicate Init(c: Constants, v: Variables)
 {
   && v.WF(c)
-  && Host.GroupInit(c.hostConstants, v.hosts)
+  && Host.GroupInit(c.hosts, v.hosts)
 }
 
 ghost predicate Transmission(c: Constants, v: Variables, v': Variables, actor: nat, transmit: Transmit)
@@ -42,10 +42,10 @@ ghost predicate Transmission(c: Constants, v: Variables, v': Variables, actor: n
 {
   // Sender action
   && c.ValidIdx(actor)
-  && Host.Next(c.hostConstants[actor], v.hosts[actor], v'.hosts[actor], transmit.Send())
+  && Host.Next(c.hosts[actor], v.hosts[actor], v'.hosts[actor], transmit.Send())
   // Receiver action
-  && var succ := Successor(|c.hostConstants|, actor);
-  && Host.Next(c.hostConstants[succ], v.hosts[succ], v'.hosts[succ], transmit.Recv())     // step receiver
+  && var succ := Successor(|c.hosts|, actor);
+  && Host.Next(c.hosts[succ], v.hosts[succ], v'.hosts[succ], transmit.Recv())     // step receiver
   // All others unchanged
   && forall idx:nat | 
       && c.ValidIdx(idx) 
