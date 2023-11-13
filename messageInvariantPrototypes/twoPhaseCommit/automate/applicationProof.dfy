@@ -102,7 +102,7 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   if ! AllPreferYes(c) && CoordinatorHasDecided(c, v'.Last()) {
     var noVoter: HostId :| c.ValidParticipantId(noVoter) && c.participants[noVoter].preference == No;
     var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-    if dsStep.CoordinatorStep? {
+    if dsStep.CoordinatorHostStep? {
         /* Proof by contradiction. Suppose coordinator decided Commit. Then it must have
         a Yes vote from all participants, including noVoter. This is a contradiction */
         var l, l' := v.Last().GetCoordinator(c), v'.Last().GetCoordinator(c);
