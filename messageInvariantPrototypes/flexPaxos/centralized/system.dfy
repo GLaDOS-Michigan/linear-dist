@@ -11,9 +11,9 @@ datatype Constants = Constants(
   p1Quorum: nat,
   p2Quorum: nat,
   n: nat,
-  leaderConstants: seq<LeaderHost.Constants>,
-  acceptorConstants: seq<AcceptorHost.Constants>,
-  learnerConstants: seq<LearnerHost.Constants>
+  leaders: seq<LeaderHost.Constants>,
+  acceptors: seq<AcceptorHost.Constants>,
+  learners: seq<LearnerHost.Constants>
 )
 {
   ghost predicate WF() {
@@ -28,27 +28,27 @@ datatype Constants = Constants(
   }
 
   ghost predicate ValidLeaderIdx(id: int) {
-    0 <= id < |leaderConstants|
+    0 <= id < |leaders|
   }
 
   ghost predicate ValidAcceptorIdx(id: int) {
-    0 <= id < |acceptorConstants|
+    0 <= id < |acceptors|
   }
 
   ghost predicate ValidLearnerIdx(id: int) {
-    0 <= id < |learnerConstants|
+    0 <= id < |learners|
   }
   
   ghost predicate UniqueLeaderIds() {
-    forall i, j | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaderConstants[i].id == leaderConstants[j].id :: i == j
+    forall i, j | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaders[i].id == leaders[j].id :: i == j
   }
 
   ghost predicate UniqueAcceptorIds() {
-    forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptorConstants[i].id == acceptorConstants[j].id :: i == j
+    forall i, j | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptors[i].id == acceptors[j].id :: i == j
   }
 
   ghost predicate UniqueLearnerIds() {
-    forall i, j | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learnerConstants[i].id == learnerConstants[j].id :: i == j
+    forall i, j | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learners[i].id == learners[j].id :: i == j
   }
 } // end datatype Constants
 
@@ -60,16 +60,16 @@ datatype Variables = Variables(
 {
   ghost predicate WF(c: Constants) {
     && c.WF()
-    && LeaderHost.GroupWF(c.leaderConstants, leaders, c.p1Quorum)
-    && AcceptorHost.GroupWF(c.acceptorConstants, acceptors, c.n)
-    && LearnerHost.GroupWF(c.learnerConstants, learners, c.p2Quorum)
+    && LeaderHost.GroupWF(c.leaders, leaders, c.p1Quorum)
+    && AcceptorHost.GroupWF(c.acceptors, acceptors, c.n)
+    && LearnerHost.GroupWF(c.learners, learners, c.p2Quorum)
   }
 
   ghost predicate LeaderCanPropose(c: Constants, ldr: LeaderId) 
     requires WF(c)
     requires c.ValidLeaderIdx(ldr)
   {
-    leaders[ldr].CanPropose(c.leaderConstants[ldr])
+    leaders[ldr].CanPropose(c.leaders[ldr])
   }
 } // end datatype Variables
 
@@ -78,9 +78,9 @@ datatype Variables = Variables(
 
 ghost predicate Init(c: Constants, v: Variables) {
   && v.WF(c)
-  && LeaderHost.GroupInit(c.leaderConstants, v.leaders, c.p1Quorum)
-  && AcceptorHost.GroupInit(c.acceptorConstants, v.acceptors, c.n)
-  && LearnerHost.GroupInit(c.learnerConstants, v.learners, c.p2Quorum)
+  && LeaderHost.GroupInit(c.leaders, v.leaders, c.p1Quorum)
+  && AcceptorHost.GroupInit(c.acceptors, v.acceptors, c.n)
+  && LearnerHost.GroupInit(c.learners, v.learners, c.p2Quorum)
 }
 
 datatype Step = 
@@ -99,10 +99,10 @@ ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: Lead
   // Leader action
   && c.ValidLeaderIdx(ldr)
   && transmit.m.Prepare?
-  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
+  && LeaderHost.Next(c.leaders[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
   // Acceptor action
   && c.ValidAcceptorIdx(acc)
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
+  && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
   // All others unchanged
   && AcceptorsUnchangedExcept(c, v, v', acc)
   && LeadersUnchangedExcept(c, v, v', ldr)
@@ -121,17 +121,17 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
   && if doPromise then
       // Acceptor action
       && transmit.m.Promise?
-      && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Send())
+      && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Send())
       // Leader action
       && c.ValidLeaderIdx(ldr)
-      && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Recv())
+      && LeaderHost.Next(c.leaders[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Recv())
       // All others unchanged
       && LeadersUnchangedExcept(c, v, v', ldr)
       && AcceptorsUnchangedExcept(c, v, v', acc)
       && LearnersUnchanged(v, v')
   else
       // Acceptor action
-      && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], MessageOps(None, None))
+      && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], MessageOps(None, None))
       // Leader action
       && c.ValidLeaderIdx(ldr)
       && LeadersUnchanged(v, v')
@@ -149,10 +149,10 @@ ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables,
   // Leader action
   && c.ValidLeaderIdx(ldr)
   && transmit.m.Propose?
-  && LeaderHost.Next(c.leaderConstants[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
+  && LeaderHost.Next(c.leaders[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
   // Acceptor action
   && c.ValidAcceptorIdx(acc)
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
+  && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
   // All others unchanged
   && LeadersUnchangedExcept(c, v, v', ldr)
   && AcceptorsUnchangedExcept(c, v, v', acc)
@@ -167,10 +167,10 @@ ghost predicate NextP2bStep(c: Constants, v: Variables, v': Variables,
   // Acceptor action
   && c.ValidAcceptorIdx(acc)
   && transmit.m.Accept?
-  && AcceptorHost.Next(c.acceptorConstants[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Send())
+  && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Send())
   // Learner action
   && c.ValidLearnerIdx(lnr)
-  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], transmit.Recv())
+  && LearnerHost.Next(c.learners[lnr], v.learners[lnr], v'.learners[lnr], transmit.Recv())
   // All others unchanged
   && LearnersUnchangedExcept(c, v, v', lnr)
   && AcceptorsUnchangedExcept(c, v, v', acc)
@@ -182,7 +182,7 @@ ghost predicate NextLearnerInternalStep(c: Constants, v: Variables, v': Variable
 {
   // Learner action
   && c.ValidLearnerIdx(lnr)
-  && LearnerHost.Next(c.learnerConstants[lnr], v.learners[lnr], v'.learners[lnr], MessageOps(None, None))
+  && LearnerHost.Next(c.learners[lnr], v.learners[lnr], v'.learners[lnr], MessageOps(None, None))
   // All others unchanged
   && LearnersUnchangedExcept(c, v, v', lnr)
   && LeadersUnchanged(v, v')
