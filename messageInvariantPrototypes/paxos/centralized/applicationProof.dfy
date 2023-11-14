@@ -13,7 +13,6 @@ ghost predicate OneValuePerBallot(c: Constants, v: Variables)
 {
   && OneValuePerBallotAcceptors(c, v)
   && OneValuePerBallotLearners(c, v)
-  && OneValuePerBallotAcceptorsAndLearners(c, v)
   && OneValuePerBallotLeaderAndLearners(c, v)
   && OneValuePerBallotLeaderAndAcceptors(c, v)
 }
@@ -43,20 +42,6 @@ ghost predicate OneValuePerBallotLearners(c: Constants, v: Variables)
     && c.ValidLearnerIdx(l2)
     && vb1 in v.learners[l1].receivedAccepts.m
     && vb2 in v.learners[l2].receivedAccepts.m
-    && vb1.b == vb2.b
-  ::
-    vb1.v == vb2.v
-}
-
-// Learners and Acceptors only have one value for each ballot
-ghost predicate OneValuePerBallotAcceptorsAndLearners(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall a, l, vb1, vb2 |
-    && c.ValidAcceptorIdx(a)
-    && c.ValidLearnerIdx(l)
-    && v.acceptors[a].HasAccepted(vb1)
-    && vb2 in v.learners[l].receivedAccepts.m
     && vb1.b == vb2.b
   ::
     vb1.v == vb2.v
@@ -284,7 +269,7 @@ ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  && OneValuePerBallot(c, v)
+  // && OneValuePerBallot(c, v)
   && LearnerValidReceivedAccepts(c, v)
   && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
@@ -333,7 +318,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvInductiveHelper1(c, v, v');
   InvInductiveHelper2(c, v, v');
   InvInductiveHelper3(c, v, v');
-  InvNextOneValuePerBallot(c, v, v');
+  // InvNextOneValuePerBallot(c, v, v');
   InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
@@ -359,7 +344,9 @@ lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
   ensures LearnerValidReceivedAcceptsKeys(c, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
   ensures AcceptorValidPromisedAndAccepted(c, v')
-{}
+{
+  assert AcceptorValidPromisedAndAccepted(c, v');
+}
 
 lemma  InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -382,38 +369,6 @@ lemma InvInductiveHelper3(c: Constants, v: Variables, v': Variables)
   assert LeaderHearedImpliesProposed(c, v');
   assert LeaderReceivedPromisesImpliesAcceptorState(c, v');
 }
-
-lemma InvNextOneValuePerBallot(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires OneValuePerBallot(c, v)
-  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
-  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
-  requires LearnerReceivedAcceptImpliesProposed(c, v)
-  requires AcceptorAcceptedImpliesProposed(c, v)
-  requires Next(c, v, v')
-  ensures OneValuePerBallot(c, v')
-{
-  InvNextOneValuePerBallotLeaderAndLearners(c, v, v');
-  InvNextOneValuePerBallotLeaderAndAcceptors(c, v, v');
-}
-
-lemma InvNextOneValuePerBallotLeaderAndLearners(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires OneValuePerBallot(c, v)
-  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
-  requires LearnerReceivedAcceptImpliesProposed(c, v)
-  requires Next(c, v, v')
-  ensures OneValuePerBallotLeaderAndLearners(c, v')
-{}
-
-lemma InvNextOneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires OneValuePerBallot(c, v)
-  requires AcceptorValidPromisedAndAccepted(c, v) // prereq for AcceptorAcceptedImpliesProposed
-  requires AcceptorAcceptedImpliesProposed(c, v)
-  requires Next(c, v, v')
-  ensures OneValuePerBallotLeaderAndAcceptors(c, v')
-{}
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
