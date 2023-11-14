@@ -22,7 +22,8 @@ module ShardedKVProof {
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && HostsCompleteKeys (c, v)
+    // && HostsCompleteKeys (c, v)
+    && true
   }
 
   ghost predicate Inv(c: Constants, v: Variables)
@@ -52,7 +53,7 @@ module ShardedKVProof {
   {
     MessageInvInductive(c, v, v');
     OwnershipInvInductive(c, v, v');
-    InvNextHostsCompleteKeys(c, v, v');
+    // InvNextHostsCompleteKeys(c, v, v');
     AtMostOwnerPerKeyImpliesSafety(c, v');
   }
 
@@ -61,28 +62,28 @@ module ShardedKVProof {
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
-lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
-  requires v'.WF(c)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures HostsCompleteKeys(c, v')
-{
-  forall i:int, idx, k: UniqueKey | 
-    && v'.ValidHistoryIdx(i)
-    && c.ValidIdx(idx)
-  ensures v'.History(i).hosts[idx].HasKey(k)
-  {
+// lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
+//   requires v'.WF(c)
+//   requires Inv(c, v)
+//   requires Next(c, v, v')
+//   ensures HostsCompleteKeys(c, v')
+// {
+//   forall i:int, idx, k: UniqueKey | 
+//     && v'.ValidHistoryIdx(i)
+//     && c.ValidIdx(idx)
+//   ensures v'.History(i).hosts[idx].HasKey(k)
+//   {
 
-    VariableNextProperties(c, v, v');
-    if i == |v'.history| - 1 {
-      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      var actor, msgOps := dsStep.actor, dsStep.msgOps;
-      if actor == idx {
-        assert v.Last().hosts[idx].HasKey(k);  // trigger
-      }
-    }
-  }
-}
+//     VariableNextProperties(c, v, v');
+//     if i == |v'.history| - 1 {
+//       var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
+//       var actor, msgOps := dsStep.actor, dsStep.msgOps;
+//       if actor == idx {
+//         assert v.Last().hosts[idx].HasKey(k);  // trigger
+//       }
+//     }
+//   }
+// }
 
 lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
