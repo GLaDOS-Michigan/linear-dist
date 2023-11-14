@@ -91,8 +91,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 {
   MonotonicityInvInductive(c, v, v');
   MessageInvInductive(c, v, v');
-  InvNextReceivedVotesValid(c, v, v');
-  InvNextIsLeaderImpliesHasQuorum(c, v, v');
+  InvNextIsReceivedVotesValidAndLeaderImpliesHasQuorum(c, v, v');
   InvNextHasVoteImpliesVoterNominates(c, v, v');
   SafetyProof(c, v');
 }
@@ -102,22 +101,11 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 *                                        Proof                                         *
 ***************************************************************************************/
 
-
-lemma InvNextReceivedVotesValid(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires ValidMessages(c, v)
-  requires ReceivedVotesValid(c, v)
-  requires Next(c, v, v')
-  ensures ReceivedVotesValid(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
-
-lemma InvNextIsLeaderImpliesHasQuorum(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires IsLeaderImpliesHasQuorum(c, v)
+lemma InvNextIsReceivedVotesValidAndLeaderImpliesHasQuorum(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
   requires Next(c, v, v')
   ensures IsLeaderImpliesHasQuorum(c, v')
+  ensures ReceivedVotesValid(c, v')
 {
   VariableNextProperties(c, v, v');
 }
@@ -150,7 +138,7 @@ lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variab
         if step.RecvVoteStep? {
           var msg := msgOps.recv.value;
         }  else {
-          ReceiveVotesUpdatedInRecvVoteStep(hc, h, h', step, msgOps);
+          assert h'.receivedVotes == h.receivedVotes;
           assert false;
         }
       }
@@ -159,7 +147,6 @@ lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variab
 }
 
 lemma SafetyProof(c: Constants, v': Variables) 
-  // requires MessageInv(c, v')
   requires v'.WF(c)
   requires ApplicationInv(c, v')
   ensures Safety(c, v')
@@ -185,12 +172,5 @@ lemma SafetyProof(c: Constants, v': Variables)
     assert false;
   }
 }
-
-lemma ReceiveVotesUpdatedInRecvVoteStep(hc: Host.Constants, h: Host.Variables, h': Host.Variables, step:  Host.Step, msgOps: MessageOps)
-  requires Host.NextStep(hc, h, h', step, msgOps)
-  requires !step.RecvVoteStep? 
-  ensures h'.receivedVotes == h.receivedVotes
-{}
-
 } // end module ToyLeaderElectionProof
 

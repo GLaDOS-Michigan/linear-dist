@@ -97,18 +97,7 @@ lemma ChordDominatesInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures ChordDominates(c, v')
 {
-  forall i:int, src:nat, dst:nat, mid:nat | 
-      && v'.ValidHistoryIdx(i)
-      && c.ValidIdx(src)
-      && c.ValidIdx(dst)
-      && c.ValidIdx(mid)
-      && v'.History(i).hosts[dst].highestHeard == c.hosts[src].hostId
-      && Between(src, mid, dst)
-  ensures
-      c.hosts[mid].hostId < c.hosts[src].hostId
-  {
     VariableNextProperties(c, v, v');
-  }
 }
 }  // end module RingLeaderElectionProof
 

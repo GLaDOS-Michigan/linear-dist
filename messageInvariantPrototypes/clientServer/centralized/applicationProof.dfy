@@ -24,10 +24,16 @@ ghost predicate ServerRequestsValid(c: Constants, v: Variables)
 }
 
 
+ghost predicate ApplicationInv(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  ServerRequestsValid(c, v)
+}
+
 ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
-  && ServerRequestsValid(c, v)
+  && ApplicationInv(c, v)
   && Safety(c, v)
 }
 
