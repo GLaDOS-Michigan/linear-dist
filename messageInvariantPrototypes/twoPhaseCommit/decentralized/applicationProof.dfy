@@ -18,18 +18,44 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
-  LeaderTallyReflectsPreferences(c, v)
+  && LeaderVotesValid1(c, v)
+  && LeaderVotesValid2(c, v)
+  && LeaderTallyReflectsPreferences1(c, v)
+  && LeaderTallyReflectsPreferences2(c, v)
+}
+
+ghost predicate LeaderVotesValid1(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall hostId | hostId in v.GetCoordinator(c).yesVotes
+  :: 0 <= hostId < |c.participants|
+}
+
+ghost predicate LeaderVotesValid2(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall hostId | hostId in v.GetCoordinator(c).noVotes
+  :: 0 <= hostId < |c.participants|
 }
 
 // Leader's local tally reflect participant preferences
-ghost predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
+ghost predicate LeaderTallyReflectsPreferences1(c: Constants, v: Variables)
   requires v.WF(c)
+  requires LeaderVotesValid1(c, v)
 {
   var n := |c.participants|;
-  && (forall hostId | hostId in v.GetCoordinator(c).yesVotes ::
-        0 <= hostId < n && GetParticipantPreference(c, hostId) == Yes )
+  && (forall hostId | hostId in v.GetCoordinator(c).yesVotes  ::
+      GetParticipantPreference(c, hostId) == Yes )
+}
+
+// Leader's local tally reflect participant preferences
+ghost predicate LeaderTallyReflectsPreferences2(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires LeaderVotesValid2(c, v)
+{
+  var n := |c.participants|;
   && (forall hostId | hostId in v.GetCoordinator(c).noVotes ::
-        0 <= hostId < n && GetParticipantPreference(c, hostId) == No )
+      GetParticipantPreference(c, hostId) == No )
 }
 
 // User-level invariant
@@ -68,7 +94,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures LeaderTallyReflectsPreferences(c, v')
+  ensures LeaderTallyReflectsPreferences1(c, v')
+  ensures LeaderTallyReflectsPreferences2(c, v')
 {}
 
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
@@ -106,7 +133,8 @@ lemma AC4Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   requires MessageInv(c, v')
-  requires LeaderTallyReflectsPreferences(c, v')
+  requires LeaderTallyReflectsPreferences1(c, v')
+  requires LeaderTallyReflectsPreferences2(c, v')
   ensures SafetyAC4(c, v')
 {}
 

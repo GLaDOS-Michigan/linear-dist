@@ -19,21 +19,42 @@ import opened Obligations
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  LeaderTallyReflectsPreferences(c, v)
+  && LeaderVotesValid1(c, v)
+  && LeaderVotesValid2(c, v)
+  && LeaderTallyReflectsPreferences1(c, v)
+  && LeaderTallyReflectsPreferences2(c, v)
+}
+
+ghost predicate LeaderVotesValid1(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall i, hostId | v.ValidHistoryIdx(i) && hostId in v.History(i).GetCoordinator(c).yesVotes
+  :: 0 <= hostId < |c.participants|
+}
+
+ghost predicate LeaderVotesValid2(c: Constants, v: Variables) 
+  requires v.WF(c)
+{
+  forall i, hostId | v.ValidHistoryIdx(i) && hostId in v.History(i).GetCoordinator(c).noVotes
+  :: 0 <= hostId < |c.participants|
 }
 
 // Leader's local tally reflect participant preferences
-ghost predicate LeaderTallyReflectsPreferences(c: Constants, v: Variables)
+ghost predicate LeaderTallyReflectsPreferences1(c: Constants, v: Variables)
   requires v.WF(c)
+  requires LeaderVotesValid1(c, v)
 {
-  var n := |c.participants|;
-  forall i | v.ValidHistoryIdx(i) 
-  :: 
-    var hosts := v.History(i);
-    && (forall hostId | hostId in hosts.GetCoordinator(c).yesVotes ::
-        0 <= hostId < n && GetParticipantPreference(c, hostId) == Yes )
-    && (forall hostId | hostId in hosts.GetCoordinator(c).noVotes ::
-          0 <= hostId < n && GetParticipantPreference(c, hostId) == No )
+  forall i, hostId | v.ValidHistoryIdx(i) && hostId in v.History(i).GetCoordinator(c).yesVotes
+  :: GetParticipantPreference(c, hostId) == Yes
+}
+
+// Leader's local tally reflect participant preferences
+ghost predicate LeaderTallyReflectsPreferences2(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires LeaderVotesValid2(c, v)
+{
+  forall i, hostId | v.ValidHistoryIdx(i) && hostId in v.History(i).GetCoordinator(c).noVotes
+  :: GetParticipantPreference(c, hostId) == No
 }
 
 // User-level invariant
@@ -78,7 +99,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures LeaderTallyReflectsPreferences(c, v')
+  ensures ApplicationInv(c, v')
 {
   VariableNextProperties(c, v, v');
 }
@@ -94,9 +115,9 @@ lemma AC1Proof(c: Constants, v: Variables, v': Variables)
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires LeaderTallyReflectsPreferences(c, v')
   ensures AC3Contrapos(c, v')
 {
+  LeaderTallyReflectsPreferencesInductive(c, v, v');
   AC3ContraposLemma(c, v);
   VariableNextProperties(c, v, v');
   if ! AllPreferYes(c) && CoordinatorHasDecided(c, v'.Last()) {
@@ -109,7 +130,6 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
         if l.decision.WONone? && l'.decision == WOSome(Commit) {
           YesVotesContainsAllParticipantsWhenFull(c, v, |v.history|-1);
           assert GetParticipantPreference(c, noVoter) == Yes;  // witness
-          assert false;
         }
     }
   }
@@ -128,10 +148,15 @@ lemma AC4Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   requires MessageInv(c, v')
-  requires LeaderTallyReflectsPreferences(c, v')
+  requires ApplicationInv(c, v')
   ensures SafetyAC4(c, v')
 {
-  VariableNextProperties(c, v, v');
+  if AllPreferYes(c) && CoordinatorHasDecided(c, v'.Last()) {
+    if !CoordinatorDecidedCommit(c, v'.Last()) {
+      var x :| x in v'.Last().GetCoordinator(c).noVotes;
+      assert GetParticipantPreference(c, x) == No;  // contradicts AllPreferYes(c)
+    }
+  }
 }
 
 lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables, i: int)
