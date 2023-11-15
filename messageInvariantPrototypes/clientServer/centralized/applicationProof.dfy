@@ -13,21 +13,30 @@ import opened Obligations
 
 
 // The server's requests must have come from sender client
-ghost predicate ServerRequestsValid(c: Constants, v: Variables)
+ghost predicate ServerRequestsValid1(c: Constants, v: Variables)
   requires v.WF(c)
 {
   v.GetServer(c).currentRequest.Some?
   ==> 
   && var req := v.GetServer(c).currentRequest.value;
   && c.ValidClientIdx(req.clientId)
-  && req.reqId in v.clients[req.clientId].requests.s
 }
 
+ghost predicate ServerRequestsValid2(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ServerRequestsValid1(c, v)
+{
+  v.GetServer(c).currentRequest.Some?
+  ==> 
+  && var req := v.GetServer(c).currentRequest.value;
+  && req.reqId in v.clients[req.clientId].requests.s
+}
 
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  ServerRequestsValid(c, v)
+  && ServerRequestsValid1(c, v)
+  && ServerRequestsValid2(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)

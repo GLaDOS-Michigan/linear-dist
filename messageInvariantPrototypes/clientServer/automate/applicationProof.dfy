@@ -11,7 +11,7 @@ import opened Obligations
 
 
 // The server's requests must have come from sender client
-ghost predicate ServerRequestsValid(c: Constants, v: Variables)
+ghost predicate ServerRequestsValid1(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall i| 
@@ -20,13 +20,26 @@ ghost predicate ServerRequestsValid(c: Constants, v: Variables)
   ::
     && var req := v.History(i).GetServer(c).currentRequest.value;
     && c.ValidClientIdx(req.clientId)
+}
+
+// The server's requests must have come from sender client
+ghost predicate ServerRequestsValid2(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ServerRequestsValid1(c, v)
+{
+  forall i| 
+    && v.ValidHistoryIdx(i)
+    && v.History(i).GetServer(c).currentRequest.Some?
+  ::
+    && var req := v.History(i).GetServer(c).currentRequest.value;
     && req.reqId in v.History(i).clients[req.clientId].requests.s
 }
 
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  ServerRequestsValid(c, v)
+  && ServerRequestsValid1(c, v)
+  && ServerRequestsValid2(c, v)
 }
 
 ghost predicate Inv(c: Constants, v: Variables)
@@ -69,7 +82,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 lemma InvNextServerRequestsValid(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures ServerRequestsValid(c, v')
+  ensures ServerRequestsValid1(c, v')
+  ensures ServerRequestsValid2(c, v')
 {
   VariableNextProperties(c, v, v');
   forall i| 
