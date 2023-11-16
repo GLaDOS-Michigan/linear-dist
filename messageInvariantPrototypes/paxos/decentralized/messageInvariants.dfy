@@ -36,17 +36,18 @@ ghost predicate LeaderValidHighestHeard(c: Constants, v: Variables)
     )
 }
 
-// certified self-inductive
+
+// This is not needed in ApplicationProof
 // Leader updates receivedPromises based on Promise messages
-ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall idx, src | c.ValidLeaderIdx(idx) && src in v.leaders[idx].receivedPromises
-  :: (exists prom: Message ::
-        && IsPromiseMessage(v, prom)
-        && prom.bal == idx
-    )
-} 
+// ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
+//   requires v.WF(c)
+// {
+//   forall idx, src | c.ValidLeaderIdx(idx) && src in v.leaders[idx].receivedPromises
+//   :: (exists prom: Message ::
+//         && IsPromiseMessage(v, prom)
+//         && prom.bal == idx
+//     )
+// } 
 
 // certified self-inductive
 ghost predicate AcceptorValidPendingMsg(c: Constants, v: Variables) 
@@ -77,7 +78,6 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && ValidMessageSrc(c, v)
   && AcceptorValidPendingMsg(c, v)
   && LeaderValidHighestHeard(c, v)
-  && LeaderValidReceivedPromises(c, v)
   && LearnerValidReceivedAccepts(c, v)
 }
 
