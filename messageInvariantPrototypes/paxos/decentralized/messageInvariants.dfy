@@ -91,7 +91,15 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires MessageInv(c, v)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
-{}
+{
+  InvNextValidMessageSrc(c, v, v');
+}
+
+lemma InvNextValidMessageSrc(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires Next(c, v, v')
+  ensures ValidMessageSrc(c, v)
 
 /***************************************************************************************
 *                                        Utils                                         *
