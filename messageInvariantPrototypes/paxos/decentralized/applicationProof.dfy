@@ -63,7 +63,7 @@ ghost predicate AcceptorValidAcceptedVB2(c: Constants, v: Variables)
 // Tony update a week later: monotonic variables need to be annotated by the user. Hence,
 // if user were to annotate l.receivedAccepts as a monotonic set, then this is a proper 
 // message invariant
-ghost predicate LearnMsgsValid(c: Constants, v: Variables)
+ghost predicate LearnMsgsValid1(c: Constants, v: Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
 {
@@ -72,6 +72,17 @@ ghost predicate LearnMsgsValid(c: Constants, v: Variables)
   :: 
     && var vb := VB(val, bal);
     && vb in v.learners[lnr].receivedAccepts
+}
+
+ghost predicate LearnMsgsValid2(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires LearnMsgsValid1(c, v)
+{
+  forall lnr:LearnerId, bal, val | 
+    Learn(lnr, bal, val) in v.network.sentMsgs
+  :: 
+    && var vb := VB(val, bal);
     && |v.learners[lnr].receivedAccepts[vb]| >= c.f+1
 }
 
@@ -79,7 +90,7 @@ ghost predicate LearnMsgsValid(c: Constants, v: Variables)
 // application level knowledge that a.promised is monotonically increasing.
 // Every Promise message in the network has a ballot upper-bounded by the promised ballot
 // of the source acceptor
-ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables) 
+ghost predicate AcceptorPromisedMonotonic1(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall idx, prom | 
@@ -88,6 +99,17 @@ ghost predicate AcceptorPromisedMonotonic(c: Constants, v: Variables)
     && prom.acc == c.acceptorConstants[idx].id
   ::
     && v.acceptors[idx].promised.Some?
+}
+
+ghost predicate AcceptorPromisedMonotonic2(c: Constants, v: Variables) 
+  requires v.WF(c)
+  requires AcceptorPromisedMonotonic1(c, v)
+{
+  forall idx, prom | 
+    && c.ValidAcceptorIdx(idx) 
+    && IsPromiseMessage(v, prom)
+    && prom.acc == c.acceptorConstants[idx].id
+  ::
     && prom.bal <= v.acceptors[idx].promised.value
 }
 
@@ -244,16 +266,18 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB1(c, v)
   && AcceptorValidAcceptedVB2(c, v)
-  && LearnMsgsValid(c, v)
-  && AcceptorPromisedMonotonic(c, v)
-  && ProposeImpliesLeaderState(c, v)
+  && LearnMsgsValid1(c, v)
+  && LearnMsgsValid2(c, v)
+  && AcceptorPromisedMonotonic1(c, v)
+  && AcceptorPromisedMonotonic2(c, v)
+  && ProposeImpliesLeaderState(c, v)                  // 2
   && PromiseVbImpliesAccepted(c, v)
   && AcceptMessageImpliesProposed(c, v)
-  && AcceptMessagesValid(c, v)
-  && AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
+  && AcceptMessagesValid(c, v)                        // 2
+  && AcceptMsgImpliesLargerPromiseCarriesVb(c, v)     // 2
   && HighestHeardBackedByReceivedPromises(c, v)
   && ProposeBackedByPromiseQuorum(c, v)
-  && AcceptorPromisedLargerThanAccepted(c, v)
+  && AcceptorPromisedLargerThanAccepted(c, v)         // 2
   && PromiseBalLargerThanAccepted(c, v)
   && ChosenValImpliesProposeOnlyVal(c, v)
 }
@@ -300,7 +324,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   MessageInvInductive(c, v, v');
   InvNextAcceptorValidPromised(c, v, v');
   InvNextAcceptorValidAcceptedVB(c, v, v');
-  assert LearnMsgsValid(c, v');
+  InvNextLearnMsgsValid(c, v, v');
   InvNextAcceptorPromisedMonotonic(c, v, v');
   InvNextProposeImpliesLeaderState(c, v, v');
   InvNextPromiseVbImpliesAccepted(c, v, v');
@@ -334,10 +358,18 @@ lemma InvNextAcceptorValidAcceptedVB(c: Constants, v: Variables, v': Variables)
   ensures AcceptorValidAcceptedVB2(c, v')
 {}
 
+lemma InvNextLearnMsgsValid(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LearnMsgsValid1(c, v')
+  ensures LearnMsgsValid2(c, v')
+{}
+
 lemma InvNextAcceptorPromisedMonotonic(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures AcceptorPromisedMonotonic(c, v')
+  ensures AcceptorPromisedMonotonic1(c, v')
+  ensures AcceptorPromisedMonotonic2(c, v')
 {}
 
 lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables)
@@ -405,11 +437,16 @@ lemma InvNextPromiseBalLargerThanAccepted(c: Constants, v: Variables, v': Variab
 {}
 
 lemma InvNextImpliesAcceptMsgImpliesLargerPromiseCarriesVb(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires AcceptorPromisedMonotonic1(c, v)
+  requires AcceptorPromisedMonotonic2(c, v)
+  requires AcceptMessagesValid(c, v)
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
   requires Next(c, v, v')
   ensures AcceptMsgImpliesLargerPromiseCarriesVb(c, v')
 {
-  // Tony: Surprised that this lemma requires no proof
+  assert AcceptMsgImpliesLargerPromiseCarriesVb(c, v');
 }
 
 lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v': Variables)
@@ -700,7 +737,8 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
 lemma LearnedImpliesChosen(c: Constants, v: Variables, learnMsg: Message)
   requires v.WF(c)
   requires MessageInv(c, v)
-  requires LearnMsgsValid(c, v)
+  requires LearnMsgsValid1(c, v)
+  requires LearnMsgsValid2(c, v)
   requires IsLearnMessage(v, learnMsg)
   ensures Chosen(c, v, VB(learnMsg.val, learnMsg.bal))
 {
