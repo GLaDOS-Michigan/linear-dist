@@ -228,7 +228,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnedImpliesQuorumOfAccepts(c, v)
   && LearnerReceivedAcceptImpliesProposed(c, v)  // 2
   && LearnerReceivedAcceptImpliesAccepted(c, v)  // 2
-  && AcceptorValidPromisedAndAccepted(c, v)        // 3
+  && AcceptorValidPromisedAndAccepted(c, v)
   && AcceptorAcceptedImpliesProposed(c, v)       // 2
   && LeaderValidReceivedPromises(c, v)
   && LeaderHighestHeardUpperBound(c, v)
