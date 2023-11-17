@@ -73,14 +73,11 @@ ghost predicate LearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables)
 ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables) 
   requires v.WF(c)
 {
-  forall acc: AcceptorId | c.ValidAcceptorIdx(acc)
-  ::
-    && (v.acceptors[acc].pendingPrepare.Some? 
-        ==> c.ValidLeaderIdx(v.acceptors[acc].pendingPrepare.value.bal))
-    && (v.acceptors[acc].promised.MNSome? 
-        ==> c.ValidLeaderIdx(v.acceptors[acc].promised.value))
-    && (v.acceptors[acc].acceptedVB.MVBSome? 
-        ==> c.ValidLeaderIdx(v.acceptors[acc].acceptedVB.value.b))
+  forall acc: AcceptorId | 
+    && c.ValidAcceptorIdx(acc) 
+    && v.acceptors[acc].acceptedVB.MVBSome? 
+  :: 
+    c.ValidLeaderIdx(v.acceptors[acc].acceptedVB.value.b)
 }
 
 ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
@@ -358,8 +355,6 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   requires LeaderHearedImpliesProposed(c, v)
   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires Next(c, v, v')
-  requires AcceptorValidPromisedAndAccepted(c, v')
-  requires AcceptorAcceptedImpliesProposed(c, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
 {
   forall ldr:LeaderId, acc:AcceptorId |
@@ -375,7 +370,7 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
 }
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+  requires v.WF(c)
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesAccepted(c, v')

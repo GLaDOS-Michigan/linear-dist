@@ -87,14 +87,9 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
   forall acc: AcceptorId, i | 
     && v.ValidHistoryIdx(i)
     && c.ValidAcceptorIdx(acc)
+    && v.History(i).acceptors[acc].acceptedVB.MVBSome? 
   ::
-    && var vi := v.History(i);
-    && (vi.acceptors[acc].pendingPrepare.Some? 
-        ==> c.ValidLeaderIdx(vi.acceptors[acc].pendingPrepare.value.bal))
-    && (vi.acceptors[acc].promised.MNSome? 
-        ==> c.ValidLeaderIdx(vi.acceptors[acc].promised.value))
-    && (vi.acceptors[acc].acceptedVB.MVBSome? 
-        ==> c.ValidLeaderIdx(vi.acceptors[acc].acceptedVB.value.b))
+    c.ValidLeaderIdx(v.History(i).acceptors[acc].acceptedVB.value.b)
 }
 
 // If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
