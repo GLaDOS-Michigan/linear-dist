@@ -224,11 +224,12 @@ ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables)
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
     && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
+    && c.ValidLeaderIdx(v.History(i).leaders[ldr].highestHeardBallot.value)
   ::
     // note that once a leader CanPropose(), its value does not change
     && var vi := v.History(i);
     var b := vi.leaders[ldr].highestHeardBallot.value;
-    && c.ValidLeaderIdx(b)
+    // && c.ValidLeaderIdx(b)
     && vi.LeaderCanPropose(c, b)
     && vi.leaders[b].Value() == vi.leaders[ldr].Value()
 }
@@ -312,18 +313,18 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerValidReceivedAccepts(c, v)
   && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
-  && LearnerReceivedAcceptImpliesProposed(c, v)
-  && LearnerReceivedAcceptImpliesAccepted(c, v)
-  && AcceptorValidPromisedAndAccepted(c, v)
-  && AcceptorPromisedLargerThanAccepted(c, v)
-  && AcceptorAcceptedImpliesProposed(c, v)
+  && LearnerReceivedAcceptImpliesProposed(c, v)  // 2
+  && LearnerReceivedAcceptImpliesAccepted(c, v)  // 2
+  && AcceptorValidPromisedAndAccepted(c, v)        // 3
+  && AcceptorPromisedLargerThanAccepted(c, v)    // 2
+  && AcceptorAcceptedImpliesProposed(c, v)       // 2
   && LeaderValidReceivedPromises(c, v)
   && LeaderHighestHeardUpperBound(c, v)
-  && LeaderHearedImpliesProposed(c, v)
-  && LeaderReceivedPromisesImpliesAcceptorState(c, v)
+  && LeaderHearedImpliesProposed(c, v)           // 2
+  && LeaderReceivedPromisesImpliesAcceptorState(c, v)   // 2
   && LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
   && ChosenValImpliesAcceptorOnlyAcceptsVal(c, v)
-  && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  && ChosenImpliesProposingLeaderHearsChosenBallot(c, v)  // 2
   && ChosenValImpliesLeaderOnlyHearsVal(c, v)
 }
 

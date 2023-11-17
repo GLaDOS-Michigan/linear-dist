@@ -188,10 +188,10 @@ ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables)
   forall ldr:LeaderId | 
     && c.ValidLeaderIdx(ldr)
     && v.leaders[ldr].highestHeardBallot.MNSome?
+    && c.ValidLeaderIdx(v.leaders[ldr].highestHeardBallot.value)
   ::
     // note that once a leader CanPropose(), its value does not change
     var b := v.leaders[ldr].highestHeardBallot.value;
-    && c.ValidLeaderIdx(b)
     && v.LeaderCanPropose(c, b)
     && v.leaders[b].Value() == v.leaders[ldr].Value()
 }
@@ -417,7 +417,9 @@ lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v'
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesAccepted(c, v')
-{}
+{
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
+}
 
 lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
