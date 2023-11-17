@@ -269,7 +269,6 @@ ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
 ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  // && OneValuePerBallot(c, v)
   && LearnerValidReceivedAccepts(c, v)
   && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
@@ -315,10 +314,16 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  InvInductiveHelper1(c, v, v');
-  InvInductiveHelper2(c, v, v');
-  InvInductiveHelper3(c, v, v');
-  // InvNextOneValuePerBallot(c, v, v');
+  InvNextLearnerValidReceivedAccepts(c, v, v');
+
+  InvNextLearnerValidReceivedAcceptsKeys(c, v, v');
+  InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
+  InvNextAcceptorValidPromisedAndAccepted(c, v, v');
+  InvNextAcceptorAcceptedImpliesProposed(c, v, v');
+  InvNextLeaderValidReceivedPromises(c, v, v');
+  InvNextLeaderHighestHeardUpperBound(c, v, v');
+  InvNextLeaderHearedImpliesProposed(c, v, v');
+  InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
   InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
@@ -336,37 +341,74 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 ***************************************************************************************/
 
 
-// Bundle for simple-to-prove invariants
-lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
+lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
-  ensures LearnerValidReceivedAcceptsKeys(c, v')
-  ensures LearnerReceivedAcceptImpliesProposed(c, v')
-  ensures AcceptorValidPromisedAndAccepted(c, v')
-{
-  assert AcceptorValidPromisedAndAccepted(c, v');
-}
+{}
 
-lemma  InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
+lemma InvNextLearnerValidReceivedAcceptsKeys(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
+  ensures LearnerValidReceivedAcceptsKeys(c, v')
+{}
+
+lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LearnerReceivedAcceptImpliesProposed(c, v')
+{}
+
+lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures AcceptorValidPromisedAndAccepted(c, v')
+{}
+
+lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires AcceptorValidPromisedAndAccepted(c, v)
+  requires AcceptorAcceptedImpliesProposed(c, v)
+  requires LeaderValidReceivedPromises(c, v)
+  requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
+{
+  assert AcceptorAcceptedImpliesProposed(c, v');
+}
+
+lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
   ensures LeaderValidReceivedPromises(c, v')
+{}
+
+lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
   ensures LeaderHighestHeardUpperBound(c, v')
 {}
 
-lemma InvInductiveHelper3(c: Constants, v: Variables, v': Variables)
+lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LeaderHearedImpliesProposed(c, v)
+  requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')
+  requires AcceptorAcceptedImpliesProposed(c, v')
+  ensures LeaderHearedImpliesProposed(c, v')
+{
+  assert LeaderHearedImpliesProposed(c, v');
+}
+
+lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires LeaderHearedImpliesProposed(c, v)
   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
   requires AcceptorAcceptedImpliesProposed(c, v')
-  ensures LeaderHearedImpliesProposed(c, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
 {
-  assert LeaderHearedImpliesProposed(c, v');
   assert LeaderReceivedPromisesImpliesAcceptorState(c, v');
 }
 
