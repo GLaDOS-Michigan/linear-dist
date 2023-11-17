@@ -35,7 +35,7 @@ ghost predicate AcceptorValidPromised(c: Constants, v: Variables)
 
 // Acceptor updates its acceptedVB based on a Propose message carrying that ballot 
 // and value, and there is also a corresponding Accept message
-ghost predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
+ghost predicate AcceptorValidAcceptedVB1(c: Constants, v: Variables)
   requires v.WF(c)
 {
   forall idx, val, bal | 
@@ -43,6 +43,15 @@ ghost predicate AcceptorValidAcceptedVB(c: Constants, v: Variables)
     && v.acceptors[idx].acceptedVB == Some(VB(val, bal))
   :: 
     && Propose(bal, val) in v.network.sentMsgs
+}
+
+ghost predicate AcceptorValidAcceptedVB2(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, val, bal | 
+    && c.ValidAcceptorIdx(idx) 
+    && v.acceptors[idx].acceptedVB == Some(VB(val, bal))
+  :: 
     && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
 }
 
@@ -233,7 +242,8 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires ValidMessageSrc(c, v)
 {
   && AcceptorValidPromised(c, v)
-  && AcceptorValidAcceptedVB(c, v)
+  && AcceptorValidAcceptedVB1(c, v)
+  && AcceptorValidAcceptedVB2(c, v)
   && LearnMsgsValid(c, v)
   && AcceptorPromisedMonotonic(c, v)
   && ProposeImpliesLeaderState(c, v)
@@ -320,7 +330,8 @@ lemma InvNextAcceptorValidPromised(c: Constants, v: Variables, v': Variables)
 lemma InvNextAcceptorValidAcceptedVB(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures AcceptorValidAcceptedVB(c, v')
+  ensures AcceptorValidAcceptedVB1(c, v')
+  ensures AcceptorValidAcceptedVB2(c, v')
 {}
 
 lemma InvNextAcceptorPromisedMonotonic(c: Constants, v: Variables, v': Variables)
@@ -335,15 +346,17 @@ lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables
   ensures ProposeImpliesLeaderState(c, v')
   ensures OneValuePerProposeBallot(c, v)  // Implied by ProposeImpliesLeaderState
   ensures OneValuePerProposeBallot(c, v')  // Implied by ProposeImpliesLeaderState
-{}
+{
+  assert OneValuePerProposeBallot(c, v);
+  assert OneValuePerProposeBallot(c, v');
+}
 
 lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
-  requires
-    && AcceptorValidAcceptedVB(c, v)
-    && PromiseVbImpliesAccepted(c, v)
-    && AcceptMessagesValid(c, v)
+  requires AcceptorValidAcceptedVB2(c, v)
+  requires PromiseVbImpliesAccepted(c, v)
+  requires AcceptMessagesValid(c, v)
   requires Next(c, v, v')
   ensures PromiseVbImpliesAccepted(c, v')
 {
@@ -525,19 +538,15 @@ lemma InvNextProposeBackedByPromiseQuorumNoNewPropose(c: Constants, v: Variables
 // This is the core Paxos lemma
 lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Variables) 
   requires v.WF(c) && v'.WF(c)
-  requires  ValidMessageSrc(c, v)
-  requires  && AcceptorValidPromised(c, v)
-            && AcceptorValidAcceptedVB(c, v)
-            && LearnMsgsValid(c, v)
-            && AcceptorPromisedMonotonic(c, v)
-            && ProposeImpliesLeaderState(c, v)
-            && PromiseVbImpliesAccepted(c, v)
-            && AcceptMessageImpliesProposed(c, v)
-            && AcceptMessagesValid(c, v)
-            && HighestHeardBackedByReceivedPromises(c, v)
-            && ProposeBackedByPromiseQuorum(c, v)
-            && AcceptorPromisedLargerThanAccepted(c, v)
-            && ChosenValImpliesProposeOnlyVal(c, v)
+  requires ValidMessageSrc(c, v)
+  requires ProposeImpliesLeaderState(c, v)
+  requires PromiseVbImpliesAccepted(c, v)
+  requires AcceptMessageImpliesProposed(c, v)
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
+  requires HighestHeardBackedByReceivedPromises(c, v)
+  requires PromiseBalLargerThanAccepted(c, v)
+  requires ChosenValImpliesProposeOnlyVal(c, v)
+  
   requires Next(c, v, v')
   requires OneValuePerProposeBallot(c, v')
   requires ProposeBackedByPromiseQuorum(c, v')
@@ -558,25 +567,7 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     propose.val == vb.v
   {
     if dsStep.LeaderStep? {
-      NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
-      assert Chosen(c, v, vb);
-      var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
-      var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-      if step.ProposeStep? && propose !in v.network.sentMsgs {
-        /* Suppose vb has been chosen in state v, and propose is of some v' with vb.v != v'. 
-        * By HighestHeardBackedByReceivedPromises, this v' was carried by a Promise message
-        * with winning ballot b' <= vb.b. 
-        * By ChosenValImpliesPromiseQuorumSeesBal, b' >= vb.b. 
-        * By PromiseVbImpliesAccepted, there is an Accept(VB(v', b')). By AcceptMessageImpliesProposed,
-        * there is a Propose(b', v') in the state v. This contradicts ChosenValImpliesProposeOnlyVal. */
-        if propose.val != vb.v {
-          assert LeaderHost.NextProposeStep(lc, l, l', msgOps);
-          var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
-          assert IsPromiseQuorum(c, v, pquorum, actor);   // trigger 
-          assert l.highestHeardBallot.Some?;              // trigger
-          assert false;
-        }
-      }
+      InvNextChosenValImpliesProposeOnlyValLeaderStep(c, v, v', vb, propose, dsStep);
     } else if dsStep.AcceptorStep? {
       var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
       var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
@@ -600,6 +591,55 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
     } 
   }
 }
+
+lemma InvNextChosenValImpliesProposeOnlyValLeaderStep(c: Constants, v: Variables, v': Variables, vb: ValBal, propose: Message, dsStep: Step)
+  requires v.WF(c) && v'.WF(c)
+  // input constraints
+  requires Chosen(c, v', vb)
+  requires IsProposeMessage(v', propose)
+  requires propose.bal > vb.b
+  requires dsStep.LeaderStep?
+
+  // preconditions
+  requires ValidMessageSrc(c, v)
+  requires ProposeImpliesLeaderState(c, v)
+  requires PromiseVbImpliesAccepted(c, v)
+  requires AcceptMessageImpliesProposed(c, v)
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
+  requires HighestHeardBackedByReceivedPromises(c, v)
+  requires PromiseBalLargerThanAccepted(c, v)
+  requires ChosenValImpliesProposeOnlyVal(c, v)
+  requires Next(c, v, v')
+  requires NextStep(c, v, v', dsStep)
+  ensures propose.val == vb.v
+{
+  InvImpliesChosenValImpliesPromiseQuorumSeesBal(c, v);  // requires AcceptMsgImpliesLargerPromiseCarriesVb
+  var actor, msgOps := dsStep.actor, dsStep.msgOps;
+  NoNewChosenInLeaderOrLearnerSteps(c, v, v', dsStep);
+  assert Chosen(c, v, vb);
+  var lc, l, l' := c.leaderConstants[actor], v.leaders[actor], v'.leaders[actor];
+  var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
+  if step.ProposeStep? && propose !in v.network.sentMsgs {
+    /* Suppose vb has been chosen in state v, and propose is of some v' with vb.v != v'. 
+    * By HighestHeardBackedByReceivedPromises, this v' was carried by a Promise message
+    * with winning ballot b' <= vb.b. 
+    * By ChosenValImpliesPromiseQuorumSeesBal, b' >= vb.b. 
+    * By PromiseVbImpliesAccepted, there is an Accept(VB(v', b')). By AcceptMessageImpliesProposed,
+    * there is a Propose(b', v') in the state v. This contradicts ChosenValImpliesProposeOnlyVal. */
+    if propose.val != vb.v {
+      assert LeaderHost.NextProposeStep(lc, l, l', msgOps);
+      var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
+      assert IsPromiseQuorum(c, v, pquorum, actor);   // trigger 
+      assert l.highestHeardBallot.Some?;              // trigger
+      assert false;
+    }
+    assert propose.val == vb.v;
+  }
+  assert propose.val == vb.v;
+}
+
+
+
 
 // Helper lemma for InvNextChosenValImpliesProposeOnlyVal. Here lies most of the heavy-lifting Paxos logic
 lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosenVb: ValBal, p: Message) 
@@ -727,7 +767,7 @@ ghost predicate ChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables)
 lemma InvImpliesChosenValImpliesPromiseQuorumSeesBal(c: Constants, v: Variables) 
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
-  requires ApplicationInv(c, v)
+  requires AcceptMsgImpliesLargerPromiseCarriesVb(c, v)
   ensures ChosenValImpliesPromiseQuorumSeesBal(c, v)
 {
   forall chosenVb, prQuorum, pbal | 
