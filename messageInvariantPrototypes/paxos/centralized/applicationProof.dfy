@@ -315,7 +315,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   InvNextLearnerValidReceivedAccepts(c, v, v');
-
   InvNextLearnerValidReceivedAcceptsKeys(c, v, v');
   InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
   InvNextAcceptorValidPromisedAndAccepted(c, v, v');
@@ -363,18 +362,42 @@ lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Va
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorValidPromisedAndAccepted(c, v')
-{}
+{
+  assert AcceptorValidPromisedAndAccepted(c, v');
+}
 
 lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
-  requires LeaderValidReceivedPromises(c, v)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
 {
-  assert AcceptorAcceptedImpliesProposed(c, v');
+  forall acc:AcceptorId |
+    && c.ValidAcceptorIdx(acc)
+    && v'.acceptors[acc].acceptedVB.MVBSome?
+  ensures
+    var vb := v'.acceptors[acc].acceptedVB.value;
+    && v'.LeaderCanPropose(c, vb.b)
+    && v'.leaders[vb.b].Value() == vb.v
+  {
+    var vb := v'.acceptors[acc].acceptedVB.value;
+    var dsStep :|  NextStep(c, v, v', dsStep);
+    if dsStep.P2aStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    } else if dsStep.P1bStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    } else if dsStep.P2aStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    } else if dsStep.P2bStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    }
+  }
 }
 
 lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
@@ -409,7 +432,16 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   requires AcceptorAcceptedImpliesProposed(c, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
 {
-  assert LeaderReceivedPromisesImpliesAcceptorState(c, v');
+  forall ldr:LeaderId, acc:AcceptorId |
+    && c.ValidLeaderIdx(ldr)
+    && c.ValidAcceptorIdx(acc)
+    && acc in v'.leaders[ldr].ReceivedPromises()
+  ensures
+    v'.acceptors[acc].HasPromisedAtLeast(ldr)
+  {
+    //trigger
+    assert v'.acceptors[acc].HasPromisedAtLeast(ldr);
+  }
 }
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
