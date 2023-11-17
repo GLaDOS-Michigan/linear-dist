@@ -82,16 +82,16 @@ ghost predicate Init(c: Constants, v: Variables) {
 }
 
 datatype Step = 
-  | P1aStep(leader: LeaderId, acceptors: set<AcceptorId>, transmit: Transmit)
+  | P1aStep(leader: LeaderId, acceptors: AcceptorId, transmit: Transmit)
   | P1bStep(acceptor: AcceptorId, leader: LeaderId, transmit: Transmit)
-  | P2aStep(leader: LeaderId, acceptors: set<AcceptorId>, transmit: Transmit)
+  | P2aStep(leader: LeaderId, acceptors: AcceptorId, transmit: Transmit)
   | P2bStep(acceptor: AcceptorId, learner: LearnerId, transmit: Transmit)
   | LearnerInternalStep(learner: LearnerId)
   | StutterStep()
 
 
 // Leader sends Prepare message to Acceptor. Acceptor buffers it in its pendingPrepare field 
-ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: LeaderId, accs: set<AcceptorId>, transmit: Transmit) 
+ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: LeaderId, acc: AcceptorId, transmit: Transmit) 
   requires v.WF(c) && v'.WF(c)
 {
   // Leader action
@@ -99,13 +99,10 @@ ghost predicate NextP1aStep(c: Constants, v: Variables, v': Variables, ldr: Lead
   && transmit.m.Prepare?
   && LeaderHost.Next(c.leaders[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
   // Acceptor action
-  && |accs| >= c.f+1
-  && (forall acc | acc in accs ::
-    && c.ValidAcceptorIdx(acc)
-    && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
-  )
+  && c.ValidAcceptorIdx(acc)
+  && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
   // All others unchanged
-  && AcceptorsUnchangedExceptSet(c, v, v', accs)
+  && AcceptorsUnchangedExcept(c, v, v', acc)
   && LeadersUnchangedExcept(c, v, v', ldr)
   && LearnersUnchanged(v, v')
 }
@@ -144,7 +141,7 @@ ghost predicate NextP1bStep(c: Constants, v: Variables, v': Variables,
 
 // Leader sends Proposal to an acceptor. The acceptor processes the proposal
 ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables, 
-    ldr: LeaderId, accs: set<AcceptorId>, transmit: Transmit) 
+    ldr: LeaderId, acc: AcceptorId, transmit: Transmit) 
   requires v.WF(c) && v'.WF(c)
 {
   // Leader action
@@ -152,14 +149,11 @@ ghost predicate NextP2aStep(c: Constants, v: Variables, v': Variables,
   && transmit.m.Propose?
   && LeaderHost.Next(c.leaders[ldr], v.leaders[ldr], v'.leaders[ldr], transmit.Send())
   // Acceptor action
-  && |accs| >= c.f+1
-  && (forall acc | acc in accs ::
-    && c.ValidAcceptorIdx(acc)
-    && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
-  )
+  && c.ValidAcceptorIdx(acc)
+  && AcceptorHost.Next(c.acceptors[acc], v.acceptors[acc], v'.acceptors[acc], transmit.Recv())
   // All others unchanged
   && LeadersUnchangedExcept(c, v, v', ldr)
-  && AcceptorsUnchangedExceptSet(c, v, v', accs)
+  && AcceptorsUnchangedExcept(c, v, v', acc)
   && LearnersUnchanged(v, v')
 }
 
@@ -197,9 +191,9 @@ ghost predicate NextStep(c: Constants, v: Variables, v': Variables, step: Step)
   requires v.WF(c) && v'.WF(c)
 {
   match step
-    case P1aStep(ldr, accs, transmit) => NextP1aStep(c, v, v', ldr, accs, transmit)
+    case P1aStep(ldr, acc, transmit) => NextP1aStep(c, v, v', ldr, acc, transmit)
     case P1bStep(acc, ldr, transmit) => NextP1bStep(c, v, v', ldr, acc, transmit)
-    case P2aStep(ldr, accs, transmit) => NextP2aStep(c, v, v', ldr, accs, transmit)
+    case P2aStep(ldr, acc, transmit) => NextP2aStep(c, v, v', ldr, acc, transmit)
     case P2bStep(acc, lnr, transmit) => NextP2bStep(c, v, v', acc, lnr, transmit)
     case LearnerInternalStep(lnr) => NextLearnerInternalStep(c, v, v', lnr)
     case StutterStep => v' == v
@@ -236,14 +230,6 @@ ghost predicate AcceptorsUnchangedExcept(c: Constants, v: Variables, v': Variabl
   requires c.ValidAcceptorIdx(acc)
 {
   forall id:nat | c.ValidAcceptorIdx(id) && id != acc
-  :: v.acceptors[id] == v'.acceptors[id]
-}
-
-ghost predicate AcceptorsUnchangedExceptSet(c: Constants, v: Variables, v': Variables, accs: set<AcceptorId>)
-  requires v.WF(c) && v'.WF(c)
-  requires forall acc | acc in accs :: c.ValidAcceptorIdx(acc)
-{
-  forall id:nat | c.ValidAcceptorIdx(id) && id !in accs
   :: v.acceptors[id] == v'.acceptors[id]
 }
 
