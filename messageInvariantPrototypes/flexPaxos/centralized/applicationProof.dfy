@@ -342,9 +342,15 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  InvInductiveHelper1(c, v, v');
-  InvInductiveHelper2(c, v, v');
-  InvInductiveHelper3(c, v, v');
+  InvNextLearnerValidReceivedAccepts(c, v, v');
+  InvNextLearnerValidReceivedAcceptsKeys(c, v, v');
+  InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
+  InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
+  InvNextAcceptorValidPromisedAndAccepted(c, v, v');
+  InvNextAcceptorAcceptedImpliesProposed(c, v, v');
+  InvNextLeaderValidReceivedPromises(c, v, v');
+  InvNextLeaderHighestHeardUpperBound(c, v, v');
+  InvNextLeaderHearedImpliesProposed(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
   InvNextLeaderHearedImpliesProposed(c, v, v');
@@ -363,43 +369,90 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 ***************************************************************************************/
 
 
-// Bundle for simple-to-prove invariants
-lemma InvInductiveHelper1(c: Constants, v: Variables, v': Variables)
+lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
+{}
+
+lemma InvNextLearnerValidReceivedAcceptsKeys(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
   ensures LearnerValidReceivedAcceptsKeys(c, v')
+{}
+
+lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
+{}
+
+lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v)
+  requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesAccepted(c, v')
+{
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
+}
+
+lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
   ensures AcceptorValidPromisedAndAccepted(c, v')
 {
-  assert LearnerValidReceivedAccepts(c, v');
-  assert LearnerValidReceivedAcceptsKeys(c, v');
-  assert LearnerReceivedAcceptImpliesProposed(c, v');
-  assert LearnerReceivedAcceptImpliesAccepted(c, v');
   assert AcceptorValidPromisedAndAccepted(c, v');
 }
 
-lemma  InvInductiveHelper2(c: Constants, v: Variables, v': Variables)
+lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
-  requires LeaderValidReceivedPromises(c, v)
-  requires LeaderHighestHeardUpperBound(c, v)
   requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
-  ensures LeaderValidReceivedPromises(c, v')
-  ensures LeaderHighestHeardUpperBound(c, v')
 {
-  assert AcceptorAcceptedImpliesProposed(c, v');
-  assert LeaderValidReceivedPromises(c, v');
-  assert LeaderHighestHeardUpperBound(c, v');
+  forall acc:AcceptorId |
+    && c.ValidAcceptorIdx(acc)
+    && v'.acceptors[acc].acceptedVB.MVBSome?
+  ensures
+    var vb := v'.acceptors[acc].acceptedVB.value;
+    && v'.LeaderCanPropose(c, vb.b)
+    && v'.leaders[vb.b].Value() == vb.v
+  {
+    var vb := v'.acceptors[acc].acceptedVB.value;
+    var dsStep :|  NextStep(c, v, v', dsStep);
+    if dsStep.P2aStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    } else if dsStep.P1bStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    } else if dsStep.P2aStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    } else if dsStep.P2bStep? {
+      assert v'.LeaderCanPropose(c, vb.b);
+      assert v'.leaders[vb.b].Value() == vb.v;
+    }
+  }
 }
 
-lemma InvInductiveHelper3(c: Constants, v: Variables, v': Variables)
+lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LeaderValidReceivedPromises(c, v')
+{}
+
+lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LeaderHighestHeardUpperBound(c, v')
+{}
+
+lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires LeaderHearedImpliesProposed(c, v)
-  requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
   requires AcceptorAcceptedImpliesProposed(c, v')
@@ -407,12 +460,6 @@ lemma InvInductiveHelper3(c: Constants, v: Variables, v': Variables)
 {
   assert LeaderHearedImpliesProposed(c, v');
 }
-
-lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures LeaderHearedImpliesProposed(c, v')
-{}
 
 lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
