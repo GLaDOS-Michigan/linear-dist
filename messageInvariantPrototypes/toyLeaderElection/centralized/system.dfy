@@ -38,7 +38,7 @@ module System {
 
   datatype Step =
     | HostLocalStep(host: HostId)   // host can be nominated, or declare victory in this step
-    | VoteReqStep(nominee: HostId, receiver: HostId, transmit: Transmit)
+    | VoteReqStep(nominee: HostId, receivers: set<HostId>, transmit: Transmit)
     | VoteStep(voter: HostId, nominee: HostId, transmit: Transmit)
     | StutterStep()
 
@@ -54,19 +54,22 @@ module System {
     )
   }
 
-  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, nominee: HostId, receiver: HostId, transmit: Transmit)
+  ghost predicate NextVoteReqStep(c: Constants, v: Variables, v': Variables, nominee: HostId, receivers: set<HostId>, transmit: Transmit)
     requires v.WF(c) && v'.WF(c)
   {
     // Sender action
-    && nominee != receiver  // important to not introduce false
+    && nominee !in receivers  // important to not introduce false
     && c.ValidHostId(nominee)
     && transmit.m.VoteReq?
     && Host.Next(c.hosts[nominee], v.hosts[nominee], v'.hosts[nominee], transmit.Send())
     // Receiver action
-    && c.ValidHostId(receiver)
-    && Host.Next(c.hosts[receiver], v.hosts[receiver], v'.hosts[receiver], transmit.Recv())
+    && |receivers| > |c.hosts| / 2
+    && (forall r | r in receivers ::
+        && c.ValidHostId(r)
+        && Host.Next(c.hosts[r], v.hosts[r], v'.hosts[r], transmit.Recv())
+    )
     // All others unchanged
-    && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx != receiver
+    && (forall idx: HostId | c.ValidHostId(idx) && idx != nominee && idx !in receivers
         :: v'.hosts[idx] == v.hosts[idx]
     )
   }
@@ -93,7 +96,7 @@ module System {
   {
     match step
       case HostLocalStep(host) => NextHostLocalStep(c, v, v', host)
-      case VoteReqStep(nominee, receiver, transmit) => NextVoteReqStep(c, v, v', nominee, receiver, transmit)
+      case VoteReqStep(nominee, receivers, transmit) => NextVoteReqStep(c, v, v', nominee, receivers, transmit)
       case VoteStep(voter, nominee, transmit) => NextVoteStep(c, v, v', voter, nominee, transmit)
       case StutterStep => v' == v
   }
