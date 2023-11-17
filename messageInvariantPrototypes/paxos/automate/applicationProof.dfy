@@ -10,48 +10,6 @@ import opened MonotonicityInvariants
 import opened MessageInvariants
 import opened Obligations
 
-
-ghost predicate OneValuePerBallot(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  && OneValuePerBallotAcceptors(c, v)
-  && OneValuePerBallotLearners(c, v)
-  && OneValuePerBallotLeaderAndLearners(c, v)
-  && OneValuePerBallotLeaderAndAcceptors(c, v)
-}
-
-// Acceptors only have one value for each ballot
-ghost predicate OneValuePerBallotAcceptors(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall a1, a2, i|
-    && v.ValidHistoryIdx(i)
-    && c.ValidAcceptorIdx(a1)
-    && c.ValidAcceptorIdx(a2)
-    && v.History(i).acceptors[a1].acceptedVB.MVBSome?
-    && v.History(i).acceptors[a2].acceptedVB.MVBSome?
-    && v.History(i).acceptors[a1].acceptedVB.value.b 
-        == v.History(i).acceptors[a2].acceptedVB.value.b 
-  ::
-    v.History(i).acceptors[a1].acceptedVB.value.v
-        == v.History(i).acceptors[a2].acceptedVB.value.v
-}
-
-// Learners only have one value for each ballot
-ghost predicate OneValuePerBallotLearners(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall l1, l2, vb1, vb2, i|
-    && v.ValidHistoryIdx(i)
-    && c.ValidLearnerIdx(l1)
-    && c.ValidLearnerIdx(l2)
-    && vb1 in v.History(i).learners[l1].receivedAccepts.m
-    && vb2 in v.History(i).learners[l2].receivedAccepts.m
-    && vb1.b == vb2.b
-  ::
-    vb1.v == vb2.v
-}
-
 // Leaders and Learners only have one value for each ballot
 ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
   requires v.WF(c)
@@ -61,19 +19,6 @@ ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
     && c.ValidLeaderIdx(ldr)
     && c.ValidLearnerIdx(lnr)
     && VB(acceptedVal, ldr) in v.History(i).learners[lnr].receivedAccepts.m
-  ::
-    acceptedVal == v.History(i).leaders[ldr].Value()
-}
-
-// Leaders and Acceptors only have one value for each ballot
-ghost predicate OneValuePerBallotLeaderAndAcceptors(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall ldr, acc, acceptedVal, i |
-    && v.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && c.ValidAcceptorIdx(acc)
-    && v.History(i).acceptors[acc].HasAccepted(VB(acceptedVal, ldr))
   ::
     acceptedVal == v.History(i).leaders[ldr].Value()
 }
@@ -89,18 +34,6 @@ ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
     && e in v.History(i).learners[lnr].receivedAccepts.m[vb]
   ::
     c.ValidAcceptorIdx(e)
-}
-
-// Learner's receivedAccepts.m contain valid leader ballots
-ghost predicate LearnerValidReceivedAcceptsKeys(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall lnr:LearnerId, vb:ValBal, i |
-    && v.ValidHistoryIdx(i)
-    && c.ValidLearnerIdx(lnr)
-    && vb in v.History(i).learners[lnr].receivedAccepts.m
-  ::
-    c.ValidLeaderIdx(vb.b)
 }
 
 // Learner's learned value must be backed by a quorum of accepts
@@ -119,12 +52,12 @@ ghost predicate LearnedImpliesQuorumOfAccepts(c: Constants, v: Variables)
 
 ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
-  requires LearnerValidReceivedAcceptsKeys(c, v)
 {
   forall lnr:LearnerId, vb:ValBal, i |
     && v.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
     && vb in v.History(i).learners[lnr].receivedAccepts.m
+    && c.ValidLeaderIdx(vb.b)
   ::
     && v.History(i).LeaderCanPropose(c, vb.b)
     && v.History(i).leaders[vb.b].Value() == vb.v
@@ -311,7 +244,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
 {
   && LearnerValidReceivedAccepts(c, v)
-  && LearnerValidReceivedAcceptsKeys(c, v)
   && LearnedImpliesQuorumOfAccepts(c, v)
   && LearnerReceivedAcceptImpliesProposed(c, v)  // 2
   && LearnerReceivedAcceptImpliesAccepted(c, v)  // 2
@@ -364,7 +296,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   MessageInvInductive(c, v, v');
   MonotonicityInvInductive(c, v, v');
   InvNextLearnerValidReceivedAccepts(c, v, v');
-  InvNextLearnerValidReceivedAcceptsKeys(c, v, v');
   InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
   InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
@@ -394,14 +325,6 @@ lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variabl
   requires LearnerValidReceivedAccepts(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
-
-lemma InvNextLearnerValidReceivedAcceptsKeys(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures LearnerValidReceivedAcceptsKeys(c, v')
 {
   VariableNextProperties(c, v, v');
 }
@@ -449,18 +372,17 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
   requires ValidMessages(c, v)
   requires SendAcceptValidity(c, v)
   requires LeaderHostReceivedPromisesAndValueMonotonic(c, v)
-  requires LearnerValidReceivedAcceptsKeys(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires LearnerReceivedAcceptImpliesProposed(c, v)
   requires Next(c, v, v')
-  requires LearnerValidReceivedAcceptsKeys(c, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
 {
   forall lnr:LearnerId, vb:ValBal, i |
     && v'.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
     && vb in v'.History(i).learners[lnr].receivedAccepts.m
+    && c.ValidLeaderIdx(vb.b)
   ensures
     && v'.History(i).LeaderCanPropose(c, vb.b)
     && v'.History(i).leaders[vb.b].Value() == vb.v
@@ -723,7 +645,7 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
   
   // prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
   requires AcceptorAcceptedImpliesProposed(c, v')
-  requires OneValuePerBallot(c, v')
+  requires OneValuePerBallotLeaderAndLearners(c, v')
   requires LeaderHighestHeardUpperBound(c, v')
   requires LeaderHearedImpliesProposed(c, v')
   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
@@ -775,7 +697,7 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
   requires Inv(c, v)
 
   // Prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
-  requires OneValuePerBallot(c, v')
+  requires OneValuePerBallotLeaderAndLearners(c, v')
   requires LeaderHighestHeardUpperBound(c, v')
   requires LeaderHearedImpliesProposed(c, v')
   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v')
@@ -936,7 +858,7 @@ lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables
   requires v.Last().leaders[ldr].HeardAtLeast(chosen.b)
   requires v.Last().leaders[ldr].Value() != chosen.v
   requires chosen.b < ldr
-  requires OneValuePerBallot(c, v)
+  requires OneValuePerBallotLeaderAndLearners(c, v)
   requires LeaderHighestHeardUpperBound(c, v)
   requires LeaderHearedImpliesProposed(c, v)
   requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
@@ -999,7 +921,10 @@ ghost predicate AtMostOneChosenVal(c: Constants, v: Variables)
     && vb1.b <= vb2.b 
     && ChosenAtHistory(c, v.History(i), vb1) 
     && ChosenAtHistory(c, v.History(j), vb2)
-  :: vb1.v == vb2.v
+  :: 
+    && c.ValidLeaderIdx(vb1.b)
+    && c.ValidLeaderIdx(vb2.b)
+    && vb1.v == vb2.v
 }
 
 ghost predicate IsPrepareMessage(v: Variables, m: Message) {
@@ -1121,12 +1046,7 @@ returns (accSet: set<AcceptorId>)
 lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
   requires v.WF(c)
   requires LearnerHostReceivedAcceptsMonotonic(c, v)
-  requires OneValuePerBallot(c, v)
-  requires LearnerValidReceivedAccepts(c, v)
-  requires LearnerValidReceivedAcceptsKeys(c, v)  // prereq for LearnerReceivedAcceptImpliesProposed
-  requires LearnerReceivedAcceptImpliesProposed(c, v)
-  requires ChosenValImpliesLeaderOnlyHearsVal(c, v)
-  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  requires ApplicationInv(c, v)
   ensures AtMostOneChosenVal(c, v)
 {
   forall i, j, vb1: ValBal, vb2: ValBal | 
@@ -1137,7 +1057,9 @@ lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
     && ChosenAtHistory(c, v.History(i), vb1)
     && ChosenAtHistory(c, v.History(j), vb2)
   ensures 
-    vb1.v == vb2.v
+    && c.ValidLeaderIdx(vb1.b)
+    && c.ValidLeaderIdx(vb2.b)
+    && vb1.v == vb2.v
   {
     reveal_ChosenAtHistory();
     // vb1 chosen at i implies that vb1 is also chosen at j, by LearnerReceivedAcceptsMonotonic.
@@ -1150,6 +1072,7 @@ lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
     // There are then two cases. If vb1.b == vb2.b, then the conclusion holds via OneValuePerBallot
     // Otherwise, leader 2 must hear leader 1's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
     // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
+    assert vb1.v == vb2.v;
   }
 }
 
