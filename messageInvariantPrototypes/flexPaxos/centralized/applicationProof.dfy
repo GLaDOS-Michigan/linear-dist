@@ -81,18 +81,6 @@ ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables)
     c.ValidLeaderIdx(v.acceptors[acc].acceptedVB.value.b)
 }
 
-// If an acceptor has accepted vb, then it must have promised a ballot >= vb.b
-ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall acc | 
-    && c.ValidAcceptorIdx(acc) 
-    && v.acceptors[acc].acceptedVB.MVBSome?
-  :: 
-    && v.acceptors[acc].promised.MNSome?
-    && v.acceptors[acc].acceptedVB.value.b <= v.acceptors[acc].promised.value
-}
-
 ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
@@ -221,7 +209,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   && LearnerReceivedAcceptImpliesProposed(c, v)
   && LearnerReceivedAcceptImpliesAccepted(c, v)
   && AcceptorValidPromisedAndAccepted(c, v)
-  && AcceptorPromisedLargerThanAccepted(c, v)
   && AcceptorAcceptedImpliesProposed(c, v)
   && LeaderValidReceivedPromises(c, v)
   && LeaderHighestHeardUpperBound(c, v)
