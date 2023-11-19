@@ -9,14 +9,14 @@ module ShardedKVProof {
   import opened MessageInvariants
   import opened OwnershipInvariants
 
-  ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
-   requires v.WF(c)
-  {
-    forall i:int, idx, k: UniqueKey | 
-      && v.ValidHistoryIdx(i)
-      && c.ValidIdx(idx)
-    :: v.History(i).hosts[idx].HasKey(k)
-  }
+  // ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
+  //  requires v.WF(c)
+  // {
+  //   forall i:int, idx, k: UniqueKey | 
+  //     && v.ValidHistoryIdx(i)
+  //     && c.ValidIdx(idx)
+  //   :: v.History(i).hosts[idx].HasKey(k)
+  // }
   
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)

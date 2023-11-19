@@ -8,14 +8,6 @@ module ShardedKVProof {
   import opened DistributedSystem
   import opened Obligations
 
-  ghost predicate MessagesValid(c: Constants, v: Variables)
-   requires v.WF(c)
-  {
-    forall m | m in v.network.sentMsgs
-    :: && c.ValidIdx(m.src)
-       && c.ValidIdx(m.dst)
-  }
-
   ghost predicate HostsCompleteKeys(c: Constants, v: Variables)
    requires v.WF(c)
   {
@@ -65,8 +57,7 @@ module ShardedKVProof {
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && MessagesValid(c, v)
-    && HostsCompleteKeys (c, v)
+    // && HostsCompleteKeys (c, v)
     && AtMostOneInFlight(c, v)
     && LiveKeyImpliesNoneInFlight(c, v)
   }
@@ -94,7 +85,7 @@ module ShardedKVProof {
     ensures Inv(c, v')
   {
     assert v'.WF(c);
-    InvNextHostsCompleteKeys(c, v, v');
+    // InvNextHostsCompleteKeys(c, v, v');
     InvNextAtMostOneInFlight(c, v, v');
     InvNextLiveKeyImpliesNoneInFlight(c, v, v');
     InvNextSafety(c, v, v');
@@ -105,22 +96,22 @@ module ShardedKVProof {
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
-lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
-  requires v'.WF(c)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures HostsCompleteKeys(c, v')
-{
-  forall i, k: UniqueKey | c.ValidIdx(i)
-  ensures v'.hosts[i].HasKey(k)
-  {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    var actor, msgOps := dsStep.actor, dsStep.msgOps;
-    if actor == i {
-      assert v.hosts[i].HasKey(k);  // trigger
-    }
-  }
-}
+// lemma InvNextHostsCompleteKeys(c: Constants, v: Variables, v': Variables)
+//   requires v'.WF(c)
+//   requires Inv(c, v)
+//   requires Next(c, v, v')
+//   ensures HostsCompleteKeys(c, v')
+// {
+//   forall i, k: UniqueKey | c.ValidIdx(i)
+//   ensures v'.hosts[i].HasKey(k)
+//   {
+//     var dsStep :| NextStep(c, v, v', dsStep);
+//     var actor, msgOps := dsStep.actor, dsStep.msgOps;
+//     if actor == i {
+//       assert v.hosts[i].HasKey(k);  // trigger
+//     }
+//   }
+// }
 
 lemma InvNextAtMostOneInFlight(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
@@ -157,7 +148,7 @@ lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, 
 
 lemma InvNextLiveKeyImpliesNoneInFlight(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
-  requires HostsCompleteKeys(c, v')
+  // requires HostsCompleteKeys(c, v')`
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LiveKeyImpliesNoneInFlight(c, v')
