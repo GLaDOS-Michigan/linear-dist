@@ -46,15 +46,15 @@ ghost predicate AcceptorValidAcceptedVB1(c: Constants, v: Variables)
     && Propose(bal, val) in v.network.sentMsgs
 }
 
-// ghost predicate AcceptorValidAcceptedVB2(c: Constants, v: Variables)
-//   requires v.WF(c)
-// {
-//   forall idx, val, bal | 
-//     && c.ValidAcceptorIdx(idx) 
-//     && v.acceptors[idx].acceptedVB == MVBSome(VB(val, bal))
-//   :: 
-//     && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
-// }
+ghost predicate AcceptorValidAcceptedVB2(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall idx, val, bal | 
+    && c.ValidAcceptorIdx(idx) 
+    && v.acceptors[idx].acceptedVB == MVBSome(VB(val, bal))
+  :: 
+    && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
+}
 
 ghost predicate LearnedValueValid(c: Constants, v: Variables)
   requires v.WF(c)
@@ -247,7 +247,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
 {
   && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB1(c, v)
-  // && AcceptorValidAcceptedVB2(c, v)
+  && AcceptorValidAcceptedVB2(c, v)
   && LearnedValueValid(c, v)
   && AcceptorPromisedMonotonic1(c, v)
   && AcceptorPromisedMonotonic2(c, v)
@@ -336,7 +336,7 @@ lemma InvNextAcceptorValidAcceptedVB(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorValidAcceptedVB1(c, v')
-  // ensures AcceptorValidAcceptedVB2(c, v')
+  ensures AcceptorValidAcceptedVB2(c, v')
 {}
 
 lemma InvNextLearnedValueValid(c: Constants, v: Variables, v': Variables)
@@ -346,7 +346,9 @@ lemma InvNextLearnedValueValid(c: Constants, v: Variables, v': Variables)
 {}
 
 lemma InvNextAcceptorPromisedMonotonic(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+  requires v.WF(c)
+  requires AcceptorPromisedMonotonic1(c, v)
+  requires AcceptorPromisedMonotonic2(c, v)
   requires Next(c, v, v')
   ensures AcceptorPromisedMonotonic1(c, v')
   ensures AcceptorPromisedMonotonic2(c, v')
@@ -366,7 +368,7 @@ lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables
 lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
-  // requires AcceptorValidAcceptedVB2(c, v)
+  requires AcceptorValidAcceptedVB2(c, v)
   requires PromiseVbImpliesAccepted(c, v)
   requires AcceptMessagesValid(c, v)
   requires Next(c, v, v')
@@ -378,7 +380,6 @@ lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
   ensures
     Accept(prom.vbOpt.value, prom.acc) in v'.network.sentMsgs
   {
-    assume false;
     if prom !in v.network.sentMsgs {
       var dsStep :| NextStep(c, v, v', dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
@@ -400,7 +401,9 @@ lemma InvNextAcceptMessageImpliesProposed(c: Constants, v: Variables, v': Variab
 {}
 
 lemma InvNextAcceptMessagesValid(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
+  requires v.WF(c)
+  requires ValidMessageSrc(c, v)
+  requires AcceptMessagesValid(c, v)
   requires Next(c, v, v')
   ensures AcceptMessagesValid(c, v')
 {}
