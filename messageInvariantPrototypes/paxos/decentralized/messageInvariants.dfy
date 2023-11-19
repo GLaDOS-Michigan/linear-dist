@@ -3,6 +3,7 @@ include "spec.dfy"
 module PaxosMessageInvariants {
 
 import opened Types
+import opened MonotonicityLibrary
 import opened UtilitiesLibrary
 import opened DistributedSystem
 import opened Obligations
@@ -19,7 +20,6 @@ ghost predicate ValidMessageSrc(c: Constants, v: Variables)
     case Promise(_, acc, _) => c.ValidAcceptorIdx(acc)
     case Propose(bal, _) => c.ValidLeaderIdx(bal)
     case Accept(_, acc) => c.ValidAcceptorIdx(acc)
-    case Learn(lnr, _, _) => c.ValidLearnerIdx(lnr)
 }
 
 // certified self-inductive
@@ -28,11 +28,11 @@ ghost predicate ValidMessageSrc(c: Constants, v: Variables)
 ghost predicate LeaderValidHighestHeard(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall idx, b| c.ValidLeaderIdx(idx) && v.leaders[idx].highestHeardBallot == Some(b)
+  forall idx, b| c.ValidLeaderIdx(idx) && v.leaders[idx].highestHeardBallot == MNSome(b)
   :: (exists prom: Message ::
         && IsPromiseMessage(v, prom)
         && prom.bal == idx
-        && prom.vbOpt == Some(VB(v.leaders[idx].value, b))
+        && prom.vbOpt == Some(VB(v.leaders[idx].Value(), b))
     )
 }
 
@@ -53,8 +53,8 @@ ghost predicate LeaderValidHighestHeard(c: Constants, v: Variables)
 ghost predicate AcceptorValidPendingMsg(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall idx | c.ValidAcceptorIdx(idx) && v.acceptors[idx].pendingMsg.Some?
-  :: v.acceptors[idx].pendingMsg.value in v.network.sentMsgs
+  forall idx | c.ValidAcceptorIdx(idx) && v.acceptors[idx].pendingPrepare.Some?
+  :: Prepare(v.acceptors[idx].pendingPrepare.value.bal) in v.network.sentMsgs
 }
 
 // certified self-inductive
@@ -65,8 +65,8 @@ ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
 {
   forall idx, vb, acc | 
     && c.ValidLearnerIdx(idx)
-    && vb in v.learners[idx].receivedAccepts
-    && acc in v.learners[idx].receivedAccepts[vb]
+    && vb in v.learners[idx].receivedAccepts.m
+    && acc in v.learners[idx].receivedAccepts.m[vb]
   ::
     Accept(vb, acc) in v.network.sentMsgs
 }
@@ -124,10 +124,5 @@ ghost predicate IsAcceptMessage(v: Variables, m: Message) {
   && m.Accept?
   && m in v.network.sentMsgs
 }
-
-ghost predicate IsLearnMessage(v: Variables, m: Message) {
-  && m.Learn?
-  && m in v.network.sentMsgs
-} 
 }  // end module PaxosProof
 

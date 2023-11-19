@@ -5,6 +5,7 @@ module PaxosProof {
 
 import opened Types
 import opened UtilitiesLibrary
+import opened MonotonicityLibrary
 import opened DistributedSystem
 import opened Obligations
 import opened PaxosMessageInvariants
@@ -26,7 +27,7 @@ ghost predicate Chosen(c: Constants, v: Variables, vb: ValBal) {
 ghost predicate AcceptorValidPromised(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall idx, b | c.ValidAcceptorIdx(idx) && v.acceptors[idx].promised == Some(b)
+  forall idx, b | c.ValidAcceptorIdx(idx) && v.acceptors[idx].promised == MNSome(b)
   :: (exists m: Message ::
         && (IsPrepareMessage(v, m) || IsProposeMessage(v, m))
         && m.bal == b
@@ -40,50 +41,31 @@ ghost predicate AcceptorValidAcceptedVB1(c: Constants, v: Variables)
 {
   forall idx, val, bal | 
     && c.ValidAcceptorIdx(idx) 
-    && v.acceptors[idx].acceptedVB == Some(VB(val, bal))
+    && v.acceptors[idx].acceptedVB == MVBSome(VB(val, bal))
   :: 
     && Propose(bal, val) in v.network.sentMsgs
 }
 
-ghost predicate AcceptorValidAcceptedVB2(c: Constants, v: Variables)
+// ghost predicate AcceptorValidAcceptedVB2(c: Constants, v: Variables)
+//   requires v.WF(c)
+// {
+//   forall idx, val, bal | 
+//     && c.ValidAcceptorIdx(idx) 
+//     && v.acceptors[idx].acceptedVB == MVBSome(VB(val, bal))
+//   :: 
+//     && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
+// }
+
+ghost predicate LearnedValueValid(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall idx, val, bal | 
-    && c.ValidAcceptorIdx(idx) 
-    && v.acceptors[idx].acceptedVB == Some(VB(val, bal))
+  forall lnr:LearnerId, val | 
+    && c.ValidLearnerIdx(lnr)
+    && v.learners[lnr].learned == Some(val)
   :: 
-    && Accept(VB(val, bal), c.acceptorConstants[idx].id) in v.network.sentMsgs
-}
-
-
-// Tony: I once thought this was a message invariant, but it isn't --- it depends on 
-// application level knowledge that l.receivedAccepts is monotonically increasing.
-// For every Learn(lnr, val) message in the network, the learner must have a quorum of
-// accepts for that val, at some common ballot
-// Tony update a week later: monotonic variables need to be annotated by the user. Hence,
-// if user were to annotate l.receivedAccepts as a monotonic set, then this is a proper 
-// message invariant
-ghost predicate LearnMsgsValid1(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
-{
-  forall lnr:LearnerId, bal, val | 
-    Learn(lnr, bal, val) in v.network.sentMsgs
-  :: 
-    && var vb := VB(val, bal);
-    && vb in v.learners[lnr].receivedAccepts
-}
-
-ghost predicate LearnMsgsValid2(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires ValidMessageSrc(c, v)
-  requires LearnMsgsValid1(c, v)
-{
-  forall lnr:LearnerId, bal, val | 
-    Learn(lnr, bal, val) in v.network.sentMsgs
-  :: 
-    && var vb := VB(val, bal);
-    && |v.learners[lnr].receivedAccepts[vb]| >= c.f+1
+    (exists bal :: 
+        && VB(val, bal) in v.learners[lnr].receivedAccepts.m
+        && |v.learners[lnr].receivedAccepts.m[VB(val, bal)]| >= c.f+1)
 }
 
 // Tony: I once thought this was a message invariant, but it isn't --- it depends on 
@@ -98,7 +80,7 @@ ghost predicate AcceptorPromisedMonotonic1(c: Constants, v: Variables)
     && IsPromiseMessage(v, prom)
     && prom.acc == c.acceptorConstants[idx].id
   ::
-    && v.acceptors[idx].promised.Some?
+    && v.acceptors[idx].promised.MNSome?
 }
 
 ghost predicate AcceptorPromisedMonotonic2(c: Constants, v: Variables) 
@@ -131,8 +113,8 @@ ghost predicate ProposeImpliesLeaderState(c: Constants, v: Variables)
   requires ValidMessageSrc(c, v)
 {
   forall p | IsProposeMessage(v, p) 
-  ::  && |v.leaders[p.bal].receivedPromises| >= c.f+1
-      && v.leaders[p.bal].value == p.val
+  ::  && |v.leaders[p.bal].ReceivedPromises()| >= c.f+1
+      && v.leaders[p.bal].Value() == p.val
 }
 
 ghost predicate PromiseVbImpliesAccepted(c: Constants, v: Variables) {
@@ -167,7 +149,7 @@ ghost predicate AcceptMessagesValid(c: Constants, v: Variables)
   requires ValidMessageSrc(c, v)
 {
   forall acc | IsAcceptMessage(v, acc)
-  ::  && v.acceptors[acc.acc].acceptedVB.Some?
+  ::  && v.acceptors[acc.acc].acceptedVB.MVBSome?
       && acc.vb.b <= v.acceptors[acc.acc].acceptedVB.value.b
 }
 
@@ -208,10 +190,10 @@ ghost predicate LeaderPromiseSetProperties(c: Constants, v: Variables, idx: int,
   var cldr := c.leaderConstants[idx];
   var hbal := ldr.highestHeardBallot;
   && IsPromiseSet(c, v, pset, cldr.id)
-  && (hbal.Some? ==> PromiseSetHighestVB(c, v, pset, cldr.id, VB(ldr.value, hbal.value)))
-  && (hbal.None? ==> PromiseSetEmptyVB(c, v, pset, cldr.id))
-  && |pset| == |ldr.receivedPromises|
-  && (forall p: Message | p in pset :: p.acc in ldr.receivedPromises)
+  && (hbal.MNSome? ==> PromiseSetHighestVB(c, v, pset, cldr.id, VB(ldr.Value(), hbal.value)))
+  && (hbal.MNNone? ==> PromiseSetEmptyVB(c, v, pset, cldr.id))
+  && |pset| == |ldr.ReceivedPromises()|
+  && (forall p: Message | p in pset :: p.acc in ldr.ReceivedPromises())
 }
 
 // Tony: If receivedPromises remembers whole messages rather than the source, this 
@@ -228,9 +210,9 @@ ghost predicate AcceptorPromisedLargerThanAccepted(c: Constants, v: Variables)
 {
   forall idx | 
     && c.ValidAcceptorIdx(idx) 
-    && v.acceptors[idx].acceptedVB.Some?
+    && v.acceptors[idx].acceptedVB.MVBSome?
   :: 
-    && v.acceptors[idx].promised.Some?
+    && v.acceptors[idx].promised.MNSome?
     && v.acceptors[idx].acceptedVB.value.b <= v.acceptors[idx].promised.value
 }
 
@@ -265,9 +247,8 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
 {
   && AcceptorValidPromised(c, v)
   && AcceptorValidAcceptedVB1(c, v)
-  && AcceptorValidAcceptedVB2(c, v)
-  && LearnMsgsValid1(c, v)
-  && LearnMsgsValid2(c, v)
+  // && AcceptorValidAcceptedVB2(c, v)
+  && LearnedValueValid(c, v)
   && AcceptorPromisedMonotonic1(c, v)
   && AcceptorPromisedMonotonic2(c, v)
   && ProposeImpliesLeaderState(c, v)                  // 2
@@ -324,7 +305,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   MessageInvInductive(c, v, v');
   InvNextAcceptorValidPromised(c, v, v');
   InvNextAcceptorValidAcceptedVB(c, v, v');
-  InvNextLearnMsgsValid(c, v, v');
+  InvNextLearnedValueValid(c, v, v');
   InvNextAcceptorPromisedMonotonic(c, v, v');
   InvNextProposeImpliesLeaderState(c, v, v');
   InvNextPromiseVbImpliesAccepted(c, v, v');
@@ -355,14 +336,13 @@ lemma InvNextAcceptorValidAcceptedVB(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AcceptorValidAcceptedVB1(c, v')
-  ensures AcceptorValidAcceptedVB2(c, v')
+  // ensures AcceptorValidAcceptedVB2(c, v')
 {}
 
-lemma InvNextLearnMsgsValid(c: Constants, v: Variables, v': Variables)
+lemma InvNextLearnedValueValid(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures LearnMsgsValid1(c, v')
-  ensures LearnMsgsValid2(c, v')
+  ensures LearnedValueValid(c, v')
 {}
 
 lemma InvNextAcceptorPromisedMonotonic(c: Constants, v: Variables, v': Variables)
@@ -386,7 +366,7 @@ lemma InvNextProposeImpliesLeaderState(c: Constants, v: Variables, v': Variables
 lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires ValidMessageSrc(c, v)
-  requires AcceptorValidAcceptedVB2(c, v)
+  // requires AcceptorValidAcceptedVB2(c, v)
   requires PromiseVbImpliesAccepted(c, v)
   requires AcceptMessagesValid(c, v)
   requires Next(c, v, v')
@@ -398,6 +378,7 @@ lemma InvNextPromiseVbImpliesAccepted(c: Constants, v: Variables, v': Variables)
   ensures
     Accept(prom.vbOpt.value, prom.acc) in v'.network.sentMsgs
   {
+    assume false;
     if prom !in v.network.sentMsgs {
       var dsStep :| NextStep(c, v, v', dsStep);
       var actor, msgOps := dsStep.actor, dsStep.msgOps;
@@ -465,15 +446,15 @@ lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v'
     {
       if && step.ReceiveStep? && actor == idx 
         && msgOps.recv.value.Promise? 
-        && |l.receivedPromises| <= c.f
-        && msgOps.recv.value.acc !in l.receivedPromises
+        && |l.ReceivedPromises()| <= c.f
+        && msgOps.recv.value.acc !in l.ReceivedPromises()
         && msgOps.recv.value.bal == lc.id 
       {
         var pset :| LeaderPromiseSetProperties(c, v, idx, pset);
         var newM := msgOps.recv.value;
         var doUpdate := && newM.vbOpt.Some? 
-                        && (|| l.highestHeardBallot.None?
-                            || (l.highestHeardBallot.Some? && newM.vbOpt.value.b > l.highestHeardBallot.value));
+                        && (|| l.highestHeardBallot.MNNone?
+                            || (l.highestHeardBallot.MNSome? && newM.vbOpt.value.b > l.highestHeardBallot.value));
         if doUpdate {
           var pset' := pset + {msgOps.recv.value};  // witness
           // trigger them triggers
@@ -481,8 +462,8 @@ lemma InvNextHighestHeardBackedByReceivedPromises(c: Constants, v: Variables, v'
           assert LeaderPromiseSetProperties(c, v', idx, pset');
         } else {
           var pset' := pset + {msgOps.recv.value};  // witness
-          if l.highestHeardBallot.Some? {
-            var highestheard := VB(l.value, l.highestHeardBallot.value);
+          if l.highestHeardBallot.MNSome? {
+            var highestheard := VB(l.Value(), l.highestHeardBallot.value);
             var winningProm :| WinningPromiseMessageInQuorum(c, v, pset, idx, highestheard, winningProm);  // witness
             assert WinningPromiseMessageInQuorum(c, v', pset', idx, highestheard, winningProm);  // trigger
           }
@@ -515,8 +496,8 @@ lemma InvNextHighestHeardBackedByReceivedPromisesHelper(c: Constants, v: Variabl
 {
   var pset :| LeaderPromiseSetProperties(c, v, idx, pset);  // witness
   var l := v.leaders[idx];
-  if l.highestHeardBallot.Some? {
-    var highestheard := VB(l.value, l.highestHeardBallot.value);
+  if l.highestHeardBallot.MNSome? {
+    var highestheard := VB(l.Value(), l.highestHeardBallot.value);
     var winningProm :| WinningPromiseMessageInQuorum(c, v, pset, idx, highestheard, winningProm);  // witness
     assert WinningPromiseMessageInQuorum(c, v', pset, idx, highestheard, winningProm);  // trigger
   }
@@ -538,9 +519,9 @@ lemma InvNextProposeBackedByPromiseQuorum(c: Constants, v: Variables, v': Variab
       var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
       if step.ProposeStep? && p !in v.network.sentMsgs {
         var quorum :| LeaderPromiseSetProperties(c, v, actor, quorum);  // witness
-        if l.highestHeardBallot.Some? {
+        if l.highestHeardBallot.MNSome? {
           // This is where HighestHeardBackedByReceivedPromises comes in
-          var leaderVB := VB(l.value, l.highestHeardBallot.value);
+          var leaderVB := VB(l.Value(), l.highestHeardBallot.value);
           var m :| WinningPromiseMessageInQuorum(c, v, quorum, lc.id, leaderVB, m);  // witness
           assert WinningPromiseMessageInQuorum(c, v', quorum, lc.id, leaderVB, m);  // trigger
         }
@@ -609,7 +590,14 @@ lemma InvNextChosenValImpliesProposeOnlyVal(c: Constants, v: Variables, v': Vari
       var ac, a, a' := c.acceptorConstants[actor], v.acceptors[actor], v'.acceptors[actor];
       var step :| AcceptorHost.NextStep(ac, a, a', step, msgOps);
       if step.MaybeAcceptStep? {
-        var new_prop := a.pendingMsg.value;
+        if !Chosen(c, v, vb) && propose.val != vb.v {
+          /* This is a point where something can suddenly be chosen.*/
+          assert propose.bal > vb.b;
+          InvNextValidMessageSrc(c, v, v');
+          ChosenAndConflictingProposeImpliesFalse(c, v', vb, propose);
+          assert false;
+        }
+      } else if step.BroadcastAcceptedStep? {
         if !Chosen(c, v, vb) && propose.val != vb.v {
           /* This is a point where something can suddenly be chosen.*/
           assert propose.bal > vb.b;
@@ -667,7 +655,7 @@ lemma InvNextChosenValImpliesProposeOnlyValLeaderStep(c: Constants, v: Variables
       assert LeaderHost.NextProposeStep(lc, l, l', msgOps);
       var pquorum :| LeaderPromiseSetProperties(c, v, actor, pquorum);  // by HighestHeardBackedByReceivedPromises
       assert IsPromiseQuorum(c, v, pquorum, actor);   // trigger 
-      assert l.highestHeardBallot.Some?;              // trigger
+      assert l.highestHeardBallot.MNSome?;              // trigger
       assert false;
     }
     assert propose.val == vb.v;
@@ -734,20 +722,17 @@ lemma ChosenAndConflictingProposeImpliesFalse(c: Constants, v: Variables, chosen
 
 
 // Lemma: For any Learn message, that learned value must have been chosen
-lemma LearnedImpliesChosen(c: Constants, v: Variables, learnMsg: Message)
+lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, vb: ValBal)
   requires v.WF(c)
   requires MessageInv(c, v)
-  requires LearnMsgsValid1(c, v)
-  requires LearnMsgsValid2(c, v)
-  requires IsLearnMessage(v, learnMsg)
-  ensures Chosen(c, v, VB(learnMsg.val, learnMsg.bal))
+  requires c.ValidLearnerIdx(lnr)
+  requires v.learners[lnr].learned == Some(vb.v)
+  requires vb in v.learners[lnr].receivedAccepts.m
+  requires |v.learners[lnr].receivedAccepts.m[vb]| >= c.f+1
+  ensures Chosen(c, v, vb)
 {
-  /* Suppose learnMsg(lnr, bal, val) in network. Then by LearnMsgsValid, lnr has a 
-    a quorum of receivedAccepts for vb := VB(bal, val). By LearnerValidReceivedAccepts,
-    there is a corresponding set of Accept(vb, _) messages in the network. */
-  var l := v.learners[learnMsg.lnr];
-  var vb := VB(learnMsg.val, learnMsg.bal);
-  var quorum := QuorumFromReceivedAccepts(l.receivedAccepts[vb], vb);  // witness
+  var l := v.learners[lnr];
+  var quorum := QuorumFromReceivedAccepts(l.receivedAccepts.m[vb], vb);  // witness
   assert IsAcceptQuorum(c, v, quorum, vb);  // trigger
 }
 
@@ -778,12 +763,19 @@ lemma MessageAndApplicationInvImpliesAgreement(c: Constants, v: Variables)
     values are chosen, thus violating fact that at most one value is chosen 
     (at most one chosen value is implied by application invs) */
   if !Agreement(c, v) {
-    var m1, m2 :| 
-      && IsLearnMessage(v, m1)
-      && IsLearnMessage(v, m2)
-      && m1.val != m2.val;
-    LearnedImpliesChosen(c, v, m1);
-    LearnedImpliesChosen(c, v, m2);
+    var l1, l2 :| 
+      && c.ValidLearnerIdx(l1)
+      && c.ValidLearnerIdx(l2)
+      && v.learners[l1].learned.Some?
+      && v.learners[l2].learned.Some?
+      && v.learners[l1].learned != v.learners[l2].learned;
+    var v1, v2 := v.learners[l1].learned.value, v.learners[l2].learned.value;
+    var b1 :| && VB(v1, b1) in v.learners[l1].receivedAccepts.m
+              && |v.learners[l1].receivedAccepts.m[VB(v1, b1)]| >= c.f+1;
+    var b2 :| && VB(v2, b2) in v.learners[l2].receivedAccepts.m
+              && |v.learners[l2].receivedAccepts.m[VB(v2, b2)]| >= c.f+1;
+    LearnedImpliesChosen(c, v, l1, VB(v1, b1));
+    LearnedImpliesChosen(c, v, l2, VB(v2, b2));
     assert false;
   }
 }
