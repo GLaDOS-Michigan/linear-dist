@@ -62,7 +62,7 @@ module LockServerProof {
 
 lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
-  requires AtMostOwnerPerKeyClients(c, v)
+  requires AtMostOneOwnerPerKeyClients(c, v)
   ensures Safety(c, v)
 {
   forall idx1, idx2 | 
