@@ -1,3 +1,4 @@
+/// This file is auto-generated from /Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/messageInvariantPrototypes/lockServer/distributedMonotonic/distributedSystem.dfy
 include "spec.dfy"
 
 module MessageInvariants {
@@ -5,6 +6,17 @@ import opened Types
 import opened UtilitiesLibrary
 import opened MonotonicityLibrary
 import opened DistributedSystem
+
+// All msg have a valid source
+ghost predicate ValidMessages(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall msg | msg in v.network.sentMsgs
+  ::
+  if msg.Release? then 0 <= msg.Src() < |c.clients|
+  else if msg.Grant? then 0 <= msg.Src() < |c.server|
+  else true
+}
 
 ghost predicate SendReleaseValidity(c: Constants, v: Variables)
   requires v.WF(c)
@@ -34,6 +46,7 @@ ghost predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && ValidVariables(c, v)
+  && ValidMessages(c, v)
   && SendReleaseValidity(c, v)
   && SendGrantValidity(c, v)
 }
@@ -51,6 +64,7 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
   requires MessageInv(c, v)
   requires Next(c, v, v')
   ensures MessageInv(c, v')
+
 {
   InvNextValidVariables(c, v, v');
   InvNextSendReleaseValidity(c, v, v');
@@ -60,7 +74,6 @@ lemma MessageInvInductive(c: Constants, v: Variables, v': Variables)
 /***************************************************************************************
 *                                     Aux Proofs                                       *
 ***************************************************************************************/
-
 
 lemma InvNextSendReleaseValidity(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)

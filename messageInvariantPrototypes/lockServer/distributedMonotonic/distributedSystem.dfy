@@ -1,12 +1,12 @@
+/// This file is auto-generated from /Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/messageInvariantPrototypes/lockServer/centralized/system.dfy
 include "../hosts.dfy"
-
 
 module Network {
   import opened Types
+
   datatype Variables = Variables(sentMsgs:set<Message>)
 
-  ghost predicate Init(v: Variables)
-  {
+  ghost predicate Init(v: Variables) {
     && v.sentMsgs == {}
   }
 
@@ -16,126 +16,131 @@ module Network {
     && v'.sentMsgs ==
       v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }
   }
-} // end module Network
-
+}  // end module Network
 
 module DistributedSystem {
-  import opened UtilitiesLibrary
   import opened Types
-  import Network
+  import opened UtilitiesLibrary
+  import opened Network
   import ClientHost
   import ServerHost
 
-  datatype Constants = Constants(
-    clients: seq<ClientHost.Constants>,
-    server: seq<ServerHost.Constants>
-    )
-  {
-    ghost predicate ValidClientIdx(id: int) {
+  datatype Constants = Constants(clients: seq<ClientHost.Constants>, server: seq<ServerHost.Constants>) {
+    ghost predicate ValidClientIdx(id: int)
+      decreases this, id
+    {
       0 <= id < |clients|
     }
 
-    ghost predicate UniqueIds() {
-      forall i, j | ValidClientIdx(i) && ValidClientIdx(j) && clients[i].myId == clients[j].myId :: i == j
+    ghost predicate UniqueIds()
+      decreases this
+    {
+      forall i: int, j: int | ValidClientIdx(i) && ValidClientIdx(j) && clients[i].myId == clients[j].myId :: 
+        i == j
     }
 
-    ghost predicate WF() {
-      && 0 < |clients|
-      && UniqueIds()
-      && |server| == 1
+    ghost predicate WF()
+      decreases this
+    {
+      0 < |clients| &&
+      UniqueIds() &&
+      |server| == 1
     }
   }
+  // end datatype Constants
 
-  datatype Hosts = Hosts(
-    clients: seq<ClientHost.Variables>,
-    server: seq<ServerHost.Variables>
-  ) {
-    ghost predicate WF(c: Constants) {
-      && c.WF()
-      && ClientHost.GroupWF(c.clients, clients)
-      && var allClients := (set x | 0 <= x < |c.clients| :: c.clients[x].myId);
-      && ServerHost.GroupWF(c.server, server, allClients)
+  datatype Hosts = Hosts(clients: seq<ClientHost.Variables>, server: seq<ServerHost.Variables>) {
+    ghost predicate WF(c: Constants)
+      decreases this, c
+    {
+      c.WF() &&
+      ClientHost.GroupWF(c.clients, clients) &&
+      ghost var allClients: set<HostId> := set x: int {:trigger c.clients[x]} | 0 <= x < |c.clients| :: c.clients[x].myId; true && ServerHost.GroupWF(c.server, server, allClients)
     }
   }
+  // end datatype Hosts
 
   datatype Variables = Variables(
     history: seq<Hosts>,
-    network: Network.Variables)
-  {
+    network: Network.Variables
+  ) {
+  
     ghost predicate ValidHistoryIdx(i: int) {
       0 <= i < |history|
     }
-
+  
     ghost predicate ValidHistoryIdxStrict(i: int) {
       0 <= i < |history|-1
     }
-
+  
     ghost predicate WF(c: Constants) {
       && c.WF()
       && 0 < |history|
       && (forall i | ValidHistoryIdx(i) :: history[i].WF(c))
     }
-
+  
+    ghost function Last() : (h: Hosts)
+      requires 0 < |history|
+      ensures h == history[|history|-1]
+      ensures h == History(|history|-1)
+   {
+      UtilitiesLibrary.Last(history)
+    }
+  
     ghost function History(i: int) : (h: Hosts)
       requires ValidHistoryIdx(i)
       ensures h == history[i]
     {
       history[i]
     }
+  }  // end datatype Variables
 
-    ghost function Last() : (h: Hosts) 
-      requires 0 < |history|
-      ensures h == history[|history|-1]
-    {
-      UtilitiesLibrary.Last(history)
-    }
-  } // end datatype Variables
 
   ghost predicate InitHosts(c: Constants, h: Hosts)
+    requires h.WF(c)
   {
-    && var allClients := (set x | 0 <= x < |c.clients| :: c.clients[x].myId);
-    && ClientHost.GroupInit(c.clients, h.clients)
-    && ServerHost.GroupInit(c.server, h.server, allClients)
+    && ghost var allClients: set<HostId> := set x: int {:trigger c.clients[x]} | 0 <= x < |c.clients| :: c.clients[x].myId; ClientHost.GroupInit(c.clients, h.clients) && ServerHost.GroupInit(c.server, h.server, allClients)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
   {
     && v.WF(c)
-    && |v.history| == 1
+   && |v.history| == 1
     && InitHosts(c, v.History(0))
     && Network.Init(v.network)
   }
 
-  ghost predicate NextClientStep(c: Constants, h: Hosts, h': Hosts, actor: int, msgOps: MessageOps)
-    requires h.WF(c) && h'.WF(c)
-  {
-    && c.ValidClientIdx(actor)
-    && ClientHost.Next(c.clients[actor], h.clients[actor], h'.clients[actor], msgOps)
-    // all other hosts UNCHANGED
-    && (forall otherClientIdx | c.ValidClientIdx(otherClientIdx) && otherClientIdx != actor :: h'.clients[otherClientIdx] == h.clients[otherClientIdx])
-    && h'.server == h.server
-  }
-
-  ghost predicate NextServerStep(c: Constants, h: Hosts, h': Hosts, msgOps: MessageOps)
-    requires h.WF(c) && h'.WF(c)
-  {
-    && ServerHost.Next(c.server[0], h.server[0], h'.server[0], msgOps)
-    // all other hosts UNCHANGED
-    && h'.clients == h.clients
-    && |h'.server| == 1
-  }
-
   datatype Step = 
-    | ServerStep(msgOps: MessageOps)
-    | ClientStep(actor: int, msgOps: MessageOps)
+    | ClientHostStep(actor: nat, msgOps: MessageOps)
+    | ServerHostStep(actor: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
     && Network.Next(n, n', step.msgOps)
-    && match step 
-      case ClientStep(actor, msgOps) => NextClientStep(c, h, h', actor, msgOps)
-      case ServerStep(msgOps) => NextServerStep(c, h, h', msgOps)
+    && match step
+      case ClientHostStep(actor, msgOps) => NextClientHostStep(c, h, h', actor, msgOps)
+      case ServerHostStep(actor, msgOps) => NextServerHostStep(c, h, h', actor, msgOps)
+  }
+
+  ghost predicate NextClientHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+    requires h.WF(c) && h'.WF(c)
+  {
+    && 0 <= actor < |h.clients|
+    && ClientHost.Next(c.clients[actor], h.clients[actor], h'.clients[actor], msgOps)
+    // all other hosts UNCHANGED
+    && (forall other| 0 <= other < |h.clients| && other != actor :: h'.clients[other] == h.clients[other])
+    && h'.server == h.server
+  }
+
+  ghost predicate NextServerHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+    requires h.WF(c) && h'.WF(c)
+  {
+    && 0 <= actor < |h.server|
+    && ServerHost.Next(c.server[actor], h.server[actor], h'.server[actor], msgOps)
+    // all other hosts UNCHANGED
+    && h'.clients == h.clients
+    && (forall other| 0 <= other < |h.server| && other != actor :: h'.server[other] == h.server[other])
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)
@@ -150,25 +155,16 @@ module DistributedSystem {
 *                                Variable properties                                   *
 ***************************************************************************************/
 
-  // All msg have a valid source
-  ghost predicate ValidMessages(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    forall msg | msg in v.network.sentMsgs
-    :: && (if msg.Release? then c.ValidClientIdx(msg.Src()) else msg.Src() == 0)
-       && (if msg.Grant? then c.ValidClientIdx(msg.Dst()) else msg.Dst() == 0)
-  }
-
   ghost predicate {:opaque} ValidHistory(c: Constants, v: Variables)
     requires v.WF(c)
   {
     InitHosts(c, v.History(0))
   }
-  
-  ghost predicate ValidVariables(c: Constants, v: Variables) 
+
+  // Bundle of Variable properties
+  ghost predicate ValidVariables(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && ValidMessages(c, v)
     && ValidHistory(c, v)
   }
 
@@ -178,7 +174,6 @@ module DistributedSystem {
   {
     reveal_ValidHistory();
   }
-
 
   lemma InvNextValidVariables(c: Constants, v: Variables, v': Variables)
     requires v.WF(c)
@@ -201,4 +196,5 @@ module DistributedSystem {
     assert 0 < |v.history|;
     assert 1 < |v'.history|;
   }
-}  // end module DistributedSystem
+
+} // end module DistributedSystem
