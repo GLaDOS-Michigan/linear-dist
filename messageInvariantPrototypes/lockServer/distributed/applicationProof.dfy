@@ -11,46 +11,47 @@ module LockServerProof {
 *                                   Definitions                                        *
 ***************************************************************************************/
 
-  ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate LockInFlight(c: Constants, v: Variables) 
     requires v.WF(c)
   {
-    exists msg :: KeyInFlightByMessage(c, v, msg, k)
+    exists msg :: LockInFlightByMessage(c, v, msg)
   }
 
-  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey) 
+  ghost predicate LockInFlightByMessage(c: Constants, v: Variables, msg: Message) 
     requires v.WF(c)
   {
     && msg in v.network.sentMsgs
     && ((0 <= msg.Dst() < |c.clients| &&
-          ClientHost.UniqueKeyInFlightForHost(c.clients[msg.Dst()], v.clients[msg.Dst()], k, msg)
+          ClientHost.UniqueKeyInFlightForHost(c.clients[msg.Dst()], v.clients[msg.Dst()], 0, msg)
         )
         || (0 <= msg.Dst() < |c.server| &&
-            ServerHost.UniqueKeyInFlightForHost(c.server[msg.Dst()], v.server[msg.Dst()], k, msg)
+            ServerHost.UniqueKeyInFlightForHost(c.server[msg.Dst()], v.server[msg.Dst()], 0, msg)
         )
     )
   }
 
-  ghost predicate NoClientOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate NoClientOwnsLock(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     forall idx | 0 <= idx < |c.clients| 
     :: 
-    !ClientHost.HostOwnsUniqueKey(c.clients[idx], v.clients[idx], k)
+    !v.clients[idx].hasLock
   }
 
-  ghost predicate NoServerOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate NoServerOwnsLock(c: Constants, v: Variables) 
     requires v.WF(c)
   {
     forall idx | 0 <= idx < |c.server|
     :: 
-    !ServerHost.HostOwnsUniqueKey(c.server[idx], v.server[idx], k)
+
+    !v.server[idx].hasLock
   }
 
-  ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate NoHostOwnsLock(c: Constants, v: Variables) 
     requires v.WF(c)
   {
-    && NoClientOwnsKey(c, v, k)
-    && NoServerOwnsKey(c, v, k)
+    && NoClientOwnsLock(c, v)
+    && NoServerOwnsLock(c, v)
   }
 
 /***************************************************************************************
@@ -58,71 +59,56 @@ module LockServerProof {
 ***************************************************************************************/
 
 
-  ghost predicate AtMostOneInFlightMessagePerKey(c: Constants, v: Variables)
+  ghost predicate AtMostOneInFlightMessage(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall k, m1, m2 | KeyInFlightByMessage(c, v, m1, k) && KeyInFlightByMessage(c, v, m2, k)
+    forall m1, m2 | LockInFlightByMessage(c, v, m1) && LockInFlightByMessage(c, v, m2)
     :: m1 == m2
   }
 
-  ghost predicate HostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables)
+  ghost predicate HostOwnsLockImpliesNotInFlight(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall k | !NoHostOwnsKey(c, v, k)
-    ::
-    !UniqueKeyInFlight(c, v, k)
+    !NoHostOwnsLock(c, v) ==> !LockInFlight(c, v)
   }
 
-  ghost predicate AtMostOneOwnerPerKeyClients(c: Constants, v: Variables)
+  ghost predicate AtMostOneLockHolderClients(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall h1, h2, k | 
+    forall h1, h2| 
       && 0 <= h1 < |c.clients|
       && 0 <= h2 < |c.clients|
-      && ClientHost.HostOwnsUniqueKey(c.clients[h1], v.clients[h1], k) 
-      && ClientHost.HostOwnsUniqueKey(c.clients[h2], v.clients[h2], k) 
+      && v.clients[h1].hasLock
+      && v.clients[h2].hasLock
     ::
       && h1 == h2
   }
 
-  ghost predicate AtMostOneOwnerPerKeyServers(c: Constants, v: Variables)
+  ghost predicate AtMostOneLockHolderServers(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall h1, h2, k | 
+    forall h1, h2 | 
       && 0 <= h1 < |c.server|
       && 0 <= h2 < |c.server|
-      && ServerHost.HostOwnsUniqueKey(c.server[h1], v.server[h1], k) 
-      && ServerHost.HostOwnsUniqueKey(c.server[h2], v.server[h2], k) 
+      && v.server[h1].hasLock
+      && v.server[h2].hasLock
     ::
       && h1 == h2
-  }
-
-  ghost predicate ClientsOwnKey(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    forall k | !NoClientOwnsKey(c, v, k) :: NoServerOwnsKey(c, v, k)
-  }
-
-  ghost predicate ServersOwnKey(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    forall k | !NoServerOwnsKey(c, v, k) :: NoClientOwnsKey(c, v, k)
   }
 
   ghost predicate ServerOwnsLockImpliesNoClientsOwnsLock(c: Constants, v: Variables)
   requires v.WF(c)
   {
-    v.server[0].hasLock ==> 
-    (forall id | c.ValidClientIdx(id) :: !v.clients[id].hasLock)
+    v.server[0].hasLock ==> NoClientOwnsLock(c, v)
   }
   
   ghost predicate ApplicationInv(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && AtMostOneInFlightMessagePerKey(c, v)
-    && AtMostOneOwnerPerKeyClients(c, v)
-    && AtMostOneOwnerPerKeyServers(c, v)
-    && HostOwnsKeyImpliesNotInFlight(c, v)
+    && AtMostOneInFlightMessage(c, v)
+    && AtMostOneLockHolderClients(c, v)
+    && AtMostOneLockHolderServers(c, v)
+    && HostOwnsLockImpliesNotInFlight(c, v)
     && ServerOwnsLockImpliesNoClientsOwnsLock(c, v)
   }
 
@@ -152,12 +138,12 @@ module LockServerProof {
     ensures Inv(c, v')
   {
     MessageInvInductive(c, v, v');
-    InvNextAtMostOneInFlightMessagePerKey(c, v, v');
-    InvNextHostOwnsKeyImpliesNotInFlight(c, v, v');
-    InvNextAtMostOwnerPerKeyClients(c, v, v');
-    InvNextAtMostOwnerPerKeyServers(c, v, v');
-    InvNextServersOwnKey(c, v, v');
-    AtMostOwnerPerKeyImpliesSafety(c, v');
+    InvNextAtMostOneInFlightMessage(c, v, v');
+    InvNextHostOwnsLockImpliesNotInFlight(c, v, v');
+    InvNextAtMostOneLockHolderClients(c, v, v');
+    InvNextAtMostOneLockHolderServers(c, v, v');
+    InvNextServerOwnsLockImpliesNoClientsOwnsLock(c, v, v');
+    AtMostOneLockOwnerImpliesSafety(c, v');
   }
 
 
@@ -165,189 +151,126 @@ module LockServerProof {
 *                                 InvNext Proofs                                       *
 ***************************************************************************************/
 
-lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
+lemma AtMostOneLockOwnerImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
-  requires AtMostOneOwnerPerKeyClients(c, v)
+  requires AtMostOneLockHolderClients(c, v)
   ensures Safety(c, v)
-{
-  forall idx1, idx2 | 
-    && c.ValidClientIdx(idx1) 
-    && c.ValidClientIdx(idx2) 
-    && HoldsLock(c, v, idx1)
-    && HoldsLock(c, v, idx2)
-  ensures
-   idx1 == idx2
-  {
-    // triggers
-    assert ClientHost.HostOwnsUniqueKey(c.clients[idx1], v.clients[idx1], 0);
-    assert ClientHost.HostOwnsUniqueKey(c.clients[idx2], v.clients[idx2], 0);
-  }
-}
+{}
 
-lemma InvNextAtMostOneInFlightMessagePerKey(c: Constants, v: Variables, v': Variables)
+lemma InvNextAtMostOneInFlightMessage(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures AtMostOneInFlightMessagePerKey(c, v')
+  ensures AtMostOneInFlightMessage(c, v')
 {
-  forall k, m1, m2 | KeyInFlightByMessage(c, v', m1, k) && KeyInFlightByMessage(c, v', m2, k) 
+  forall m1, m2 | LockInFlightByMessage(c, v', m1) && LockInFlightByMessage(c, v', m2) 
   ensures m1 == m2
   {
     if m1 != m2 {
-      if KeyInFlightByMessage(c, v, m1, k) {
-        InvNextAtMostOneInFlightHelper(c, v, v', m1, m2, k);
+      if LockInFlightByMessage(c, v, m1) {
+        assert !LockInFlightByMessage(c, v, m2);
       } else {
-        InvNextAtMostOneInFlightHelper(c, v, v', m2, m1, k);
+        assert LockInFlightByMessage(c, v, m2);
       }
     }
   }
 }
 
-lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: UniqueKey)
+lemma InvNextHostOwnsLockImpliesNotInFlight(c: Constants, v: Variables, v': Variables)
   requires v'.WF(c)
   requires Inv(c, v)
   requires Next(c, v, v')
-  // input constraints
-  requires m1 != m2
-  requires KeyInFlightByMessage(c, v, m1, k)
-  requires !KeyInFlightByMessage(c, v, m2, k)
-  // postcondition
-  ensures !KeyInFlightByMessage(c, v', m2, k)
+  ensures HostOwnsLockImpliesNotInFlight(c, v')
 {
-  assert UniqueKeyInFlight(c, v, k);
-}
-
-lemma InvNextHostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables, v': Variables)
-  requires v'.WF(c)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures HostOwnsKeyImpliesNotInFlight(c, v')
-{
-  forall k | !NoHostOwnsKey(c, v', k)
-  ensures !UniqueKeyInFlight(c, v', k)
-  {
-    if UniqueKeyInFlight(c, v', k) {
-      var msg :| KeyInFlightByMessage(c, v', msg , k);
-      if msg in v.network.sentMsgs {
-        assert KeyInFlightByMessage(c, v, msg, k);
-        assert NoHostOwnsKey(c, v, k);  
-        var dsStep :| NextStep(c, v, v', dsStep);
-        assert dsStep.msgOps.recv.value == msg by {
-          if dsStep.msgOps.recv.value != msg {
-            var m' := dsStep.msgOps.recv.value;
-            assert !KeyInFlightByMessage(c, v, m', k);
-          }
+  if !NoHostOwnsLock(c, v') && LockInFlight(c, v'){
+    var msg :| LockInFlightByMessage(c, v', msg);
+    if msg in v.network.sentMsgs {
+      assert LockInFlightByMessage(c, v, msg);
+      var dsStep :| NextStep(c, v, v', dsStep);
+      assert dsStep.msgOps.recv.value == msg by {
+        if dsStep.msgOps.recv.value != msg {
+          var m' := dsStep.msgOps.recv.value;
+          assert !LockInFlightByMessage(c, v, m');
         }
-      } else {
-        assert !(NoServerOwnsKey(c, v, k) && NoClientOwnsKey(c, v, k));
       }
     }
   }
 }
 
-lemma InvNextAtMostOwnerPerKeyClients(c: Constants, v: Variables, v': Variables) 
+lemma InvNextAtMostOneLockHolderClients(c: Constants, v: Variables, v': Variables) 
   requires v'.WF(c)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures AtMostOneOwnerPerKeyClients(c, v')
+  ensures AtMostOneLockHolderClients(c, v')
 {
-  forall h1, h2, k | 
+  forall h1, h2 | 
       && 0 <= h1 < |c.clients|
       && 0 <= h2 < |c.clients|
-      && ClientHost.HostOwnsUniqueKey(c.clients[h1], v'.clients[h1], k) 
-      && ClientHost.HostOwnsUniqueKey(c.clients[h2], v'.clients[h2], k) 
+      && v'.clients[h1].hasLock
+      && v'.clients[h2].hasLock
   ensures
      && h1 == h2
   {
     var dsStep :| NextStep(c, v, v', dsStep);
     if h1 != h2 {
-      if ClientHost.HostOwnsUniqueKey(c.clients[h2], v'.clients[h2], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
-        assert UniqueKeyInFlight(c, v, k);
+      if v'.clients[h2].hasLock {
+        assert LockInFlightByMessage(c, v, dsStep.msgOps.recv.value);  
         assert false;
       }
-      if ClientHost.HostOwnsUniqueKey(c.clients[h1], v'.clients[h1], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
-        assert UniqueKeyInFlight(c, v, k);
+      if v'.clients[h1].hasLock {
+        assert LockInFlightByMessage(c, v, dsStep.msgOps.recv.value);  
         assert false;
       }
     } 
   }
 }
 
-lemma InvNextAtMostOwnerPerKeyServers(c: Constants, v: Variables, v': Variables) 
+lemma InvNextAtMostOneLockHolderServers(c: Constants, v: Variables, v': Variables) 
   requires v'.WF(c)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures AtMostOneOwnerPerKeyServers(c, v')
+  ensures AtMostOneLockHolderServers(c, v')
 {
-  forall h1, h2, k | 
+  forall h1, h2 | 
       && 0 <= h1 < |c.server|
       && 0 <= h2 < |c.server|
-      && ServerHost.HostOwnsUniqueKey(c.server[h1], v'.server[h1], k) 
-      && ServerHost.HostOwnsUniqueKey(c.server[h2], v'.server[h2], k) 
+      && v'.server[h1].hasLock
+      && v'.server[h2].hasLock
   ensures
      && h1 == h2
   {
     var dsStep :| NextStep(c, v, v', dsStep);
     if h1 != h2 {
-      if ServerHost.HostOwnsUniqueKey(c.server[h2], v'.server[h2], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
-        assert UniqueKeyInFlight(c, v, k);
+      if v'.server[h2].hasLock {
+        assert LockInFlightByMessage(c, v, dsStep.msgOps.recv.value);  
         assert false;
       }
-      if ServerHost.HostOwnsUniqueKey(c.server[h1], v'.server[h1], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
-        assert UniqueKeyInFlight(c, v, k);
+      if v'.server[h1].hasLock {
+        assert LockInFlightByMessage(c, v, dsStep.msgOps.recv.value);  
         assert false;
       }
     }
   }
 }
 
-lemma InvNextClientsOwnKey(c: Constants, v: Variables, v': Variables) 
-  requires v'.WF(c)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures ClientsOwnKey(c, v')
-{
-  forall k | !NoClientOwnsKey(c, v', k)
-  ensures NoServerOwnsKey(c, v', k) {
-    var dsStep :| NextStep(c, v, v', dsStep);
-    var idx :| 0 <= idx < |c.clients| && ClientHost.HostOwnsUniqueKey(c.clients[idx], v'.clients[idx], k);
-    if ClientHost.HostOwnsUniqueKey(c.clients[idx], v.clients[idx], k) {
-      assert !UniqueKeyInFlight(c, v, k);
-      if !NoServerOwnsKey(c, v', k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-        assert false;
-      }
-    } else {
-      assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-      assert UniqueKeyInFlight(c, v, k);
-    }
-  }
-}
-
-lemma InvNextServersOwnKey(c: Constants, v: Variables, v': Variables) 
+lemma InvNextServerOwnsLockImpliesNoClientsOwnsLock(c: Constants, v: Variables, v': Variables) 
   requires v'.WF(c)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures ServerOwnsLockImpliesNoClientsOwnsLock(c, v')
 {
-  forall k | !NoServerOwnsKey(c, v', k)
-  ensures NoClientOwnsKey(c, v', k) {
+  if v'.server[0].hasLock {
     var dsStep :| NextStep(c, v, v', dsStep);
-    var idx :| 0 <= idx < |c.server| && ServerHost.HostOwnsUniqueKey(c.server[idx], v'.server[idx], k);
-    if ServerHost.HostOwnsUniqueKey(c.server[idx], v.server[idx], k) {
-      assert !UniqueKeyInFlight(c, v, k);
-      if !NoClientOwnsKey(c, v', k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
+    var idx :| 0 <= idx < |c.server| && v'.server[idx].hasLock;
+    if v.server[idx].hasLock {
+      assert !LockInFlight(c, v);
+      if !NoClientOwnsLock(c, v') {
+        assert LockInFlightByMessage(c, v, dsStep.msgOps.recv.value);
         assert false;
       }
     } else {
-      assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-      assert UniqueKeyInFlight(c, v, k);
-    }
+      assert LockInFlightByMessage(c, v, dsStep.msgOps.recv.value);
+    }    
   }
 }
 
