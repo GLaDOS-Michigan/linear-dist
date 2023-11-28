@@ -121,7 +121,7 @@ public class MessageInvariantsDriver {
     } 
     if (options.ownershipInvs) {
       // Write ownership invariants
-      string ownerInvString = MsgInvPrinter.PrintOwnershipInvariants(ownerInvFile);
+      string ownerInvString = MsgInvPrinter.PrintOwnershipInvariants(ownerInvFile, program.FullName);
       string ownerInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/ownershipInvariantsAutogen.dfy";
       Console.WriteLine(string.Format("Writing ownership invariants to {0}", ownerInvOutputFullname));
       File.WriteAllText(ownerInvOutputFullname, ownerInvString);

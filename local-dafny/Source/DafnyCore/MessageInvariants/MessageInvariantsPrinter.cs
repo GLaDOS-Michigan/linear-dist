@@ -166,8 +166,9 @@ namespace Microsoft.Dafny
       return res.ToString();
     } // end function PrintMessageInvariants
 
-    public static string PrintOwnershipInvariants(OwnershipInvariantsFile file) {
-      return @"include ""spec.dfy""
+    public static string PrintOwnershipInvariants(OwnershipInvariantsFile file, string sourceFileName) {
+      var res = $"/// This file is auto-generated from {sourceFileName}\n";
+      res += @"include ""spec.dfy""
 
 module OwnershipInvariants {
   import opened Types
@@ -375,6 +376,7 @@ lemma AtMostOneHostOwnsKey(c: Constants, v: Variables, v': Variables, k: UniqueK
   }
 }
 } // end module OwnershipInvariants";
+      return res;
     }
   } // end class MessageInvariantsFile
 }
