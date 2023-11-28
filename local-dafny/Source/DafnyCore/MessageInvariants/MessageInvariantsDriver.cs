@@ -108,13 +108,13 @@ public class MessageInvariantsDriver {
   public void WriteToFile() {
     if (options.msgInvs) {
       // Write monotonicity invariants
-      string monoInvString = MsgInvPrinter.PrintMonotonicityInvariants(monoInvFile);
+      string monoInvString = MsgInvPrinter.PrintMonotonicityInvariants(monoInvFile, program.FullName);
       string monoInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/monotonicityInvariantsAutogen.dfy";
       Console.WriteLine(string.Format("Writing monotonicity invariants to {0}", monoInvOutputFullname));
       File.WriteAllText(monoInvOutputFullname, monoInvString);
 
       // Write message invariants
-      string msgInvString = MsgInvPrinter.PrintMessageInvariants(msgInvFile);
+      string msgInvString = MsgInvPrinter.PrintMessageInvariants(msgInvFile, program.FullName);
       string msgInvOutputFullname = Path.GetDirectoryName(program.FullName) + "/messageInvariantsAutogen.dfy";
       Console.WriteLine(string.Format("Writing message invariants to {0}", msgInvOutputFullname));
       File.WriteAllText(msgInvOutputFullname, msgInvString);

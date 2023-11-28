@@ -25,11 +25,11 @@ public static class DistributedSystemPrinter {
     return res.ToString();
   }
 
-  public static string PrintDistributedSystem(DistributedSystemFile file, DafnyOptions options) {
+  public static string PrintDistributedSystem(DistributedSystemFile file, DafnyOptions options, string sourceFileName) {
     var res = new StringBuilder();
 
     // Header
-    res.AppendLine("/// This file is auto-generated");
+    res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
 
     // Dafny files to include
     foreach (string i in Includes) {

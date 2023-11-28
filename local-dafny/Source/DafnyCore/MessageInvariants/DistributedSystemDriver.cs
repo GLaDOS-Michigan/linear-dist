@@ -58,7 +58,7 @@ public class GenAsyncDriver {
   } 
 
   public void WriteToFile() {
-    string dsString = DistributedSystemPrinter.PrintDistributedSystem(dsFile, options);
+    string dsString = DistributedSystemPrinter.PrintDistributedSystem(dsFile, options, program.FullName);
     string dsOutputFullname = Path.GetDirectoryName(program.FullName) + "/distributedSystemAutogen.dfy";
     Console.WriteLine(string.Format("Writing distributed system to {0}", dsOutputFullname));
     File.WriteAllText(dsOutputFullname, dsString);

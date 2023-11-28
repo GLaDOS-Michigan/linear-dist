@@ -24,8 +24,11 @@ namespace Microsoft.Dafny
     return res.ToString();
   }
 
-    public static string PrintMonotonicityInvariants(MonotonicityInvariantsFile file) {
+    public static string PrintMonotonicityInvariants(MonotonicityInvariantsFile file, string sourceFileName) {
       var res = new StringBuilder();
+
+      // Header
+      res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
 
       // Module preamble 
       foreach (string i in includes) {
@@ -64,8 +67,11 @@ namespace Microsoft.Dafny
     } // end function PrintMonotonicityInvariants
     
 
-    public static string PrintMessageInvariants(MessageInvariantsFile file) {
+    public static string PrintMessageInvariants(MessageInvariantsFile file, string sourceFileName) {
       var res = new StringBuilder();
+
+      // Header
+      res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
 
       // Module preamble 
       foreach (string i in includes) {
