@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Microsoft.Dafny
 {
-public class MessageInvariantsDriver {
+public class RegularInvariantsDriver {
 
   public DafnyOptions options;
   public Program program;
@@ -15,7 +15,7 @@ public class MessageInvariantsDriver {
   public OwnershipInvariantsFile ownerInvFile;
 
   // Constructor
-  public MessageInvariantsDriver(DafnyOptions options, Program program)
+  public RegularInvariantsDriver(DafnyOptions options, Program program)
   {
     this.options = options;
     this.program = program;
@@ -45,9 +45,24 @@ public class MessageInvariantsDriver {
       ResolveReceiveInvariants(dsHosts, program);
     } 
     if (options.ownershipInvs) {
-      // Nothing to do here actually
+      ResolveOwnershipInvariants();
     }
   } // end method Resolve()
+
+  private void ResolveOwnershipInvariants() {
+    var systemModule = GetModule("DistributedSystem");
+
+    // Find datatype Hosts
+    IndDatatypeDecl hostsDecl = null;
+    foreach (var decl in systemModule.TopLevelDecls.ToList()) {
+      if (decl.Name.Equals("Hosts")) {
+        ownerInvFile.AddHosts((IndDatatypeDecl) decl);
+        hostsDecl = (IndDatatypeDecl) decl;
+        break;
+      }
+    }
+    Debug.Assert(hostsDecl != null, "hostsDecl should not be null");
+  }
 
   private void ResolveMonotonicityInvariants(DatatypeDecl dsHosts, Program program) {
     foreach (var kvp in program.ModuleSigs) {
@@ -103,6 +118,19 @@ public class MessageInvariantsDriver {
       var recvInv = ReceiveInvariant.FromTriggerFunction(rpt, dsHosts);
       msgInvFile.AddReceiveInvariant(recvInv);
     }
+  }
+
+    // Returns the Dafny module with the given name
+  private ModuleDefinition GetModule(string moduleName) {
+    ModuleDefinition res = null;
+    foreach (var kvp in program.ModuleSigs) {
+      var moduleDef = kvp.Value.ModuleDef;
+      if (moduleDef.DafnyName.Equals(moduleName)) {
+        res = moduleDef;
+      }
+    }
+    Debug.Assert(res != null, String.Format("Module {0} not found ", moduleName));
+    return res;
   }
 
   public void WriteToFile() {

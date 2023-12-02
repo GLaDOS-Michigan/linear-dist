@@ -69,7 +69,7 @@ namespace Microsoft.Dafny {
         options.DafnyVerify = false;
         options.Compile = false;
 
-        var msgInvDriver = new MessageInvariantsDriver(options, program);
+        var msgInvDriver = new RegularInvariantsDriver(options, program);
         msgInvDriver.Resolve();
         msgInvDriver.WriteToFile();
       }

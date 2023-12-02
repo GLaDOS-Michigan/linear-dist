@@ -166,10 +166,81 @@ namespace Microsoft.Dafny
       return res.ToString();
     } // end function PrintMessageInvariants
 
+    // Warning: Only supports up to two host types here
     public static string PrintOwnershipInvariants(OwnershipInvariantsFile file, string sourceFileName) {
       var res = new StringBuilder();
       res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
+
+      // Module preamble 
+      foreach (string i in includes) {
+        res.AppendLine(String.Format("include \"{0}\"", i));
+      }
+      res.AppendLine();
+      res.AppendLine("module OwnershipInvariants {"); // begin OwnershipInvariants module
+      foreach (string i in imports) {
+        res.AppendLine(String.Format("import opened {0}", i));
+      }
+      res.AppendLine();
+      res.AppendLine(GetFromTemplate("DefinitionsSeparator", 0));
+
+      // print predicate UniqueKeyInFlight
+      res.AppendLine(GetFromTemplate("UniqueKeyInFlight", 0));
+
+      // print predicate KeyInFlightByMessage
+      res.AppendLine("// Disjunction for each host type");
+      res.AppendLine("ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey)");
+      res.AppendLine("   requires v.WF(c)");
+      res.AppendLine("{");
+      res.AppendLine("  && msg in v.network.sentMsgs");
+      res.Append("  && (");  // open disjunct
+      foreach (var kvp in file.ExtractHosts()) {
+        var field = kvp.Value; var mod = kvp.Key;
+        res.AppendLine($"      || (0 <= msg.Dst() < |c.{field}| &&");
+        res.AppendLine($"         {mod}.UniqueKeyInFlightForHost(c.{field}[msg.Dst()], v.Last().{field}[msg.Dst()], k, msg)");
+        res.AppendLine("       )");
+      }
+      res.AppendLine("     )");  // close disjunct
+      res.AppendLine("}");
+      res.AppendLine();
+
+      // print NoHostOwnKey for each host type
+      foreach (var kvp in file.ExtractHosts()) {
+        var field = kvp.Value; var mod = kvp.Key;
+        res.AppendLine("// One for each host type");
+        PrintNoHostOwnsKeyGroup(res, mod, field);
+        res.AppendLine();
+      }
+
+      // print NoHostOwnKeyMain
+      res.AppendLine("// Conjunction of corresponding assertions for each host type");
+      res.AppendLine("ghost predicate NoHostOwnsKeyMain(c: Constants, v: Variables, k: UniqueKey)");
+      res.AppendLine("  requires v.WF(c)");
+      res.AppendLine("{");
+      foreach (var kvp in file.ExtractHosts()) {
+        var mod = kvp.Key;
+        res.AppendLine($"  && No{mod}OwnsKey(c, v, k)");
+      }
+      res.AppendLine("}");
+      res.AppendLine();
+      res.AppendLine(GetFromTemplate("InvariantsSeparator", 0));
+      res.AppendLine();
+
+
+
+
+      res.AppendLine("}  // end OwnershipInvariants module");
       return res.ToString();
+    }
+
+    // Print the NoHostOwnsKey group for given host type
+    private static void PrintNoHostOwnsKeyGroup(StringBuilder res, string mod, string field) {
+      res.AppendLine($"ghost predicate No{mod}OwnsKey(c: Constants, v: Variables, k: UniqueKey)");
+      res.AppendLine("  requires v.WF(c)");
+      res.AppendLine("{");
+      res.AppendLine($"  forall idx | 0 <= idx < |c.{field}|");
+      res.AppendLine("  ::");
+      res.AppendLine($"  !{mod}.HostOwnsUniqueKey(c.{field}[idx], v.Last().{field}[idx], k)");
+      res.AppendLine("}");
     }
   } // end class MessageInvariantsFile
 }
