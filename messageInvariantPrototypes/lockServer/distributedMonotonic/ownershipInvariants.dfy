@@ -9,12 +9,14 @@ module OwnershipInvariants {
 *                                   Definitions                                        *
 ***************************************************************************************/
 
+  // Standard
   ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
     exists msg :: KeyInFlightByMessage(c, v, msg, k)
   }
 
+  // Disjunction for each host type
   ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey) 
     requires v.WF(c)
   {
@@ -28,6 +30,7 @@ module OwnershipInvariants {
     )
   }
 
+  // One for each host type
   ghost predicate NoClientOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
@@ -36,6 +39,7 @@ module OwnershipInvariants {
     !ClientHost.HostOwnsUniqueKey(c.clients[idx], v.Last().clients[idx], k)
   }
 
+  // One for each host type
   ghost predicate NoServerOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
@@ -44,6 +48,7 @@ module OwnershipInvariants {
     !ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k)
   }
 
+  // Conjunction of corresponding assertions for each host type
   ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
@@ -55,7 +60,7 @@ module OwnershipInvariants {
 *                                    Invariants                                        *
 ***************************************************************************************/
 
-
+  // Standard
   ghost predicate AtMostOneInFlightMessagePerKey(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -63,6 +68,7 @@ module OwnershipInvariants {
     :: m1 == m2
   }
 
+  // Standard
   ghost predicate HostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -71,6 +77,7 @@ module OwnershipInvariants {
     !UniqueKeyInFlight(c, v, k)
   }
 
+  // One per host type
   ghost predicate AtMostOneOwnerPerKeyClients(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -83,6 +90,7 @@ module OwnershipInvariants {
       && h1 == h2
   }
 
+  // One per host type
   ghost predicate AtMostOneOwnerPerKeyServers(c: Constants, v: Variables)
     requires v.WF(c)
   {
@@ -95,19 +103,20 @@ module OwnershipInvariants {
       && h1 == h2
   }
 
+  // Only needed if more than one host type
   ghost predicate ClientsOwnKey(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall k | !NoClientOwnsKey(c, v, k) :: NoServerOwnsKey(c, v, k)
   }
 
+  // Only needed if more than one host type
   ghost predicate ServersOwnKey(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall k | !NoServerOwnsKey(c, v, k) :: NoClientOwnsKey(c, v, k)
   }
-  
-  
+
   ghost predicate OwnershipInv(c: Constants, v: Variables)
   {
     && v.WF(c)
