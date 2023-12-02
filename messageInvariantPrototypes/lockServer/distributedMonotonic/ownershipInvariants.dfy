@@ -10,14 +10,14 @@ module OwnershipInvariants {
 ***************************************************************************************/
 
   // Standard
-  ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate {:trigger KeyInFlightByMessage} UniqueKeyInFlight(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
-    exists msg :: KeyInFlightByMessage(c, v, msg, k)
+    exists msg :: msg in v.network.sentMsgs && KeyInFlightByMessage(c, v, msg, k)
   }
 
   // Disjunction for each host type
-  ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey) 
+  ghost predicate {:trigger UniqueKeyInFlight} KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey) 
     requires v.WF(c)
   {
     && msg in v.network.sentMsgs
@@ -49,7 +49,8 @@ module OwnershipInvariants {
   }
 
   // Conjunction of corresponding assertions for each host type
-  ghost predicate NoHostOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
+  ghost predicate {:trigger KeyInFlightByMessage, UniqueKeyInFlight} 
+  NoHostOwnsKey(c: Constants, v: Variables, k: UniqueKey) 
     requires v.WF(c)
   {
     && NoClientOwnsKey(c, v, k)
@@ -69,7 +70,8 @@ module OwnershipInvariants {
   }
 
   // Standard
-  ghost predicate HostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables)
+  ghost predicate {:trigger ServerHost.HostOwnsUniqueKey, ClientHost.HostOwnsUniqueKey} 
+  HostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall k | !NoHostOwnsKey(c, v, k)
@@ -232,12 +234,6 @@ lemma InvNextAtMostOwnerPerKeyClients(c: Constants, v: Variables, v': Variables)
     var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
     if h1 != h2 {
       if ClientHost.HostOwnsUniqueKey(c.clients[h2], v'.Last().clients[h2], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
-        assert UniqueKeyInFlight(c, v, k);
-        assert false;
-      }
-      if ClientHost.HostOwnsUniqueKey(c.clients[h1], v'.Last().clients[h1], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
         assert UniqueKeyInFlight(c, v, k);
         assert false;
       }
@@ -262,12 +258,6 @@ lemma InvNextAtMostOwnerPerKeyServers(c: Constants, v: Variables, v': Variables)
     var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
     if h1 != h2 {
       if ServerHost.HostOwnsUniqueKey(c.server[h2], v'.Last().server[h2], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
-        assert UniqueKeyInFlight(c, v, k);
-        assert false;
-      }
-      if ServerHost.HostOwnsUniqueKey(c.server[h1], v'.Last().server[h1], k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);  
         assert UniqueKeyInFlight(c, v, k);
         assert false;
       }
@@ -287,12 +277,7 @@ lemma InvNextClientsOwnKey(c: Constants, v: Variables, v': Variables)
     var idx :| 0 <= idx < |c.clients| && ClientHost.HostOwnsUniqueKey(c.clients[idx], v'.Last().clients[idx], k);
     if ClientHost.HostOwnsUniqueKey(c.clients[idx], v.Last().clients[idx], k) {
       assert !UniqueKeyInFlight(c, v, k);
-      if !NoServerOwnsKey(c, v', k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-        assert false;
-      }
     } else {
-      assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
       assert UniqueKeyInFlight(c, v, k);
     }
   }
@@ -310,12 +295,7 @@ lemma InvNextServersOwnKey(c: Constants, v: Variables, v': Variables)
     var idx :| 0 <= idx < |c.server| && ServerHost.HostOwnsUniqueKey(c.server[idx], v'.Last().server[idx], k);
     if ServerHost.HostOwnsUniqueKey(c.server[idx], v.Last().server[idx], k) {
       assert !UniqueKeyInFlight(c, v, k);
-      if !NoClientOwnsKey(c, v', k) {
-        assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
-        assert false;
-      }
     } else {
-      assert KeyInFlightByMessage(c, v, dsStep.msgOps.recv.value, k);
       assert UniqueKeyInFlight(c, v, k);
     }
   }
