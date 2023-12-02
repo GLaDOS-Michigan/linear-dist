@@ -187,7 +187,7 @@
     ],
     "UniqueKeyInFlight":
     [
-      "ghost predicate UniqueKeyInFlight(c: Constants, v: Variables, k: UniqueKey)",
+      "ghost predicate {:trigger KeyInFlightByMessage} UniqueKeyInFlight(c: Constants, v: Variables, k: UniqueKey)",
       "requires v.WF(c)",
       "{",
       "  exists msg :: KeyInFlightByMessage(c, v, msg, k)",
@@ -204,5 +204,76 @@
       "/***************************************************************************************",
       "*                                     Invariants                                       *",
       "***************************************************************************************/"
+    ],
+    "AtMostOneInFlightMessagePerKey":
+    [
+      "ghost predicate AtMostOneInFlightMessagePerKey(c: Constants, v: Variables)",
+      "  requires v.WF(c)",
+      "{",
+      "  forall k, m1, m2 | KeyInFlightByMessage(c, v, m1, k) && KeyInFlightByMessage(c, v, m2, k)",
+      "  :: m1 == m2",
+      "}"
+    ],
+    "HostOwnsKeyImpliesNotInFlightSuffix":
+    [
+      "HostOwnsKeyImpliesNotInFlight(c: Constants, v: Variables)",
+      "  requires v.WF(c)",
+      "{",
+      "  forall k | !NoHostOwnsKeyMain(c, v, k)",
+      "  ::",
+      "  !UniqueKeyInFlight(c, v, k)",
+      "}"
+    ],
+    "InitImpliesOwnershipInv":
+    [ 
+      "lemma InitImpliesOwnershipInv(c: Constants, v: Variables)",
+      "  requires Init(c, v)",
+      "  ensures OwnershipInv(c, v)",
+      "{}"
+    ],
+    "OwnershipInvInductiveHeader":
+    [ 
+      "lemma OwnershipInvInductive(c: Constants, v: Variables, v': Variables)",
+      "  requires OwnershipInv(c, v)",
+      "  requires Next(c, v, v')",
+      "  ensures OwnershipInv(c, v')",
+      "{"
+    ],
+    "InvNextAtMostOneInFlightMessagePerKey":
+    [
+      "lemma InvNextAtMostOneInFlightMessagePerKey(c: Constants, v: Variables, v': Variables)",
+      "  requires v'.WF(c)",
+      "  requires OwnershipInv(c, v)",
+      "  requires Next(c, v, v')",
+      "  ensures AtMostOneInFlightMessagePerKey(c, v')",
+      "{",
+      "  forall k, m1, m2 | KeyInFlightByMessage(c, v', m1, k) && KeyInFlightByMessage(c, v', m2, k)",
+      "  ensures m1 == m2",
+      "  {",
+      "    if m1 != m2 {",
+      "      if KeyInFlightByMessage(c, v, m1, k) {",
+      "        InvNextAtMostOneInFlightHelper(c, v, v', m1, m2, k);",
+      "      } else {",
+      "        InvNextAtMostOneInFlightHelper(c, v, v', m2, m1, k);",
+      "      }",
+      "     }",
+      "  }",
+      "}"
+    ],
+    "InvNextAtMostOneInFlightHelper":
+    [
+      "lemma InvNextAtMostOneInFlightHelper(c: Constants, v: Variables, v': Variables, m1: Message, m2: Message, k: UniqueKey)",
+      "  requires v'.WF(c)",
+      "  requires OwnershipInv(c, v)",
+      "  requires Next(c, v, v')",
+      "  // input constraints",
+      "  requires m1 != m2",
+      "  requires KeyInFlightByMessage(c, v, m1, k)",
+      "  requires !KeyInFlightByMessage(c, v, m2, k)",
+      "  // postcondition",
+      "  ensures !KeyInFlightByMessage(c, v', m2, k)",
+      "{",
+      "  assert UniqueKeyInFlight(c, v, k);",
+      "}"
     ]
 }

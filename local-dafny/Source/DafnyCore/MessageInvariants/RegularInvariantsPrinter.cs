@@ -168,6 +168,8 @@ namespace Microsoft.Dafny
 
     // Warning: Only supports up to two host types here
     public static string PrintOwnershipInvariants(OwnershipInvariantsFile file, string sourceFileName) {
+      var invariants = new List<string>(); // keep track of a list of invariants 
+      
       var res = new StringBuilder();
       res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
 
@@ -188,7 +190,7 @@ namespace Microsoft.Dafny
 
       // print predicate KeyInFlightByMessage
       res.AppendLine("// Disjunction for each host type");
-      res.AppendLine("ghost predicate KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey)");
+      res.AppendLine("ghost predicate {:trigger UniqueKeyInFlight} KeyInFlightByMessage(c: Constants, v: Variables, msg: Message, k: UniqueKey)");
       res.AppendLine("   requires v.WF(c)");
       res.AppendLine("{");
       res.AppendLine("  && msg in v.network.sentMsgs");
@@ -213,7 +215,7 @@ namespace Microsoft.Dafny
 
       // print NoHostOwnKeyMain
       res.AppendLine("// Conjunction of corresponding assertions for each host type");
-      res.AppendLine("ghost predicate NoHostOwnsKeyMain(c: Constants, v: Variables, k: UniqueKey)");
+      res.AppendLine("ghost predicate {:trigger KeyInFlightByMessage, UniqueKeyInFlight} NoHostOwnsKeyMain(c: Constants, v: Variables, k: UniqueKey)");
       res.AppendLine("  requires v.WF(c)");
       res.AppendLine("{");
       foreach (var kvp in file.ExtractHosts()) {
@@ -225,11 +227,77 @@ namespace Microsoft.Dafny
       res.AppendLine(GetFromTemplate("InvariantsSeparator", 0));
       res.AppendLine();
 
+      // print AtMostOneInFlightMessagePerKey
+      res.AppendLine(GetFromTemplate("AtMostOneInFlightMessagePerKey", 0));
+      invariants.Add("AtMostOneInFlightMessagePerKey");
+      res.AppendLine();
+
+      // print HostOwnsKeyImpliesNotInFlight
+      PrintHostOwnsKeyImpliesNotInFlight(file, res);
+      invariants.Add($"HostOwnsKeyImpliesNotInFlight");
+
+      // print AtMostOneOwnerPerKey for each host type
+      foreach (var kvp in file.ExtractHosts()) {
+        var field = kvp.Value; var mod = kvp.Key;
+        res.AppendLine("// One for each host type");
+        PrintAtMostOneOwnerPerKey(res, mod, field, invariants);
+        res.AppendLine();
+      }
+
+      // print HostOwnKey if more than one host type
+      if (file.ExtractHosts().Count > 1) {
+        var hostTypes = new List<string>(file.ExtractHosts().Keys);
+        foreach (var h in hostTypes) {
+          foreach (var other in hostTypes) {
+            if (other != h) {
+              res.AppendLine("// One for each host type");
+            PrintHostOwnKey(res, h, other, invariants);
+            res.AppendLine();
+            }
+          }
+        }
+      }
+
+      // print proof obligations
+      PrintOwnershipInvariantsObligations(res, file, invariants);
+
+      res.AppendLine(GetFromTemplate("AuxProofsSeparator", 0));
+
+      // print proofs
+      // print InvNextAtMostOneInFlightMessagePerKey
+      res.AppendLine(GetFromTemplate("InvNextAtMostOneInFlightMessagePerKey", 0));
+      res.AppendLine();
+      res.AppendLine(GetFromTemplate("InvNextAtMostOneInFlightHelper", 0));
+      res.AppendLine();
+
 
 
 
       res.AppendLine("}  // end OwnershipInvariants module");
       return res.ToString();
+    }
+
+    private static void PrintOwnershipInvariantsObligations(StringBuilder res, OwnershipInvariantsFile file, List<string> invariants) {
+      // print OwnershipInv
+      res.AppendLine("ghost predicate OwnershipInv(c: Constants, v: Variables)");
+      res.AppendLine("{");
+      res.AppendLine("  && v.WF(c)");
+      foreach (var inv in invariants) {
+        res.AppendLine($"  && {inv}(c, v)");
+      }
+      res.AppendLine("}");
+      res.AppendLine();
+      
+      // InitImpliesOwnershipInv
+      res.AppendLine(GetFromTemplate("InitImpliesOwnershipInv", 0));
+
+      // OwnershipInvInductive
+      res.Append(GetFromTemplate("OwnershipInvInductiveHeader", 0));
+      foreach (var inv in invariants) {
+        res.AppendLine($"  InvNext{inv}(c, v, v');");
+      }
+      res.AppendLine("}");
+      res.AppendLine();
     }
 
     // Print the NoHostOwnsKey group for given host type
@@ -242,5 +310,43 @@ namespace Microsoft.Dafny
       res.AppendLine($"  !{mod}.HostOwnsUniqueKey(c.{field}[idx], v.Last().{field}[idx], k)");
       res.AppendLine("}");
     }
+
+    // Print HostOwnsKeyImpliesNotInFlight
+    private static void PrintHostOwnsKeyImpliesNotInFlight(OwnershipInvariantsFile file, StringBuilder res) {
+      var triggers =  new List<string>();
+      foreach (var kvp in file.ExtractHosts()) {
+        var mod = kvp.Key;
+        triggers.Add($"{mod}.HostOwnsUniqueKey");
+      }
+      res.AppendLine($"ghost predicate {{:trigger {string.Join(",", triggers)}}}");
+      res.AppendLine(GetFromTemplate("HostOwnsKeyImpliesNotInFlightSuffix", 0));
+    }
+
+    // Print the AtMostOneOwnerPerKey group for given host type
+    private static void PrintAtMostOneOwnerPerKey(StringBuilder res, string mod, string field, List<string> invariants) {
+      res.AppendLine($"ghost predicate AtMostOneOwnerPerKey{mod}(c: Constants, v: Variables)");
+      invariants.Add($"AtMostOneOwnerPerKey{mod}");
+      res.AppendLine("  requires v.WF(c)");
+      res.AppendLine("{");
+      res.AppendLine($"  forall h1, h2, k |");
+      res.AppendLine($"    && 0 <= h1 < |c.{field}| && 0 <= h2 < |c.{field}|");
+      res.AppendLine($"    && {mod}.HostOwnsUniqueKey(c.{field}[h1], v.Last().{field}[h1], k)");
+      res.AppendLine($"    && {mod}.HostOwnsUniqueKey(c.{field}[h2], v.Last().{field}[h2], k)");
+      res.AppendLine("  ::");
+      res.AppendLine("  h1 == h2");
+      res.AppendLine("}");
+    }
+
+    // Print the HostOwnKey group for given host type
+    private static void PrintHostOwnKey(StringBuilder res, string mod, string otherMod, List<string> invariants) {
+      res.AppendLine($"ghost predicate {mod}OwnKey(c: Constants, v: Variables)");
+      invariants.Add($"{mod}OwnKey");
+      res.AppendLine("  requires v.WF(c)");
+      res.AppendLine("{");
+      res.AppendLine($"  forall k | !No{mod}OwnsKey(c, v, k) :: No{otherMod}OwnsKey(c, v, k)");
+      res.AppendLine("}");
+    }
+    
+    
   } // end class MessageInvariantsFile
 }

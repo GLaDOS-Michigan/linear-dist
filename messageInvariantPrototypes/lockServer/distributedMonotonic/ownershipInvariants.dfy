@@ -126,8 +126,8 @@ module OwnershipInvariants {
     && AtMostOneOwnerPerKeyClients(c, v)
     && AtMostOneOwnerPerKeyServers(c, v)
     && HostOwnsKeyImpliesNotInFlight(c, v)
-    && ClientsOwnKey(c, v)
-    && ServersOwnKey(c, v)
+    && ClientsOwnKey(c, v)   // Only needed if more than one host type
+    && ServersOwnKey(c, v)   // Only needed if more than one host type
   }
 
   // Base obligation
