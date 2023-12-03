@@ -87,7 +87,7 @@ module ShardedKVProof {
 
 lemma AtMostOwnerPerKeyImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
-  requires AtMostOwnerPerKey(c, v)
+  requires AtMostOneOwnerPerKeyHost(c, v)
   ensures Safety(c, v)
 {
   forall idx1, idx2, k: UniqueKey | 
