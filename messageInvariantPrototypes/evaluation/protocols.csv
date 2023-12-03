@@ -7,3 +7,4 @@ flexPaxos,
 toylock,
 shardedKv,
 shardedKvBatched,
+lockServer
