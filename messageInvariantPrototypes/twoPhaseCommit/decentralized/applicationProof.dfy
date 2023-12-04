@@ -20,7 +20,6 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
 {
   && CommitImpliesAllPreferYes(c, v)
   && LeaderVotesValid1(c, v)
-  && LeaderVotesValid2(c, v)
   && LeaderTallyReflectsPreferences1(c, v)
 }
 
@@ -31,15 +30,6 @@ ghost predicate LeaderVotesValid1(c: Constants, v: Variables)
   forall hostId | hostId in v.GetCoordinator(c).yesVotes
   :: 0 <= hostId < |c.participants|
 }
-
-// more like WF
-ghost predicate LeaderVotesValid2(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall hostId | hostId in v.GetCoordinator(c).noVotes
-  :: 0 <= hostId < |c.participants|
-}
-
 
 ghost predicate CommitImpliesAllPreferYes(c: Constants, v: Variables)
   requires v.WF(c)
@@ -97,8 +87,19 @@ lemma InvNextLeaderVotesValid(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LeaderVotesValid1(c, v')
-  ensures LeaderVotesValid2(c, v')
-{}
+{
+  forall hostId | hostId in v'.GetCoordinator(c).yesVotes
+  ensures 0 <= hostId < |c.participants| {
+    var dsStep :| NextStep(c, v, v', dsStep);
+    if dsStep.CoordinatorStep? {
+      if hostId in v.GetCoordinator(c).yesVotes {
+        assert 0 <= hostId < |c.participants|;
+      } else {
+        assert 0 <= hostId < |c.participants|;
+      }
+    }
+  }
+}
 
 lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)

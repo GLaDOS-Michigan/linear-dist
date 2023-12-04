@@ -51,13 +51,6 @@ ghost predicate ParticipantsDecisionImpliesDecideMsg1(c: Constants, v: Variables
   :: (ParticipantDecidedCommit(c, v, i) ==> DecideMsg(Commit) in v.network.sentMsgs)
 }
 
-ghost predicate ParticipantsDecisionImpliesDecideMsg2(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall i | c.ValidParticipantId(i) && PartipantHasDecided(c, v, i) 
-  :: (ParticipantDecidedAbort(c, v, i) ==> DecideMsg(Abort) in v.network.sentMsgs)
-}
-
 ghost predicate MessageInv(c: Constants, v: Variables)
 {
   && v.WF(c)
@@ -66,7 +59,6 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && DecisionMsgsAgreeWithLeader1(c, v)
   && DecisionMsgsAgreeWithLeader2(c, v)
   && ParticipantsDecisionImpliesDecideMsg1(c, v)
-  && ParticipantsDecisionImpliesDecideMsg2(c, v)
 }
 
 lemma InitImpliesMessageInv(c: Constants, v: Variables)
