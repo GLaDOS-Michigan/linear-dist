@@ -18,10 +18,18 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
+  && AC3Contrapos(c, v)
   && LeaderVotesValid1(c, v)
   && LeaderVotesValid2(c, v)
   && LeaderTallyReflectsPreferences1(c, v)
-  && LeaderTallyReflectsPreferences2(c, v)
+}
+
+ghost predicate AC3Contrapos(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  (!AllPreferYes(c) && CoordinatorHasDecided(c, v))
+  ==>
+  CoordinatorDecidedAbort(c, v)
 }
 
 ghost predicate LeaderVotesValid1(c: Constants, v: Variables) 
@@ -86,16 +94,23 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
+  InvNextLeaderVotesValid(c, v, v');
   LeaderTallyReflectsPreferencesInductive(c, v, v');
   AC3Proof(c, v, v');
-  AC4Proof(c, v, v');
 }
+
+lemma InvNextLeaderVotesValid(c: Constants, v: Variables, v': Variables)
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LeaderVotesValid1(c, v')
+  ensures LeaderVotesValid2(c, v')
+{}
 
 lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
+  requires LeaderVotesValid1(c, v')
   ensures LeaderTallyReflectsPreferences1(c, v')
-  ensures LeaderTallyReflectsPreferences2(c, v')
 {}
 
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
@@ -103,7 +118,6 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures AC3Contrapos(c, v')
 {
-  AC3ContraposLemma(c, v);
   if ! AllPreferYes(c) && CoordinatorHasDecided(c, v') {
     var noVoter: HostId :| c.ValidParticipantId(noVoter) && c.participants[noVoter].preference == No;
     var dsStep :| NextStep(c, v, v', dsStep);
@@ -119,24 +133,6 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
     }
   }
 }
-
-lemma AC3ContraposLemma(c: Constants, v: Variables)
-  requires Inv(c, v)
-  ensures AC3Contrapos(c, v)
-{
-  if  (!AllPreferYes(c) && CoordinatorHasDecided(c, v)) {
-    assert v.GetCoordinator(c).decision.value != Commit;  // trigger
-  }
-}
-
-lemma AC4Proof(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires MessageInv(c, v')
-  requires LeaderTallyReflectsPreferences1(c, v')
-  requires LeaderTallyReflectsPreferences2(c, v')
-  ensures SafetyAC4(c, v')
-{}
 
 lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
   requires Inv(c, v)

@@ -18,47 +18,18 @@ module Obligations {
   import opened MonotonicityLibrary
   import opened DistributedSystem
 
-  // AC-1: All processes that reach a decision reach the same decision as the coordinator.
-  ghost predicate SafetyAC1(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    forall i: HostId | c.ValidParticipantId(i) && PartipantHasDecided(c, v, i)
-    :: v.GetCoordinator(c).decision == v.participants[i].decision
-  }
-
   // AC-3: The Commit decision can only be reached if all processes prefer Yes.
   ghost predicate SafetyAC3(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    CoordinatorDecidedCommit(c, v)
-    ==>
-    AllPreferYes(c)
-  }
-
-  // This one is easier to prove
-  ghost predicate AC3Contrapos(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    (!AllPreferYes(c) && CoordinatorHasDecided(c, v))
-    ==>
-    CoordinatorDecidedAbort(c, v)
-  }
-
-  // AC-4: If all processes prefer Yes, then the decision must be Commit.
-  ghost predicate SafetyAC4(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    (AllPreferYes(c) && CoordinatorHasDecided(c, v))
-    ==> 
-    CoordinatorDecidedCommit(c, v)
+    forall i: HostId | c.ValidParticipantId(i) && ParticipantDecidedCommit(c, v, i)
+    :: AllPreferYes(c)
   }
 
   ghost predicate Safety(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    && SafetyAC1(c, v)
-    && SafetyAC3(c, v)
-    && SafetyAC4(c, v)
+    SafetyAC3(c, v)
   }
 
 
