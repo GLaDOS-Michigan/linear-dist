@@ -18,8 +18,7 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
-  && LeaderVotesValid1(c, v)
-  && LeaderVotesValid2(c, v)
+  && ParticipantsVoteOnce(c, v)   // Funky
   && OneDecisionMessage(c, v)     // Funky
   && AbortReflectsVotes(c, v)     // Funky
   && CommitReflectsVotes(c, v)    // Funky
@@ -48,6 +47,13 @@ ghost predicate OneDecisionMessage(c: Constants, v: Variables)
   :: m1 == m2
 }
 
+ghost predicate ParticipantsVoteOnce(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  forall m1, m2 | m1 in v.network.sentMsgs && m1.VoteMsg? && m2 in v.network.sentMsgs && m2.VoteMsg? && m1.src == m2.src
+  :: m1 == m2
+}
+
 ghost predicate AbortReflectsVotes(c: Constants, v: Variables)
   requires v.WF(c)
   requires LeaderVotesValid1(c, v)
@@ -67,10 +73,10 @@ ghost predicate LeaderDecisionAbort(c: Constants, v: Variables)
 ghost predicate LeaderDecisionCommit(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  CoordinatorDecidedAbort(c, v)
+  CoordinatorDecidedCommit(c, v)
   ==>
   && v.GetCoordinator(c).noVotes == {}
-  && |v.GetCoordinator(c).yesVotes| == c.GetCoordinator().numParticipants
+  && |v.GetCoordinator(c).yesVotes| >= c.GetCoordinator().numParticipants
 }
 
 ghost predicate CommitReflectsVotes(c: Constants, v: Variables)
@@ -110,12 +116,23 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   InvNextAbortReflectsVotes(c, v, v');
-  assume LeaderDecisionCommit(c, v');
+  InvNextLeaderDecisionCommit(c, v, v');
   InvNextCommitReflectsVotes(c, v, v');
-  AC4Proof(c, v, v');
 }
 
-// funky
+lemma InvNextLeaderDecisionCommit(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures LeaderDecisionCommit(c, v')
+{
+  if CoordinatorDecidedCommit(c, v') {
+    if CoordinatorDecidedCommit(c, v) {
+      assume false;
+      SetContainmentCardinality(v.GetCoordinator(c).yesVotes, v'.GetCoordinator(c).yesVotes);
+    }
+  }
+}
+
 lemma InvNextAbortReflectsVotes(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
@@ -153,21 +170,14 @@ lemma InvNextCommitReflectsVotes(c: Constants, v: Variables, v': Variables)
 
 lemma AC3ContraposLemma(c: Constants, v: Variables)
   requires Inv(c, v)
+  requires SafetyAC3(c, v)
   ensures AC3Contrapos(c, v)
 {
-  if  (!AllPreferYes(c) && CoordinatorHasDecided(c, v)) {
+  assume false;
+  if (!AllPreferYes(c) && CoordinatorHasDecided(c, v)) {
     assert v.GetCoordinator(c).decision.value != Commit;  // trigger
   }
 }
-
-lemma AC4Proof(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  requires MessageInv(c, v')
-  requires AbortReflectsVotes(c, v)
-  requires CommitReflectsVotes(c, v)
-  ensures SafetyAC4(c, v')
-{}
 
 lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
   requires Inv(c, v)

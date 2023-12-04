@@ -78,9 +78,7 @@ ghost predicate MessageInv(c: Constants, v: Variables)
   && VoteMsgValidSrc(c, v)
   && VoteMsgAgreeWithVoter(c, v)
   && DecisionMsgsAgreeWithLeader1(c, v)
-  && DecisionMsgsAgreeWithLeader2(c, v)
-  && ParticipantsDecisionImpliesDecideMsg1(c, v)
-  && ParticipantsDecisionImpliesDecideMsg2(c, v)
+  // && DecisionMsgsAgreeWithLeader2(c, v)   // replaced with funky AbortReflectsVotes and CommitReflectsVotes
   && NoVotesValid(c, v)  // Funky
   && YesVotesValid(c, v) // Funky
 }
