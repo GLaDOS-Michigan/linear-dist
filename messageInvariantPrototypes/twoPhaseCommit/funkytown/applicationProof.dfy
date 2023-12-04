@@ -122,18 +122,8 @@ lemma InvNextCommitReflectsVotes(c: Constants, v: Variables, v': Variables)
         assert noVoter in  v.GetCoordinator(c).yesVotes;  // trigger
         assert GetParticipantPreference(c, noVoter) == Yes;  // witness
         assert false;
-      } else {
-        assert CommitReflectsVotes(c, v');
-        assert AC3Contrapos(c, v');
       }
-    } else {
-      assert CoordinatorHasDecided(c, v);
-      assert CommitReflectsVotes(c, v');
-      assert AC3Contrapos(c, v');
     }
-  } else {
-    assert CommitReflectsVotes(c, v');
-    assert AC3Contrapos(c, v');
   }
 }
 

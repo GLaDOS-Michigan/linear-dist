@@ -18,20 +18,13 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
-  && AC3Contrapos(c, v)
+  && CommitImpliesAllPreferYes(c, v)
   && LeaderVotesValid1(c, v)
   && LeaderVotesValid2(c, v)
   && LeaderTallyReflectsPreferences1(c, v)
 }
 
-ghost predicate AC3Contrapos(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  (!AllPreferYes(c) && CoordinatorHasDecided(c, v))
-  ==>
-  CoordinatorDecidedAbort(c, v)
-}
-
+// more like WF
 ghost predicate LeaderVotesValid1(c: Constants, v: Variables) 
   requires v.WF(c)
 {
@@ -39,11 +32,21 @@ ghost predicate LeaderVotesValid1(c: Constants, v: Variables)
   :: 0 <= hostId < |c.participants|
 }
 
+// more like WF
 ghost predicate LeaderVotesValid2(c: Constants, v: Variables) 
   requires v.WF(c)
 {
   forall hostId | hostId in v.GetCoordinator(c).noVotes
   :: 0 <= hostId < |c.participants|
+}
+
+
+ghost predicate CommitImpliesAllPreferYes(c: Constants, v: Variables)
+  requires v.WF(c)
+{
+  CoordinatorDecidedCommit(c, v)
+  ==>
+  AllPreferYes(c)
 }
 
 // Leader's local tally reflect participant preferences
@@ -56,15 +59,6 @@ ghost predicate LeaderTallyReflectsPreferences1(c: Constants, v: Variables)
       GetParticipantPreference(c, hostId) == Yes )
 }
 
-// Leader's local tally reflect participant preferences
-ghost predicate LeaderTallyReflectsPreferences2(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires LeaderVotesValid2(c, v)
-{
-  var n := |c.participants|;
-  && (forall hostId | hostId in v.GetCoordinator(c).noVotes ::
-      GetParticipantPreference(c, hostId) == No )
-}
 
 // User-level invariant
 ghost predicate Inv(c: Constants, v: Variables)
@@ -116,7 +110,7 @@ lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Va
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  ensures AC3Contrapos(c, v')
+  ensures CommitImpliesAllPreferYes(c, v')
 {
   if ! AllPreferYes(c) && CoordinatorHasDecided(c, v') {
     var noVoter: HostId :| c.ValidParticipantId(noVoter) && c.participants[noVoter].preference == No;
