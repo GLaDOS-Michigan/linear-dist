@@ -26,21 +26,11 @@ module Obligations {
     :: AllPreferYes(c)
   }
 
-  // This one is easier to prove
-  ghost predicate AC3Contrapos(c: Constants, v: Variables)
-    requires v.WF(c)
-  {
-    (!AllPreferYes(c) && CoordinatorHasDecided(c, v))
-    ==>
-    CoordinatorDecidedAbort(c, v)
-  }
-
   ghost predicate Safety(c: Constants, v: Variables)
     requires v.WF(c)
   {
     SafetyAC3(c, v)
   }
-
 
   /***************************************************************************************
   *                                      Utils                                           *

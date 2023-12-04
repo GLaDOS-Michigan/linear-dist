@@ -18,26 +18,19 @@ ghost predicate ApplicationInv(c: Constants, v: Variables)
   requires v.WF(c)
   requires MessageInv(c, v)
 {
-  && ParticipantsVoteOnce(c, v)   // Funky
+  && AC3Contrapos(c, v)
   && OneDecisionMessage(c, v)     // Funky
   && AbortReflectsVotes(c, v)     // Funky
   && CommitReflectsVotes(c, v)    // Funky
   && LeaderDecisionAbort(c, v)    // Funky
-  && LeaderDecisionCommit(c, v)   // Funky
 }
 
-ghost predicate LeaderVotesValid1(c: Constants, v: Variables) 
+ghost predicate AC3Contrapos(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall hostId | hostId in v.GetCoordinator(c).yesVotes
-  :: 0 <= hostId < |c.participants|
-}
-
-ghost predicate LeaderVotesValid2(c: Constants, v: Variables) 
-  requires v.WF(c)
-{
-  forall hostId | hostId in v.GetCoordinator(c).noVotes
-  :: 0 <= hostId < |c.participants|
+  (!AllPreferYes(c) && CoordinatorHasDecided(c, v))
+  ==>
+  CoordinatorDecidedAbort(c, v)
 }
 
 ghost predicate OneDecisionMessage(c: Constants, v: Variables)
@@ -47,16 +40,8 @@ ghost predicate OneDecisionMessage(c: Constants, v: Variables)
   :: m1 == m2
 }
 
-ghost predicate ParticipantsVoteOnce(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  forall m1, m2 | m1 in v.network.sentMsgs && m1.VoteMsg? && m2 in v.network.sentMsgs && m2.VoteMsg? && m1.src == m2.src
-  :: m1 == m2
-}
-
 ghost predicate AbortReflectsVotes(c: Constants, v: Variables)
   requires v.WF(c)
-  requires LeaderVotesValid1(c, v)
 {
   (exists msg :: msg in v.network.sentMsgs && msg == DecideMsg(Abort))
   ==> (exists msg :: msg in v.network.sentMsgs && msg.VoteMsg? && msg.v == No)
@@ -70,18 +55,8 @@ ghost predicate LeaderDecisionAbort(c: Constants, v: Variables)
   |v.GetCoordinator(c).noVotes| > 0
 }
 
-ghost predicate LeaderDecisionCommit(c: Constants, v: Variables)
-  requires v.WF(c)
-{
-  CoordinatorDecidedCommit(c, v)
-  ==>
-  && v.GetCoordinator(c).noVotes == {}
-  && |v.GetCoordinator(c).yesVotes| >= c.GetCoordinator().numParticipants
-}
-
 ghost predicate CommitReflectsVotes(c: Constants, v: Variables)
   requires v.WF(c)
-  requires LeaderVotesValid1(c, v)
 {
   (exists msg :: msg in v.network.sentMsgs && msg == DecideMsg(Commit))
   ==> (forall msg | msg in v.network.sentMsgs && msg.VoteMsg? :: msg.v == Yes)
@@ -116,21 +91,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   ensures Inv(c, v')
 {
   InvNextAbortReflectsVotes(c, v, v');
-  InvNextLeaderDecisionCommit(c, v, v');
   InvNextCommitReflectsVotes(c, v, v');
-}
-
-lemma InvNextLeaderDecisionCommit(c: Constants, v: Variables, v': Variables) 
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures LeaderDecisionCommit(c, v')
-{
-  if CoordinatorDecidedCommit(c, v') {
-    if CoordinatorDecidedCommit(c, v) {
-      assume false;
-      SetContainmentCardinality(v.GetCoordinator(c).yesVotes, v'.GetCoordinator(c).yesVotes);
-    }
-  }
 }
 
 lemma InvNextAbortReflectsVotes(c: Constants, v: Variables, v': Variables) 
@@ -145,13 +106,11 @@ lemma InvNextAbortReflectsVotes(c: Constants, v: Variables, v': Variables)
 lemma InvNextCommitReflectsVotes(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires LeaderDecisionCommit(c, v')
   requires OneDecisionMessage(c, v')
   ensures CommitReflectsVotes(c, v')
   ensures AC3Contrapos(c, v')
 {
-  AC3ContraposLemma(c, v);
-  if ! AllPreferYes(c) && CoordinatorHasDecided(c, v') {
+  if !AllPreferYes(c) && CoordinatorHasDecided(c, v') {
     var noVoter: HostId :| c.ValidParticipantId(noVoter) && c.participants[noVoter].preference == No;
     var dsStep :| NextStep(c, v, v', dsStep);
     if dsStep.CoordinatorStep? {
@@ -163,21 +122,22 @@ lemma InvNextCommitReflectsVotes(c: Constants, v: Variables, v': Variables)
         assert noVoter in  v.GetCoordinator(c).yesVotes;  // trigger
         assert GetParticipantPreference(c, noVoter) == Yes;  // witness
         assert false;
+      } else {
+        assert CommitReflectsVotes(c, v');
+        assert AC3Contrapos(c, v');
       }
+    } else {
+      assert CoordinatorHasDecided(c, v);
+      assert CommitReflectsVotes(c, v');
+      assert AC3Contrapos(c, v');
     }
+  } else {
+    assert CommitReflectsVotes(c, v');
+    assert AC3Contrapos(c, v');
   }
 }
 
-lemma AC3ContraposLemma(c: Constants, v: Variables)
-  requires Inv(c, v)
-  requires SafetyAC3(c, v)
-  ensures AC3Contrapos(c, v)
-{
-  assume false;
-  if (!AllPreferYes(c) && CoordinatorHasDecided(c, v)) {
-    assert v.GetCoordinator(c).decision.value != Commit;  // trigger
-  }
-}
+
 
 lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
   requires Inv(c, v)
