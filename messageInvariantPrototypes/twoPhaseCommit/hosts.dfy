@@ -84,11 +84,11 @@ module CoordinatorHost {
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.send.None?
     && msgOps.recv.Some?
-    && NextReceiveStepRecvFunc(c, v, v', msgOps.recv.value)
+    && ReceiveVote(c, v, v', msgOps.recv.value)
   }
 
   // Receive predicate
-  ghost predicate NextReceiveStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate ReceiveVote(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && msg.VoteMsg?
     && var vote, src := msg.v, msg.src;
@@ -101,6 +101,16 @@ module CoordinatorHost {
         v' == v.(
           noVotes := v.noVotes + {src}
         )
+  }
+
+  // Receive vote trigger
+  // First 2 arguments are mandatory. Second argument identifies target host. 
+  ghost predicate ReceiveVoteTrigger1(c: Constants, v: Variables, voterId: HostId) {
+    voterId in v.yesVotes
+  }
+
+    ghost predicate ReceiveVoteTrigger2(c: Constants, v: Variables, voterId: HostId) {
+    voterId in v.noVotes
   }
 
   ghost predicate NextDecisionStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
