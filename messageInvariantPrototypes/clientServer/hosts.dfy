@@ -62,16 +62,22 @@ module ServerHost {
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && NextReceiveStepRecvFunc(c, v, v', msgOps.recv.value)
+    && ReceiveRequest(c, v, v', msgOps.recv.value)
   }
 
   // Receive predicate
-  ghost predicate NextReceiveStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate ReceiveRequest(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && v.currentRequest.None?
     && msg.RequestMsg?
     // update v'
     && v' == v.(currentRequest := Some(msg.r))
+  }
+
+  // Receive predicate trigger
+  // First 2 arguments are mandatory. Second argument identifies target host. 
+  ghost predicate ReceiveRequestTrigger(c: Constants, v: Variables, req: Request) {
+    && v.currentRequest == Some(req)
   }
 
   ghost predicate NextProcessStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
@@ -177,16 +183,22 @@ module ClientHost {
   ghost predicate NextReceiveStep(c: Constants, v: Variables, v': Variables, msgOps: MessageOps) {
     && msgOps.recv.Some?
     && msgOps.send.None?
-    && NextReceiveRespStepRecvFunc(c, v, v', msgOps.recv.value)
+    && ReceiveResponse(c, v, v', msgOps.recv.value)
   }
 
   // Receive predicate
-  ghost predicate NextReceiveRespStepRecvFunc(c: Constants, v: Variables, v': Variables, msg: Message) {
+  ghost predicate ReceiveResponse(c: Constants, v: Variables, v': Variables, msg: Message) {
     // enabling conditions
     && msg.ResponseMsg?
     && msg.r.clientId == c.clientId
     // update v'
     && v' == v.(responses := v.responses + {msg.r.reqId})
+  }
+
+  // Receive response trigger
+  // First 2 arguments are mandatory. Second argument identifies target host. 
+  ghost predicate ReceiveResponseTrigger(c: Constants, v: Variables, reqId: nat) {
+    && reqId in v.responses
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
