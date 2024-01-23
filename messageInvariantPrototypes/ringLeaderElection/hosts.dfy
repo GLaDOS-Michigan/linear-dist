@@ -93,6 +93,13 @@ module Host {
     )
   }
 
+  // Receive msg trigger
+  // First 2 arguments are mandatory. Second argument identifies target host. 
+  ghost predicate ReceiveMsgTrigger(c: Constants, v: Variables, hh: nat) {
+    && hh >= 0
+    && v.highestHeard == hh
+  }
+
   ghost predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
   {
     exists step :: NextStep(c, v, v', step, msgOps)
