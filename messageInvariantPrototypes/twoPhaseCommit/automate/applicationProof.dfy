@@ -117,7 +117,6 @@ lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures AC3Contrapos(c, v')
 {
-  LeaderTallyReflectsPreferencesInductive(c, v, v');
   AC3ContraposLemma(c, v);
   VariableNextProperties(c, v, v');
   if ! AllPreferYes(c) && CoordinatorHasDecided(c, v'.Last()) {

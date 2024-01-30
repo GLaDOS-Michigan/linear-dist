@@ -133,16 +133,7 @@ lemma AC4Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures SafetyAC4(c, v')
-{
-  if AllPreferYes(c) && CoordinatorHasDecided(c, v'){
-    var sysStep :| NextStep(c, v, v', sysStep);
-    if sysStep.DecideStep? {
-      /* Proof by contradiction: suppose coord decide no. Then leader's noVotes is
-      not empty. By LeaderTallyReflectsPreferences, this member preferred No, which 
-      contradicts with AllPreferYes(c, v) */
-    }
-  }
-}
+{}
 
 lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables)
   requires Inv(c, v)
