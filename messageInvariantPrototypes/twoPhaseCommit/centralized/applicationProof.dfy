@@ -45,6 +45,7 @@ ghost predicate LeaderTallyReflectsPreferences1(c: Constants, v: Variables)
 }
 
 // Leader's local tally reflect participant preferences
+// Auto-triggers: {GetParticipantPreference(c, hostId)}, {hostId in v.GetCoordinator(c).noVotes}
 ghost predicate LeaderTallyReflectsPreferences2(c: Constants, v: Variables)
   requires v.WF(c)
   requires LeaderVotesValid2(c, v)
