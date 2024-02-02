@@ -49,7 +49,6 @@ ghost predicate LeaderTallyReflectsPreferences1(c: Constants, v: Variables)
 }
 
 // Leader's local tally reflect participant preferences
-// prior auto-triggers: {GetParticipantPreference(c, hostId), v.History(i)}, {GetParticipantPreference(c, hostId), v.ValidHistoryIdx(i)}
 ghost predicate LeaderTallyReflectsPreferences2(c: Constants, v: Variables)
   requires v.WF(c)
   requires LeaderVotesValid2(c, v)
@@ -111,9 +110,7 @@ lemma AC1Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures SafetyAC1(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
+{}
 
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)

@@ -22,8 +22,11 @@ module Obligations {
   ghost predicate SafetyAC1(c: Constants, v: Variables)
     requires v.WF(c)
   {
-    forall i: HostId | c.ValidParticipantId(i) && PartipantHasDecided(c, v.Last(), i)
-    :: v.Last().GetCoordinator(c).decision == v.Last().participants[i].decision
+    // auto triggers: {v.Last().participants[i]}, {PartipantHasDecided(c, v.Last(), i)}, {c.ValidParticipantId(i)}
+    forall i: HostId
+    {:trigger v.Last().participants[i]} {:trigger PartipantHasDecided(c, v.Last(), i)} {:trigger c.ValidParticipantId(i)} 
+    :: (c.ValidParticipantId(i) && PartipantHasDecided(c, v.Last(), i)
+      ==> v.Last().GetCoordinator(c).decision == v.Last().participants[i].decision)
   }
 
   // AC-3: The Commit decision can only be reached if all processes prefer Yes.

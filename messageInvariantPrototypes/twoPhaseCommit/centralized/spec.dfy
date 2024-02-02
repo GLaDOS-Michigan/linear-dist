@@ -22,6 +22,7 @@ module Obligations {
   ghost predicate SafetyAC1(c: Constants, v: Variables)
     requires v.WF(c)
   {
+    // auto triggers: {v.participants[i]}, {PartipantHasDecided(c, v, i)}, {c.ValidParticipantId(i)}
     forall i: HostId | c.ValidParticipantId(i) && PartipantHasDecided(c, v, i)
     :: v.GetCoordinator(c).decision == v.participants[i].decision
   }
