@@ -53,11 +53,6 @@ ghost predicate Inv(c: Constants, v: Variables)
   && Safety(c, v)
 }
 
-
-/***************************************************************************************
-*                                        Proof                                         *
-***************************************************************************************/
-
 lemma InvImpliesSafety(c: Constants, v: Variables)
   requires Inv(c, v)
   ensures Safety(c, v)
@@ -73,17 +68,24 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  IsLeaderImpliesHasQuorumInductive(c, v, v');
+  InvNextReceivedVotesValid(c, v, v');
+  InvNextIsLeaderImpliesHasQuorum(c, v, v');
+  InvNextHasVoteImpliesVoterNominates(c, v, v');
   SafetyProof(c, v');
 }
 
-lemma ReceivedVotesValidInductive(c: Constants, v: Variables, v': Variables) 
+
+/***************************************************************************************
+*                                        Proof                                         *
+***************************************************************************************/
+
+lemma InvNextReceivedVotesValid(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures ReceivedVotesValid(c, v')
 {}
 
-lemma IsLeaderImpliesHasQuorumInductive(c: Constants, v: Variables, v': Variables) 
+lemma InvNextIsLeaderImpliesHasQuorum(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   requires ReceivedVotesValid(c, v')
@@ -93,17 +95,14 @@ lemma IsLeaderImpliesHasQuorumInductive(c: Constants, v: Variables, v': Variable
   forall h: nat | c.ValidHostId(h) && v'.IsLeader(c, h)
   ensures
     && SetIsQuorum(c.hosts[h].clusterSize, v'.hosts[h].receivedVotes)
-  {
-    var step :| NextStep(c, v, v', step);
-    // Some very strange triggers
-    if step.HostLocalStep? 
-    {} 
-    else if step.VoteStep? {
-      // trigger
-      assert SetIsQuorum(c.hosts[h].clusterSize, v'.hosts[h].receivedVotes);
-    }
-  }
+  {}
 }
+
+lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures HasVoteImpliesVoterNominates(c, v')
+{}
 
 lemma SafetyProof(c: Constants, v': Variables)
   requires v'.WF(c)
@@ -119,7 +118,6 @@ lemma SafetyProof(c: Constants, v': Variables)
   if !Safety(c, v') {
     var l1: nat :| c.ValidHostId(l1) && v'.IsLeader(c, l1);
     var l2: nat :| c.ValidHostId(l2) && v'.IsLeader(c, l2) && l2 != l1;
-    var clusterSize := |c.hosts|;
     var allHosts := (set x | 0 <= x < |c.hosts|);
     SetComprehensionSize(|c.hosts|);
 
