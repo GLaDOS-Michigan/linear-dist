@@ -5,6 +5,7 @@ include "messageInvariantsAutogen.dfy"
 module ToyLeaderElectionProof {
 import opened Types
 import opened UtilitiesLibrary
+import opened MonotonicityLibrary
 import opened DistributedSystem
 import opened MonotonicityInvariants
 import opened MessageInvariants
@@ -91,7 +92,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 {
   MonotonicityInvInductive(c, v, v');
   MessageInvInductive(c, v, v');
-  InvNextIsReceivedVotesValidAndLeaderImpliesHasQuorum(c, v, v');
+  InvNextReceivedVotesValid(c, v, v');
+  InvNextIsLeaderImpliesHasQuorum(c, v, v');
   InvNextHasVoteImpliesVoterNominates(c, v, v');
   SafetyProof(c, v');
 }
@@ -101,13 +103,27 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 *                                        Proof                                         *
 ***************************************************************************************/
 
-lemma InvNextIsReceivedVotesValidAndLeaderImpliesHasQuorum(c: Constants, v: Variables, v': Variables)
+lemma InvNextReceivedVotesValid(c: Constants, v: Variables, v': Variables) 
+  requires Inv(c, v)
+  requires Next(c, v, v')
+  ensures ReceivedVotesValid(c, v')
+{
+  VariableNextProperties(c, v, v');
+}
+
+lemma InvNextIsLeaderImpliesHasQuorum(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures IsLeaderImpliesHasQuorum(c, v')
   ensures ReceivedVotesValid(c, v')
 {
   VariableNextProperties(c, v, v');
+  
+  var allHosts := (set x | 0 <= x < |c.hosts|);
+  forall h: nat | c.ValidHostId(h) && v'.Last().IsLeader(c, h)
+  ensures
+    && SetIsQuorum(c.hosts[h].clusterSize, v'.Last().hosts[h].receivedVotes)
+  {}
 }
 
 lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variables)
@@ -158,17 +174,19 @@ lemma SafetyProof(c: Constants, v': Variables)
   if !Safety(c, v') {
     var l1: nat :| c.ValidHostId(l1) && v'.Last().IsLeader(c, l1);
     var l2: nat :| c.ValidHostId(l2) && v'.Last().IsLeader(c, l2) && l2 != l1;
-    var clusterSize := |c.hosts|;
     var allHosts := (set x | 0 <= x < |c.hosts|);
     SetComprehensionSize(|c.hosts|);
 
-    assert v'.Last() == v'.History(|v'.history|-1);  // trigger
     var rv1, rv2 :=  v'.Last().hosts[l1].receivedVotes, v'.Last().hosts[l2].receivedVotes;
     var rogueId := QuorumIntersection(allHosts, rv1, rv2);  // witness
+
     assert && v'.ValidHistoryIdx(|v'.history|-1)  // trigger
             && c.ValidHostId(l1)
             && c.ValidHostId(rogueId)
             && v'.History(|v'.history|-1).hosts[l1].HasVoteFrom(rogueId);
+
+    // assert v'.Last().hosts[rogueId].nominee == WOSome(l1);  // trigger
+    // assert v'.Last().hosts[rogueId].nominee == WOSome(l2);  // trigger
     assert false;
   }
 }

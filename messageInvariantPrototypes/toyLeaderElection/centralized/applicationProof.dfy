@@ -106,9 +106,7 @@ lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variab
 
 lemma SafetyProof(c: Constants, v': Variables)
   requires v'.WF(c)
-  requires ReceivedVotesValid(c, v')
-  requires IsLeaderImpliesHasQuorum(c, v')
-  requires HasVoteImpliesVoterNominates(c, v')
+  requires ApplicationInv(c, v')
   ensures Safety(c, v')
 {
   /* Proof by contradiction: Assume two leaders were elected in v', L1 and L2.
