@@ -247,23 +247,25 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  assert OneValuePerBallotLeaderAndLearners(c, v);
   InvNextLearnerValidReceivedAccepts(c, v, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
+  InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
+
   InvNextAcceptorValidPromisedAndAccepted(c, v, v');
   InvNextAcceptorAcceptedImpliesProposed(c, v, v');
+
   InvNextLeaderValidReceivedPromises(c, v, v');
   InvNextLeaderHighestHeardUpperBound(c, v, v');
   InvNextLeaderHearedImpliesProposed(c, v, v');
   InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
-  InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
-  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
+
   InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
 
-  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  InvImpliesAtMostOneChosenVal(c, v');
   AtMostOneChosenImpliesSafety(c, v');
 }
 
@@ -274,16 +276,49 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
 
 lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+  requires v.WF(c)
+  requires LearnerValidReceivedAccepts(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
 {}
+
+lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LearnerValidReceivedAccepts(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
+  requires Next(c, v, v')
+  ensures LearnedImpliesQuorumOfAccepts(c, v')
+{
+  forall lnr:LearnerId, val:Value |
+    c.ValidLearnerIdx(lnr) && v'.learners[lnr].HasLearnedValue(val)
+  ensures
+    exists b: LeaderId ::
+      && var vb := VB(val, b);
+      && ChosenAtLearner(c, v', vb, lnr)
+  {
+    var sysStep :| NextStep(c, v, v', sysStep);
+    if sysStep.P2bStep? {
+      if sysStep.learner == lnr {
+        assert v.learners[lnr].HasLearnedValue(val);  // trigger
+      }
+    }
+  }
+}
 
 lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
 {}
+
+lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v)
+  requires Next(c, v, v')
+  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
+{
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
+}
 
 lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -366,38 +401,6 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   {
     //trigger
     assert v'.acceptors[acc].HasPromisedAtLeast(ldr);
-  }
-}
-
-lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires LearnerReceivedAcceptImpliesAccepted(c, v)
-  requires Next(c, v, v')
-  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
-{
-  assert LearnerReceivedAcceptImpliesAccepted(c, v');
-}
-
-lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires LearnerValidReceivedAccepts(c, v)
-  requires LearnedImpliesQuorumOfAccepts(c, v)
-  requires Next(c, v, v')
-  ensures LearnedImpliesQuorumOfAccepts(c, v')
-{
-  forall lnr:LearnerId, val:Value |
-    c.ValidLearnerIdx(lnr) && v'.learners[lnr].HasLearnedValue(val)
-  ensures
-    exists b: LeaderId ::
-      && var vb := VB(val, b);
-      && ChosenAtLearner(c, v', vb, lnr)
-  {
-    var sysStep :| NextStep(c, v, v', sysStep);
-    if sysStep.P2bStep? {
-      if sysStep.learner == lnr {
-        assert v.learners[lnr].HasLearnedValue(val);  // trigger
-      }
-    }
   }
 }
 
@@ -648,6 +651,12 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   var bal :| ChosenAtLearner(c, v, VB(val, bal), lnr);
   return VB(val, bal);
 }
+
+lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ApplicationInv(c, v)
+  ensures AtMostOneChosenVal(c, v)
+{}
 
 // If only one value can be chosen, then Agreement must be satisfied
 lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
