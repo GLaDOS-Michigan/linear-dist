@@ -39,14 +39,22 @@ ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
 ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall lnr:LearnerId, vb:ValBal, i |
+  forall lnr:LearnerId, vb:ValBal, i 
+    {:trigger vb.v, v.History(i).learners[lnr]}
+    {:trigger vb.v, c.ValidLearnerIdx(lnr), v.History(i)}
+    {:trigger vb.v, c.ValidLearnerIdx(lnr), v.ValidHistoryIdx(i)}
+    {:trigger vb.b, v.History(i).learners[lnr]}
+    {:trigger vb.b, c.ValidLearnerIdx(lnr),v.History(i)}
+    {:trigger vb.b, c.ValidLearnerIdx(lnr), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
     && vb in v.History(i).learners[lnr].receivedAccepts.m
     && c.ValidLeaderIdx(vb.b)
-  ::
+  ==>
     && v.History(i).LeaderCanPropose(c, vb.b)
     && v.History(i).leaders[vb.b].Value() == vb.v
+  )
 }
 
 // Learner's learned value must be backed by a quorum of accepts
@@ -82,26 +90,36 @@ ghost predicate LearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables)
 ghost predicate AcceptorValidPromisedAndAccepted(c: Constants, v:Variables) 
   requires v.WF(c)
 {
-  forall acc: AcceptorId, i | 
+  forall acc: AcceptorId, i 
+    {:trigger v.History(i).acceptors[acc]}
+    {:trigger v.History(i), c.ValidAcceptorIdx(acc)}
+    {:trigger c.ValidAcceptorIdx(acc), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidAcceptorIdx(acc)
     && v.History(i).acceptors[acc].acceptedVB.MVBSome? 
-  ::
+    ==> 
     c.ValidLeaderIdx(v.History(i).acceptors[acc].acceptedVB.value.b)
+  )
 }
 
 ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
 {
-  forall acc:AcceptorId, i | 
+  forall acc:AcceptorId, i 
+    {:trigger v.History(i).acceptors[acc]}
+    {:trigger v.History(i), c.ValidAcceptorIdx(acc)}
+    {:trigger c.ValidAcceptorIdx(acc), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidAcceptorIdx(acc)
     && v.History(i).acceptors[acc].acceptedVB.MVBSome?
-  ::
+  ==>
     var vb := v.History(i).acceptors[acc].acceptedVB.value;
     && v.History(i).LeaderCanPropose(c, vb.b)
     && v.History(i).leaders[vb.b].Value() == vb.v
+  )
 }
 
 ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
@@ -119,12 +137,17 @@ ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
 ghost predicate LeaderHighestHeardUpperBound(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall ldr:LeaderId, i | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
-  :: 
-    v.History(i).leaders[ldr].highestHeardBallot.value < ldr
+  forall ldr:LeaderId, i 
+    {:trigger v.History(i).leaders[ldr]}
+    {:trigger v.History(i), c.ValidLeaderIdx(ldr)}
+    {:trigger c.ValidLeaderIdx(ldr), v.ValidHistoryIdx(i)}
+  :: (
+      && v.ValidHistoryIdx(i)
+      && c.ValidLeaderIdx(ldr)
+      && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
+    ==>
+      v.History(i).leaders[ldr].highestHeardBallot.value < ldr
+  )
 }
 
 // If a leader has a highestHeardBallot B, then its value has been proposed by the leader 
@@ -151,31 +174,47 @@ ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables)
 ghost predicate LeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr:LeaderId, acc:AcceptorId, i | 
+  forall ldr:LeaderId, acc:AcceptorId, i 
+  {:trigger v.History(i).acceptors[acc], v.History(i).leaders[ldr]}
+  {:trigger v.History(i).acceptors[acc], c.ValidLeaderIdx(ldr)}
+  {:trigger v.History(i).leaders[ldr], c.ValidAcceptorIdx(acc)}
+  {:trigger c.ValidAcceptorIdx(acc), c.ValidLeaderIdx(ldr), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
     && c.ValidAcceptorIdx(acc)
     && acc in v.History(i).leaders[ldr].ReceivedPromises()
-  ::
+  ==>
     v.History(i).acceptors[acc].HasPromisedAtLeast(ldr)
+  )
 }
 
 // For any leader L, if an acceptor A is in L.promises, then A cannot have accepted any
 // ballot b such that L.highestHeard < b < L
+
+//{vb.b, v.History(i), c.ValidLearnerIdx(lnr), c.ValidAcceptorIdx(acc), c.ValidLeaderIdx(ldr)}
+//{vb.b, c.ValidLearnerIdx(lnr), c.ValidAcceptorIdx(acc), c.ValidLeaderIdx(ldr), v.ValidHistoryIdx(i)}
 ghost predicate LeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, acc, lnr, vb:ValBal, i | 
-    && v.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && c.ValidAcceptorIdx(acc)
-    && c.ValidLearnerIdx(lnr)
-    && vb in v.History(i).learners[lnr].receivedAccepts.m
-    && vb.b < ldr
-    && v.History(i).leaders[ldr].HeardAtMost(vb.b)
-    && acc in v.History(i).leaders[ldr].ReceivedPromises()
-  ::
-    acc !in v.History(i).learners[lnr].receivedAccepts.m[vb]
+  forall ldr, acc, lnr, vb:ValBal, i 
+  {:trigger v.History(i).leaders[ldr], vb.b, v.History(i).learners[lnr], c.ValidAcceptorIdx(acc)}
+  {:trigger v.History(i).leaders[ldr], vb.b, c.ValidLearnerIdx(lnr), c.ValidAcceptorIdx(acc)}
+  {:trigger vb.b, v.History(i).learners[lnr], c.ValidAcceptorIdx(acc), c.ValidLeaderIdx(ldr)}
+  {:trigger vb.b, c.ValidLearnerIdx(lnr), c.ValidAcceptorIdx(acc), c.ValidLeaderIdx(ldr), v.ValidHistoryIdx(i)}
+  {:trigger vb.b, c.ValidLearnerIdx(lnr), c.ValidAcceptorIdx(acc), c.ValidLeaderIdx(ldr), v.History(i)}
+  :: (
+      && v.ValidHistoryIdx(i)
+      && c.ValidLeaderIdx(ldr)
+      && c.ValidAcceptorIdx(acc)
+      && c.ValidLearnerIdx(lnr)
+      && vb in v.History(i).learners[lnr].receivedAccepts.m
+      && vb.b < ldr
+      && v.History(i).leaders[ldr].HeardAtMost(vb.b)
+      && acc in v.History(i).leaders[ldr].ReceivedPromises()
+    ==>
+      acc !in v.History(i).learners[lnr].receivedAccepts.m[vb]
+  )
 }
 
 ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables) 
@@ -348,10 +387,9 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
 }
  
 lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires ValidMessages(c, v)
-  requires SendAcceptValidity(c, v)
-  requires LeaderHostReceivedPromisesAndValueMonotonic(c, v)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires LearnerReceivedAcceptImpliesProposed(c, v)
@@ -368,21 +406,13 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
     && v'.History(i).leaders[vb.b].Value() == vb.v
   {
     VariableNextProperties(c, v, v');
-    if i == |v'.history|-1 {
-      if vb !in v.Last().learners[lnr].receivedAccepts.m {
-        // witness and triggers
-        var msg :| msg in v.network.sentMsgs && msg.Accept? && msg.vb == vb;
-        assert c.ValidAcceptorIdx(msg.acc);
-      }
-    }
   }
 }
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  requires MonotonicityInv(c, v) && MonotonicityInv(c, v')
-  requires ValidMessages(c, v)
-  requires SendAcceptValidity(c, v)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesAccepted(c, v')
@@ -392,9 +422,8 @@ lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v'
 
 lemma InvNextAcceptorValidBundle(c: Constants, v: Variables, v': Variables) 
   requires v.WF(c)
-  requires ValidMessages(c, v)
-  requires SendProposeValidity(c, v)
-  requires LeaderHostReceivedPromisesAndValueMonotonic(c, v)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')
@@ -419,33 +448,20 @@ lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variab
   requires Next(c, v, v')
   ensures LeaderHighestHeardUpperBound(c, v')
 {
-  forall ldr:LeaderId, i | 
-    && v'.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && v'.History(i).leaders[ldr].highestHeardBallot.MNSome?
-  ensures
-    v'.History(i).leaders[ldr].highestHeardBallot.value < ldr
-  {
-    VariableNextProperties(c, v, v');
-    if i == |v'.history| - 1 {
-      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.LeaderHostStep? {
-        var actor, msgOps := dsStep.actor, dsStep.msgOps;
-        var lc, l, l' := c.leaders[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
-        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-        if step.ReceiveStep? {
-          assert IsPromiseMessage(v, msgOps.recv.value);  // trigger
-        } 
-      }
-    }
-  }
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires LeaderHearedImpliesProposed(c, v)
   requires Next(c, v, v')
+  requires AcceptorValidPromisedAndAccepted(c, v')
+  requires AcceptorAcceptedImpliesProposed(c, v')
   ensures LeaderHearedImpliesProposed(c, v')
 {  
+  assume false;  // TODO
   forall ldr:LeaderId, i | 
     && v'.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
@@ -476,34 +492,14 @@ lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variabl
 
 lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
-  requires ValidMessages(c, v)
-  requires SendPromiseValidity(c, v)
+  requires MessageInv(c, v)
   requires MonotonicityInv(c, v)
+  requires LeaderHearedImpliesProposed(c, v)
   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires Next(c, v, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
 {
-  forall ldr:LeaderId, acc:AcceptorId, i | 
-    && v'.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && c.ValidAcceptorIdx(acc)
-    && acc in v'.History(i).leaders[ldr].ReceivedPromises()
-  ensures
-    v'.History(i).acceptors[acc].HasPromisedAtLeast(ldr)
-  {
-    VariableNextProperties(c, v, v');
-    if i == |v'.history| - 1 {
-      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.LeaderHostStep? {
-        var actor, msgOps := dsStep.actor, dsStep.msgOps;
-        var lc, l, l' := c.leaders[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
-        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-        if step.ReceiveStep? {
-          assert IsPromiseMessage(v, msgOps.recv.value);  // trigger
-        } 
-      }
-    }
-  }
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
@@ -537,25 +533,10 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
   ensures
     acc !in v'.History(i).learners[lnr].receivedAccepts.m[vb]
   {
+    VariableNextProperties(c, v, v');
     if acc in v'.History(i).learners[lnr].receivedAccepts.m[vb] {
       var acceptMsg := AcceptMessageExistence(c, v', i, lnr, vb, acc);
-      var j :|  && v'.ValidHistoryIdxStrict(j)    // via SendAcceptValidity
-                && v'.History(j).acceptors[acc].HasAccepted(vb)
-                && v'.History(j).acceptors[acc].HasPromised(vb.b);
-      VariableNextProperties(c, v, v');
-      assert v.ValidHistoryIdx(j);
-      assert j < i;
       var prom := PromiseMessageExistence(c, v', i, ldr, acc);
-      var h :|  // from SendPromiseValidity
-        && v'.ValidHistoryIdxStrict(h)
-        && AcceptorHost.SendPromise(c.acceptors[acc], v'.History(h).acceptors[acc], v'.History(h+1).acceptors[acc], prom);
-      assert PromiseMessageMatchesHistory(c, v', prom, h+1);
-      if h+1 <= j {
-        assert !AcceptorHostPromisedMonotonic(c, v');
-      } else {
-        assert !AcceptorHostPromisedMonotonic(c, v');
-      }
-      assert false;
     }
   }
 }
@@ -660,8 +641,6 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
       } else {
         if v'.History(i).acceptors[acc].acceptedVB.value.v != vb.v {
           var ldr := v'.Last().acceptors[acc].acceptedVB.value.b;
-          reveal_Chosen();
-          reveal_ChosenAtHistory();
           LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldr, vb);
         }
       }
@@ -696,14 +675,11 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
       var lc, l, l' := c.leaders[ldrBal], v.Last().leaders[ldrBal], v'.Last().leaders[ldrBal];
       if dsStep.LeaderHostStep? {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
-        reveal_ChosenAtHistory();
       } else if dsStep.AcceptorHostStep? {
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
       } else {
         if v'.History(i).leaders[ldrBal].Value() != vb.v {
-          assert Chosen(c, v', vb) by {
-            reveal_Chosen();
-          }
+          assert Chosen(c, v', vb);
           LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldrBal, vb);
         }
       }
@@ -768,9 +744,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
   VariableNextProperties(c, v, v');
   NewChosenOnlyInLearnerStep(c, v, v', dsStep);
   if ldr == dsStep.actor {  // if the leader in question is now taking a step
-    assert ChosenAtHistory(c, v.Last(), vb) by {
-      reveal_ChosenAtHistory();
-    }
+    assert ChosenAtHistory(c, v.Last(), vb);
     var choosingAccs := SupportingAcceptorsForChosen(c, v, |v.history|-1, vb);
     var h, h' := v.Last(), v'.Last();
     if h.leaders[ldr].HeardAtMost(vb.b) {
@@ -809,7 +783,6 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
 {
   // Note that proof is identical to atomic case
   VariableNextProperties(c, v, v');
-  reveal_ChosenAtHistory();
   if !ChosenAtHistory(c, v.Last(), vb) {
     var actor, msgOps := dsStep.actor, dsStep.msgOps;
     var lnr:LearnerId:| ChosenAtLearner(c, v'.Last(), vb, lnr);
@@ -833,7 +806,8 @@ lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables
   requires v.WF(c)
   requires Chosen(c, v, chosen)
   requires c.ValidLeaderIdx(ldr)
-  requires v.Last().leaders[ldr].HeardAtLeast(chosen.b)
+  requires v.Last().leaders[ldr].highestHeardBallot.MNSome?
+  requires v.Last().leaders[ldr].highestHeardBallot.value >= chosen.b
   requires v.Last().leaders[ldr].Value() != chosen.v
   requires chosen.b < ldr
   requires OneValuePerBallotLeaderAndLearners(c, v)
@@ -850,8 +824,6 @@ lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables
   var ldr' := v.Last().leaders[ldr].highestHeardBallot.value;
   assert v.Last().leaders[ldr'].Value() == v.Last().leaders[ldr].Value();
   assert chosen.b <= ldr' < ldr;
-  reveal_Chosen();
-  reveal_ChosenAtHistory();
   LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
 }
 
@@ -865,14 +837,14 @@ ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
 }
 
 // A learner holds an accept quorum for vb
-ghost predicate {:opaque} Chosen(c: Constants, v: Variables, vb: ValBal) 
+ghost predicate Chosen(c: Constants, v: Variables, vb: ValBal) 
   requires v.WF(c)
 {
   ChosenAtHistory(c, v.Last(), vb)
 }
 
 // A learner holds an accept quorum for vb
-ghost predicate {:opaque} ChosenAtHistory(c: Constants, h: Hosts, vb: ValBal) 
+ghost predicate ChosenAtHistory(c: Constants, h: Hosts, vb: ValBal) 
   requires h.WF(c)
 {
   exists lnr:LearnerId:: 
@@ -937,10 +909,42 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   ensures vb.v == val
   ensures Chosen(c, v, vb)
 {
-  reveal_Chosen();
-  reveal_ChosenAtHistory();
   var bal :| ChosenAtLearner(c, v.Last(), VB(val, bal), lnr);
   return VB(val, bal);
+}
+
+lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires ApplicationInv(c, v)
+  ensures AtMostOneChosenVal(c, v)
+{
+  forall i, j, vb1: ValBal, vb2: ValBal | 
+    && v.ValidHistoryIdx(i)
+    && v.ValidHistoryIdx(j)
+    && i <= j
+    && vb1.b <= vb2.b
+    && ChosenAtHistory(c, v.History(i), vb1)
+    && ChosenAtHistory(c, v.History(j), vb2)
+  ensures 
+    && c.ValidLeaderIdx(vb1.b)
+    && c.ValidLeaderIdx(vb2.b)
+    && vb1.v == vb2.v
+  {
+    //reveal_ChosenAtHistory();
+    // vb1 chosen at i implies that vb1 is also chosen at j, by LearnerReceivedAcceptsMonotonic.
+    // This means that a leader proposed vb1, and another proposed vb2, by LearnerReceivedAcceptImpliesProposed.
+    var lnr1: nat :| ChosenAtLearner(c, v.History(i), vb1, lnr1);
+    assert ChosenAtHistory(c, v.History(j), vb1) by {
+      SetContainmentCardinality(v.History(i).learners[lnr1].receivedAccepts.m[vb1], v.History(j).learners[lnr1].receivedAccepts.m[vb1]);
+      assert ChosenAtLearner(c, v.History(j), vb1, lnr1);  // trigger
+    }
+    // There are then two cases. If vb1.b == vb2.b, then the conclusion holds via OneValuePerBallot
+    // Otherwise, leader 2 must hear leader 1's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
+    // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
+    assert vb1.v == vb2.v;
+  }
 }
 
 // If only one value can be chosen, then Agreement must be satisfied
@@ -961,7 +965,6 @@ lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
     ;
     var vb1 := LearnedImpliesChosen(c, v, l1, v.Last().learners[l1].learned.value);
     var vb2 := LearnedImpliesChosen(c, v, l2, v.Last().learners[l2].learned.value);
-    reveal_Chosen();
     assert false;
   }
 }
@@ -979,8 +982,6 @@ lemma NewChosenOnlyInLearnerStep(c: Constants, v: Variables, v': Variables, dsSt
          && ChosenAtHistory(c, v.history[|v.history|-1], vb)
         
 {
-  reveal_Chosen();
-  reveal_ChosenAtHistory();
   forall vb | ChosenAtHistory(c, v'.Last(), vb) 
   ensures ChosenAtHistory(c, v'.history[|v'.history|-2], vb) {
     var lnr:LearnerId :| ChosenAtLearner(c, v'.Last(), vb, lnr);   // witness
@@ -1004,7 +1005,6 @@ returns (supportingAccs: set<AcceptorId>)
     && vb in v.History(i).learners[lnr].receivedAccepts.m
     && supportingAccs <= v.History(i).learners[lnr].receivedAccepts.m[vb]
 {
-  reveal_ChosenAtHistory();
   var lnr: LearnerId :| ChosenAtLearner(c, v.History(i), vb, lnr);  // skolemize!
   supportingAccs := v.History(i).learners[lnr].receivedAccepts.m[vb];
   return supportingAccs;
@@ -1019,39 +1019,6 @@ returns (accSet: set<AcceptorId>)
   assert v.history[0].WF(c);  // trigger for |c.acceptors| == 2 * c.f+1
   accSet := set a |  0 <= a < |c.acceptors|;
   SetComprehensionSize(|c.acceptors|);
-}
-
-lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires LearnerHostReceivedAcceptsMonotonic(c, v)
-  requires ApplicationInv(c, v)
-  ensures AtMostOneChosenVal(c, v)
-{
-  forall i, j, vb1: ValBal, vb2: ValBal | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && vb1.b <= vb2.b
-    && ChosenAtHistory(c, v.History(i), vb1)
-    && ChosenAtHistory(c, v.History(j), vb2)
-  ensures 
-    && c.ValidLeaderIdx(vb1.b)
-    && c.ValidLeaderIdx(vb2.b)
-    && vb1.v == vb2.v
-  {
-    reveal_ChosenAtHistory();
-    // vb1 chosen at i implies that vb1 is also chosen at j, by LearnerReceivedAcceptsMonotonic.
-    // This means that a leader proposed vb1, and another proposed vb2, by LearnerReceivedAcceptImpliesProposed.
-    var lnr1: nat :| ChosenAtLearner(c, v.History(i), vb1, lnr1);
-    assert ChosenAtHistory(c, v.History(j), vb1) by {
-      SetContainmentCardinality(v.History(i).learners[lnr1].receivedAccepts.m[vb1], v.History(j).learners[lnr1].receivedAccepts.m[vb1]);
-      assert ChosenAtLearner(c, v.History(j), vb1, lnr1);  // trigger
-    }
-    // There are then two cases. If vb1.b == vb2.b, then the conclusion holds via OneValuePerBallot
-    // Otherwise, leader 2 must hear leader 1's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
-    // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
-    assert vb1.v == vb2.v;
-  }
 }
 
 lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, vb: ValBal) 
@@ -1073,7 +1040,7 @@ lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, v
       // Because vb is chosen, leader vb.b proposed it, by LearnerReceivedAcceptImpliesProposed. 
       // Also, leader vb.b sent prop, and so must proposed prob.val, by MessageInv.
       // Result then follows from LeaderCanProposeMonotonic
-      reveal_ChosenAtHistory();
+      //reveal_ChosenAtHistory();
     } else {
       // Leader prop.bal must hear leader vb.b's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
       // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
