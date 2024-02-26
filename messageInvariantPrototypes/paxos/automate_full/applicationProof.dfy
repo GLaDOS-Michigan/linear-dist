@@ -222,7 +222,7 @@ ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variable
 {
   forall vb, acc:AcceptorId, i | 
     && v.ValidHistoryIdx(i)
-    && ChosenAtHistory(c, v.History(i), vb)
+    && Chosen(c, v.History(i), vb)
     && c.ValidAcceptorIdx(acc)
     && v.History(i).acceptors[acc].HasAcceptedAtLeastBal(vb.b)
   ::
@@ -236,7 +236,7 @@ ghost predicate ChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: V
 {
   forall vb, ldrBal:LeaderId, i | 
     && v.ValidHistoryIdx(i)
-    && ChosenAtHistory(c, v.History(i), vb)
+    && Chosen(c, v.History(i), vb)
     && c.ValidLeaderIdx(ldrBal)
     && vb.b < ldrBal
     && v.History(i).LeaderCanPropose(c, ldrBal)
@@ -250,7 +250,7 @@ ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables)
 {
   forall vb, ldrBal:LeaderId, i | 
     && v.ValidHistoryIdx(i)
-    && ChosenAtHistory(c, v.History(i), vb)
+    && Chosen(c, v.History(i), vb)
     && c.ValidLeaderIdx(ldrBal)
     && v.History(i).leaders[ldrBal].HeardAtLeast(vb.b)
   ::
@@ -614,7 +614,7 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
 {
   forall vb, acc:AcceptorId, i | 
     && v'.ValidHistoryIdx(i)
-    && ChosenAtHistory(c, v'.History(i), vb)
+    && Chosen(c, v'.History(i), vb)
     && c.ValidAcceptorIdx(acc)
     && v'.History(i).acceptors[acc].HasAcceptedAtLeastBal(vb.b)
   ensures
@@ -662,7 +662,7 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
 {
   forall vb, ldrBal:LeaderId, i | 
     && v'.ValidHistoryIdx(i)
-    && ChosenAtHistory(c, v'.History(i), vb)
+    && Chosen(c, v'.History(i), vb)
     && c.ValidLeaderIdx(ldrBal)
     && v'.History(i).leaders[ldrBal].HeardAtLeast(vb.b)
   ensures
@@ -679,7 +679,7 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
         NewChosenOnlyInLearnerStep(c, v, v', dsStep);
       } else {
         if v'.History(i).leaders[ldrBal].Value() != vb.v {
-          assert Chosen(c, v', vb);
+          assert Chosen(c, v'.Last(), vb);
           LeaderHearsDifferentValueFromChosenImpliesFalse(c, v', ldrBal, vb);
         }
       }
@@ -696,7 +696,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Vari
 {
   forall vb, ldr:LeaderId, i | 
     && v'.ValidHistoryIdx(i)
-    && ChosenAtHistory(c, v'.History(i), vb)
+    && Chosen(c, v'.History(i), vb)
     && c.ValidLeaderIdx(ldr)
     && vb.b < ldr
     && v'.History(i).LeaderCanPropose(c, ldr)
@@ -734,7 +734,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
   requires LearnerReceivedAcceptImpliesAccepted(c, v')
 
   // input constraints
-  requires ChosenAtHistory(c, v'.Last(), vb)
+  requires Chosen(c, v'.Last(), vb)
   requires c.ValidLeaderIdx(ldr)
   requires vb.b < ldr
   requires v'.Last().LeaderCanPropose(c, ldr)
@@ -744,7 +744,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
   VariableNextProperties(c, v, v');
   NewChosenOnlyInLearnerStep(c, v, v', dsStep);
   if ldr == dsStep.actor {  // if the leader in question is now taking a step
-    assert ChosenAtHistory(c, v.Last(), vb);
+    assert Chosen(c, v.Last(), vb);
     var choosingAccs := SupportingAcceptorsForChosen(c, v, |v.history|-1, vb);
     var h, h' := v.Last(), v'.Last();
     if h.leaders[ldr].HeardAtMost(vb.b) {
@@ -775,7 +775,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
   requires LearnerReceivedAcceptImpliesAccepted(c, v')
 
   // input constraints
-  requires ChosenAtHistory(c, v'.Last(), vb)
+  requires Chosen(c, v'.Last(), vb)
   requires c.ValidLeaderIdx(ldr)
   requires vb.b < ldr
   requires v'.Last().LeaderCanPropose(c, ldr)
@@ -783,7 +783,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
 {
   // Note that proof is identical to atomic case
   VariableNextProperties(c, v, v');
-  if !ChosenAtHistory(c, v.Last(), vb) {
+  if !Chosen(c, v.Last(), vb) {
     var actor, msgOps := dsStep.actor, dsStep.msgOps;
     var lnr:LearnerId:| ChosenAtLearner(c, v'.Last(), vb, lnr);
     if lnr == actor {
@@ -804,7 +804,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
 // Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
 lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
   requires v.WF(c)
-  requires Chosen(c, v, chosen)
+  requires Chosen(c, v.Last(), chosen)
   requires c.ValidLeaderIdx(ldr)
   requires v.Last().leaders[ldr].highestHeardBallot.MNSome?
   requires v.Last().leaders[ldr].highestHeardBallot.value >= chosen.b
@@ -837,14 +837,7 @@ ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
 }
 
 // A learner holds an accept quorum for vb
-ghost predicate Chosen(c: Constants, v: Variables, vb: ValBal) 
-  requires v.WF(c)
-{
-  ChosenAtHistory(c, v.Last(), vb)
-}
-
-// A learner holds an accept quorum for vb
-ghost predicate ChosenAtHistory(c: Constants, h: Hosts, vb: ValBal) 
+ghost predicate Chosen(c: Constants, h: Hosts, vb: ValBal) 
   requires h.WF(c)
 {
   exists lnr:LearnerId:: 
@@ -864,17 +857,28 @@ ghost predicate ChosenAtLearner(c: Constants, h: Hosts, vb: ValBal, lnr:LearnerI
 ghost predicate AtMostOneChosenVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall i, j, vb1: ValBal, vb2: ValBal | 
+  forall i, j, vb1: ValBal, vb2: ValBal 
+    {:trigger vb2.v, vb1.v, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
+    {:trigger vb2.v, vb1.b, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
+    {:trigger vb2.v, Chosen(c, v.History(i), vb1), v.ValidHistoryIdx(j)}
+    {:trigger vb1.v, vb2.b, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
+    {:trigger vb1.v, Chosen(c, v.History(j), vb2), v.ValidHistoryIdx(i)}
+    {:trigger vb2.b, vb1.b, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
+    {:trigger vb2.b, Chosen(c, v.History(i), vb1), v.ValidHistoryIdx(j)}
+    {:trigger vb1.b, Chosen(c, v.History(j), vb2), v.ValidHistoryIdx(i)}
+    {:trigger Chosen(c, v.History(i), vb1), Chosen(c, v.History(j), vb2)}
+  :: (
     && v.ValidHistoryIdx(i)
     && v.ValidHistoryIdx(j)
     && i <= j
     && vb1.b <= vb2.b 
-    && ChosenAtHistory(c, v.History(i), vb1) 
-    && ChosenAtHistory(c, v.History(j), vb2)
-  :: 
+    && Chosen(c, v.History(i), vb1) 
+    && Chosen(c, v.History(j), vb2)
+  ==>
     && c.ValidLeaderIdx(vb1.b)
     && c.ValidLeaderIdx(vb2.b)
     && vb1.v == vb2.v
+  )
 }
 
 ghost predicate IsPrepareMessage(v: Variables, m: Message) {
@@ -907,7 +911,7 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   requires v.Last().learners[lnr].HasLearnedValue(val)
   requires LearnedImpliesQuorumOfAccepts(c, v)
   ensures vb.v == val
-  ensures Chosen(c, v, vb)
+  ensures Chosen(c, v.Last(), vb)
 {
   var bal :| ChosenAtLearner(c, v.Last(), VB(val, bal), lnr);
   return VB(val, bal);
@@ -925,8 +929,8 @@ lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
     && v.ValidHistoryIdx(j)
     && i <= j
     && vb1.b <= vb2.b
-    && ChosenAtHistory(c, v.History(i), vb1)
-    && ChosenAtHistory(c, v.History(j), vb2)
+    && Chosen(c, v.History(i), vb1)
+    && Chosen(c, v.History(j), vb2)
   ensures 
     && c.ValidLeaderIdx(vb1.b)
     && c.ValidLeaderIdx(vb2.b)
@@ -936,14 +940,14 @@ lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
     // vb1 chosen at i implies that vb1 is also chosen at j, by LearnerReceivedAcceptsMonotonic.
     // This means that a leader proposed vb1, and another proposed vb2, by LearnerReceivedAcceptImpliesProposed.
     var lnr1: nat :| ChosenAtLearner(c, v.History(i), vb1, lnr1);
-    assert ChosenAtHistory(c, v.History(j), vb1) by {
+    assert Chosen(c, v.History(j), vb1) by {
       SetContainmentCardinality(v.History(i).learners[lnr1].receivedAccepts.m[vb1], v.History(j).learners[lnr1].receivedAccepts.m[vb1]);
       assert ChosenAtLearner(c, v.History(j), vb1, lnr1);  // trigger
     }
     // There are then two cases. If vb1.b == vb2.b, then the conclusion holds via OneValuePerBallot
     // Otherwise, leader 2 must hear leader 1's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
     // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
-    assert vb1.v == vb2.v;
+    // assert vb1.v == vb2.v;
   }
 }
 
@@ -975,15 +979,15 @@ lemma NewChosenOnlyInLearnerStep(c: Constants, v: Variables, v': Variables, dsSt
   requires Next(c, v, v')
   requires NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep)
   requires !dsStep.LearnerHostStep?
-  ensures forall vb | Chosen(c, v', vb) :: Chosen(c, v, vb)
-  ensures forall vb | ChosenAtHistory(c, v'.history[|v'.history|-1], vb) 
-      :: && ChosenAtHistory(c, v'.history[|v'.history|-2], vb)
-         && ChosenAtHistory(c, v'.history[|v'.history|-2], vb)
-         && ChosenAtHistory(c, v.history[|v.history|-1], vb)
+  ensures forall vb | Chosen(c, v'.Last(), vb) :: Chosen(c, v.Last(), vb)
+  ensures forall vb | Chosen(c, v'.history[|v'.history|-1], vb) 
+      :: && Chosen(c, v'.history[|v'.history|-2], vb)
+         && Chosen(c, v'.history[|v'.history|-2], vb)
+         && Chosen(c, v.history[|v.history|-1], vb)
         
 {
-  forall vb | ChosenAtHistory(c, v'.Last(), vb) 
-  ensures ChosenAtHistory(c, v'.history[|v'.history|-2], vb) {
+  forall vb | Chosen(c, v'.Last(), vb) 
+  ensures Chosen(c, v'.history[|v'.history|-2], vb) {
     var lnr:LearnerId :| ChosenAtLearner(c, v'.Last(), vb, lnr);   // witness
     assert ChosenAtLearner(c, v.Last(), vb, lnr);                  // trigger
   }
@@ -994,7 +998,7 @@ lemma SupportingAcceptorsForChosen(c: Constants, v: Variables, i:int, vb: ValBal
 returns (supportingAccs: set<AcceptorId>)
   requires v.WF(c)
   requires v.ValidHistoryIdx(i)
-  requires ChosenAtHistory(c, v.History(i), vb)
+  requires Chosen(c, v.History(i), vb)
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   ensures |supportingAccs| >= c.f+1
   ensures forall a | a in supportingAccs :: 
@@ -1023,7 +1027,7 @@ returns (accSet: set<AcceptorId>)
 
 lemma ChosenImpliesProposeMessagesOnlyContainValue(c: Constants, v: Variables, vb: ValBal) 
   requires Inv(c, v)
-  requires ChosenAtHistory(c, v.Last(), vb)
+  requires Chosen(c, v.Last(), vb)
   ensures forall prop | 
     && IsProposeMessage(v, prop)
     && vb.b <= prop.bal
