@@ -14,26 +14,34 @@ import opened Obligations
 ghost predicate OneValuePerBallotLeaderAndLearners(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, lnr, acceptedVal, i |
+  forall ldr, lnr, acceptedVal, i 
+  {:trigger v.History(i).learners[lnr], VB(acceptedVal, ldr)}
+  {:trigger VB(acceptedVal, ldr), c.ValidLearnerIdx(lnr), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
     && c.ValidLearnerIdx(lnr)
     && VB(acceptedVal, ldr) in v.History(i).learners[lnr].receivedAccepts.m
-  ::
+  ==>
     acceptedVal == v.History(i).leaders[ldr].Value()
+  )
 }
 
 // Learner's receivedAccepts.m contain valid acceptor ids
 ghost predicate LearnerValidReceivedAccepts(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall lnr:LearnerId, vb:ValBal, e:AcceptorId, i |
+  forall lnr:LearnerId, vb:ValBal, e:AcceptorId, i 
+  {:trigger c.ValidAcceptorIdx(e), v.History(i).learners[lnr].receivedAccepts.m[vb]}
+  {:trigger c.ValidAcceptorIdx(e), vb in v.History(i).learners[lnr].receivedAccepts.m}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
     && vb in v.History(i).learners[lnr].receivedAccepts.m
     && e in v.History(i).learners[lnr].receivedAccepts.m[vb]
-  ::
+  ==>
     c.ValidAcceptorIdx(e)
+  )
 }
 
 ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables) 
@@ -61,28 +69,37 @@ ghost predicate LearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables)
 ghost predicate LearnedImpliesQuorumOfAccepts(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall lnr:LearnerId, val:Value, i |
+  forall lnr:LearnerId, val:Value, i 
+  {:trigger v.History(i).learners[lnr].HasLearnedValue(val)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
     && v.History(i).learners[lnr].HasLearnedValue(val)
-  ::
+  ==>
     exists b: LeaderId ::
       && var vb := VB(val, b);
       && ChosenAtLearner(c, v.History(i), vb, lnr)
+  )
 }
 
 // Each entry in a learner's receivedAccepts.m implies that an acceptor accepted it
 ghost predicate LearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall lnr:LearnerId, vb:ValBal, acc:AcceptorId, i |
+  forall lnr:LearnerId, vb:ValBal, acc:AcceptorId, i 
+  {:trigger vb.b, v.History(i).acceptors[acc], v.History(i).learners[lnr]}
+  {:trigger vb.b, v.History(i).acceptors[acc], c.ValidLearnerIdx(lnr)}
+  {:trigger vb.b, v.History(i).learners[lnr], c.ValidAcceptorIdx(acc)}
+  {:trigger vb.b, c.ValidAcceptorIdx(acc), c.ValidLearnerIdx(lnr), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLearnerIdx(lnr)
     && c.ValidAcceptorIdx(acc)
     && vb in v.History(i).learners[lnr].receivedAccepts.m
     && acc in v.History(i).learners[lnr].receivedAccepts.m[vb]
-  ::
+  ==>
     v.History(i).acceptors[acc].HasAcceptedAtLeastBal(vb.b) 
+  )
 }
 
 
@@ -387,26 +404,11 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
 }
  
 lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires MessageInv(c, v)
-  requires MonotonicityInv(c, v)
-  requires AcceptorValidPromisedAndAccepted(c, v)
-  requires AcceptorAcceptedImpliesProposed(c, v)
-  requires LearnerReceivedAcceptImpliesProposed(c, v)
+  requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
 {
-  forall lnr:LearnerId, vb:ValBal, i |
-    && v'.ValidHistoryIdx(i)
-    && c.ValidLearnerIdx(lnr)
-    && vb in v'.History(i).learners[lnr].receivedAccepts.m
-    && c.ValidLeaderIdx(vb.b)
-  ensures
-    && v'.History(i).LeaderCanPropose(c, vb.b)
-    && v'.History(i).leaders[vb.b].Value() == vb.v
-  {
-    VariableNextProperties(c, v, v');
-  }
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
