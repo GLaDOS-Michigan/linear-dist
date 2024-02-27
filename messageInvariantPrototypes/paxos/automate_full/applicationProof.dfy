@@ -486,39 +486,13 @@ lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variabl
   requires v.WF(c)
   requires MessageInv(c, v)
   requires MonotonicityInv(c, v)
-  requires LeaderHearedImpliesProposed(c, v)
+  requires Inv(c, v)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
   requires AcceptorAcceptedImpliesProposed(c, v')
   ensures LeaderHearedImpliesProposed(c, v')
 {  
-  assume false;  // TODO
-  forall ldr:LeaderId, i | 
-    && v'.ValidHistoryIdx(i)
-    && c.ValidLeaderIdx(ldr)
-    && v'.History(i).leaders[ldr].highestHeardBallot.MNSome?
-  ensures
-    // note that once a leader CanPropose(), its value does not change
-    && var vi' := v'.History(i);
-    var b := vi'.leaders[ldr].highestHeardBallot.value;
-    && c.ValidLeaderIdx(b)
-    && vi'.LeaderCanPropose(c, b)
-    && vi'.leaders[b].Value() == vi'.leaders[ldr].Value()
-  { 
-    VariableNextProperties(c, v, v');
-    if i == |v'.history| - 1 {
-      var dsStep :| NextStep(c, v.Last(), v'.Last(), v.network, v'.network, dsStep);
-      if dsStep.LeaderHostStep? {
-        var actor, msgOps := dsStep.actor, dsStep.msgOps;
-        var lc, l, l' := c.leaders[actor], v.Last().leaders[actor], v'.Last().leaders[actor];
-        var step :| LeaderHost.NextStep(lc, l, l', step, msgOps);
-        if step.ReceiveStep? {
-          assert IsPromiseMessage(v, msgOps.recv.value);  // trigger
-          assert c.ValidAcceptorIdx(msgOps.recv.value.acc);  // trigger
-        } 
-      }
-    }
-  }
+  VariableNextProperties(c, v, v');
 }
 
 lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
@@ -534,22 +508,8 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
 }
 
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c) && v'.WF(c)
-  // v requirements
-  requires ValidMessages(c, v)
-  requires SendAcceptValidity(c, v)
-  requires MonotonicityInv(c, v)
-  requires LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v)
-
-  // v' requirements
+  requires Inv(c, v)
   requires Next(c, v, v')
-  requires ReceiveAcceptValidity(c, v')  // custom receive invariant
-  requires ReceivePromiseValidity(c, v')  // custom receive invariant
-  requires SendAcceptValidity(c, v')
-  requires SendPromiseValidity(c, v')
-  requires AcceptorHostAcceptedVBMonotonic(c, v')
-  requires LeaderHostHighestHeardBallotMonotonic(c, v')
-  // postcondition
   ensures LeaderHighestHeardToPromisedRangeHasNoAccepts(c, v')
 { 
   forall ldr, acc, lnr, vb:ValBal, i | 
@@ -564,6 +524,8 @@ lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Vari
   ensures
     acc !in v'.History(i).learners[lnr].receivedAccepts.m[vb]
   {
+    MessageInvInductive(c, v, v');
+    MonotonicityInvInductive(c, v, v');
     VariableNextProperties(c, v, v');
     if acc in v'.History(i).learners[lnr].receivedAccepts.m[vb] {
       var acceptMsg := AcceptMessageExistence(c, v', i, lnr, vb, acc);
@@ -967,7 +929,6 @@ lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
     && c.ValidLeaderIdx(vb2.b)
     && vb1.v == vb2.v
   {
-    //reveal_ChosenAtHistory();
     // vb1 chosen at i implies that vb1 is also chosen at j, by LearnerReceivedAcceptsMonotonic.
     // This means that a leader proposed vb1, and another proposed vb2, by LearnerReceivedAcceptImpliesProposed.
     var lnr1: nat :| ChosenAtLearner(c, v.History(i), vb1, lnr1);
@@ -1051,7 +1012,7 @@ returns (accSet: set<AcceptorId>)
   ensures forall a :: c.ValidAcceptorIdx(a) <==> a in accSet
   ensures |accSet| == 2 * c.f + 1
 {
-  assert v.history[0].WF(c);  // trigger for |c.acceptors| == 2 * c.f+1
+  assert v.History(0).WF(c);  // trigger for |c.acceptors| == 2 * c.f+1
   accSet := set a |  0 <= a < |c.acceptors|;
   SetComprehensionSize(|c.acceptors|);
 }

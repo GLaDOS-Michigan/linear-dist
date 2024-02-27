@@ -119,7 +119,7 @@ module DistributedSystem {
     ghost predicate WF(c: Constants) {
       && c.WF()
       && 0 < |history|
-      && (forall i | ValidHistoryIdx(i) :: history[i].WF(c))
+      && (forall i | ValidHistoryIdx(i) :: History(i).WF(c))
     }
   
     ghost function Last() : (h: Hosts)

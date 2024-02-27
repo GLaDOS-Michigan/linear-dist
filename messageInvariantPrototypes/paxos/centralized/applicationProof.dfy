@@ -340,8 +340,7 @@ lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variab
 {}
 
 lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires LeaderHearedImpliesProposed(c, v)
+  requires Inv(c, v)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
   requires AcceptorAcceptedImpliesProposed(c, v')
