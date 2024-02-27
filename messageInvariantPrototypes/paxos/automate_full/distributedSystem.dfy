@@ -116,7 +116,9 @@ module DistributedSystem {
       0 <= i < |history|-1
     }
   
-    ghost predicate WF(c: Constants) {
+    ghost predicate WF(c: Constants) 
+      ensures History(0).WF(c)  // useful fact
+    {
       && c.WF()
       && 0 < |history|
       && (forall i | ValidHistoryIdx(i) :: History(i).WF(c))
