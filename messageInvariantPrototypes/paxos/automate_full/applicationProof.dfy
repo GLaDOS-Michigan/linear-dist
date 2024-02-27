@@ -142,12 +142,16 @@ ghost predicate AcceptorAcceptedImpliesProposed(c: Constants, v: Variables)
 ghost predicate LeaderValidReceivedPromises(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall ldr, acc, i | 
+  forall ldr, acc, i 
+  {:trigger c.ValidAcceptorIdx(acc), v.History(i).leaders[ldr]}
+  {:trigger c.ValidAcceptorIdx(acc), c.ValidLeaderIdx(ldr), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
     && acc in v.History(i).leaders[ldr].ReceivedPromises()
-  ::
+  ==>    
     c.ValidAcceptorIdx(acc)
+  )
 }
 
 // For all leaders, its highestHeardBallot is upper bounded by its own ballot
@@ -172,18 +176,21 @@ ghost predicate LeaderHighestHeardUpperBound(c: Constants, v: Variables)
 ghost predicate LeaderHearedImpliesProposed(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall ldr:LeaderId, i | 
+  forall ldr:LeaderId, i 
+  {:trigger v.History(i).leaders[ldr].highestHeardBallot}
+  :: (
     && v.ValidHistoryIdx(i)
     && c.ValidLeaderIdx(ldr)
     && v.History(i).leaders[ldr].highestHeardBallot.MNSome?
     && c.ValidLeaderIdx(v.History(i).leaders[ldr].highestHeardBallot.value)
-  ::
+  ==>
     // note that once a leader CanPropose(), its value does not change
     && var vi := v.History(i);
     var b := vi.leaders[ldr].highestHeardBallot.value;
     // && c.ValidLeaderIdx(b)
     && vi.LeaderCanPropose(c, b)
     && vi.leaders[b].Value() == vi.leaders[ldr].Value()
+  )
 }
 
 // For all ldr, acc such that acc in ldr.ReceivedPromises(), acc's current promise
@@ -237,13 +244,19 @@ ghost predicate LeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: V
 ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall vb, acc:AcceptorId, i | 
+  forall vb, acc:AcceptorId, i 
+  {:trigger vb.v, v.History(i).acceptors[acc].acceptedVB.value.v}
+  {:trigger vb.b, v.History(i).acceptors[acc].acceptedVB.value.b}
+  {:trigger v.History(i).acceptors[acc], Chosen(c, v.History(i), vb)}
+  {:trigger c.ValidAcceptorIdx(acc), Chosen(c, v.History(i), vb), v.ValidHistoryIdx(i)}
+  :: (
     && v.ValidHistoryIdx(i)
     && Chosen(c, v.History(i), vb)
     && c.ValidAcceptorIdx(acc)
     && v.History(i).acceptors[acc].HasAcceptedAtLeastBal(vb.b)
-  ::
+  ==>
      v.History(i).acceptors[acc].acceptedVB.value.v == vb.v
+  )
 }
 
 // If vb is chosen, then for all leaders > vb.b and ready to propose, they must have highest 
@@ -251,27 +264,43 @@ ghost predicate ChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variable
 ghost predicate ChosenImpliesProposingLeaderHearsChosenBallot(c: Constants, v: Variables)
   requires v.WF(c)
 {
-  forall vb, ldrBal:LeaderId, i | 
+  forall vb, ldrBal:LeaderId, i 
+  {:trigger v.History(i).leaders[ldrBal], vb.b}
+  {:trigger v.History(i).leaders[ldrBal], Chosen(c, v.History(i), vb)}
+  {:trigger v.History(i).LeaderCanPropose(c, ldrBal), vb.b}
+  {:trigger v.History(i).LeaderCanPropose(c, ldrBal), Chosen(c, v.History(i), vb)}
+  {:trigger vb.b, c.ValidLeaderIdx(ldrBal), v.ValidHistoryIdx(i)}
+  {:trigger c.ValidLeaderIdx(ldrBal), Chosen(c, v.History(i), vb)}
+  :: (
     && v.ValidHistoryIdx(i)
     && Chosen(c, v.History(i), vb)
     && c.ValidLeaderIdx(ldrBal)
     && vb.b < ldrBal
     && v.History(i).LeaderCanPropose(c, ldrBal)
-  ::
+  ==>
     v.History(i).leaders[ldrBal].HeardAtLeast(vb.b)
+  )
 }
 
 // If vb is chosen, then for all leaders has a highest heard >= vb.b, the value must be vb.v
 ghost predicate ChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall vb, ldrBal:LeaderId, i | 
+  forall vb, ldrBal:LeaderId, i 
+  {:trigger vb.v, v.History(i).leaders[ldrBal]}
+  {:trigger vb.v, c.ValidLeaderIdx(ldrBal), v.ValidHistoryIdx(i)}
+  {:trigger vb.b, v.History(i).leaders[ldrBal]}
+  {:trigger vb.b, c.ValidLeaderIdx(ldrBal), v.ValidHistoryIdx(i)}
+  {:trigger v.History(i).leaders[ldrBal], Chosen(c, v.History(i), vb)}
+  {:trigger c.ValidLeaderIdx(ldrBal), Chosen(c, v.History(i), vb)}
+  :: (
     && v.ValidHistoryIdx(i)
     && Chosen(c, v.History(i), vb)
     && c.ValidLeaderIdx(ldrBal)
     && v.History(i).leaders[ldrBal].HeardAtLeast(vb.b)
-  ::
+  ==>
     v.History(i).leaders[ldrBal].Value() == vb.v
+  )
 }
 
 // Application bundle
