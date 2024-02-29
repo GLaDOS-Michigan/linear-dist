@@ -1,7 +1,6 @@
 include "spec.dfy"
 
-module ToylockProof {
-  
+module ShardedKVProof {
 import opened Types
 import opened UtilitiesLibrary
 import opened System
