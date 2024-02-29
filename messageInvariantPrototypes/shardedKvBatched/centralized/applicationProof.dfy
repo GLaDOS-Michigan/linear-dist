@@ -1,6 +1,6 @@
 include "spec.dfy"
 
-module ToylockProof {
+module ShardedKVBatchedProof {
   
 import opened Types
 import opened UtilitiesLibrary
@@ -42,19 +42,6 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures Inv(c, v')
-{
-  InvNextSafety(c, v, v');
-}
-
-
-/***************************************************************************************
-*                                 InvNext Proofs                                       *
-***************************************************************************************/
-
-lemma InvNextSafety(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
-  requires Next(c, v, v')
-  ensures Safety(c, v')
 {}
 
 } // end module ToylockProof
