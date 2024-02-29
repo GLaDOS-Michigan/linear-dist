@@ -643,7 +643,6 @@ lemma InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c: Constants, v: Variables, 
 lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
-  requires Inv(c, v)
 
   // Prereqs for LeaderHearsDifferentValueFromChosenImpliesFalse
   requires OneValuePerBallotLeaderAndLearners(c, v')

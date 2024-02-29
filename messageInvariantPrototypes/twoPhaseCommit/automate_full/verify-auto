@@ -1,0 +1,15 @@
+#!/bin/sh
+
+dafnyMsgInv="/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Scripts/dafny /msgInvs"
+dafnyVerify="/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Scripts/dafny /timeLimit:20 /compile:0  /noNLarith /autoTriggers:1 /vcsCores:10"
+
+files="../../lib/* ../hosts.dfy ../types.dfy distributedSystem.dfy spec.dfy messageInvariantsAutogen.dfy monotonicityInvariantsAutogen.dfy applicationProof.dfy"
+
+rm -f messageInvariantsAutogen.dfy monotonicityInvariantsAutogen.dfy
+
+echo "Generating invariants"
+$dafnyMsgInv "distributedSystem.dfy" > autoInvs.log
+
+echo "Verifying $files"
+
+time $dafnyVerify $files

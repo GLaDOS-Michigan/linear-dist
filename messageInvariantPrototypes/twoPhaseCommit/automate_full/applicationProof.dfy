@@ -53,8 +53,10 @@ ghost predicate LeaderTallyReflectsPreferences2(c: Constants, v: Variables)
   requires v.WF(c)
   requires LeaderVotesValid2(c, v)
 {
-  forall i, hostId | v.ValidHistoryIdx(i) && hostId in v.History(i).GetCoordinator(c).noVotes
-  :: GetParticipantPreference(c, hostId) == No
+  forall i, hostId 
+  {:trigger GetParticipantPreference(c, hostId), v.History(i)} {:trigger hostId in v.Last().GetCoordinator(c).noVotes, v.ValidHistoryIdx(i)}
+  :: (v.ValidHistoryIdx(i) && hostId in v.History(i).GetCoordinator(c).noVotes
+    ==> GetParticipantPreference(c, hostId) == No)
 }
 
 // User-level invariant
@@ -108,16 +110,13 @@ lemma AC1Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures SafetyAC1(c, v')
-{
-  VariableNextProperties(c, v, v');
-}
+{}
 
 lemma AC3Proof(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AC3Contrapos(c, v')
 {
-  LeaderTallyReflectsPreferencesInductive(c, v, v');
   AC3ContraposLemma(c, v);
   VariableNextProperties(c, v, v');
   if ! AllPreferYes(c) && CoordinatorHasDecided(c, v'.Last()) {
@@ -150,14 +149,7 @@ lemma AC4Proof(c: Constants, v: Variables, v': Variables)
   requires MessageInv(c, v')
   requires ApplicationInv(c, v')
   ensures SafetyAC4(c, v')
-{
-  if AllPreferYes(c) && CoordinatorHasDecided(c, v'.Last()) {
-    if !CoordinatorDecidedCommit(c, v'.Last()) {
-      var x :| x in v'.Last().GetCoordinator(c).noVotes;
-      assert GetParticipantPreference(c, x) == No;  // contradicts AllPreferYes(c)
-    }
-  }
-}
+{}
 
 lemma YesVotesContainsAllParticipantsWhenFull(c: Constants, v: Variables, i: int)
   requires Inv(c, v)
