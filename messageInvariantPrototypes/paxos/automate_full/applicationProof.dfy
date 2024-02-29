@@ -375,7 +375,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
 
-  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  InvImpliesAtMostOneChosenVal(c, v');
   AtMostOneChosenImpliesSafety(c, v');
 }
 
@@ -447,6 +447,7 @@ lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v'
   ensures LearnerReceivedAcceptImpliesAccepted(c, v')
 {
   VariableNextProperties(c, v, v');
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
 }
 
 lemma InvNextAcceptorValidBundle(c: Constants, v: Variables, v': Variables) 
@@ -905,6 +906,14 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   var bal :| ChosenAtLearner(c, v.Last(), VB(val, bal), lnr);
   return VB(val, bal);
 }
+
+lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires MessageInv(c, v)
+  requires MonotonicityInv(c, v)
+  requires ApplicationInv(c, v)
+  ensures AtMostOneChosenVal(c, v)
+{}
 
 // If only one value can be chosen, then Agreement must be satisfied
 lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)

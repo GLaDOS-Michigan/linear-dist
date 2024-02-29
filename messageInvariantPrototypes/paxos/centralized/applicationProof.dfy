@@ -250,8 +250,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   assert OneValuePerBallotLeaderAndLearners(c, v);
   InvNextLearnerValidReceivedAccepts(c, v, v');
   InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
-  InvNextAcceptorValidPromisedAndAccepted(c, v, v');
-  InvNextAcceptorAcceptedImpliesProposed(c, v, v');
+  InvNextAcceptorValidBundle(c, v, v');
   InvNextLeaderValidReceivedPromises(c, v, v');
   InvNextLeaderHighestHeardUpperBound(c, v, v');
   InvNextLeaderHearedImpliesProposed(c, v, v');
@@ -263,7 +262,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
 
-  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
+  InvImpliesAtMostOneChosenVal(c, v');
   AtMostOneChosenImpliesSafety(c, v');
 }
 
@@ -279,53 +278,53 @@ lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variabl
   ensures LearnerValidReceivedAccepts(c, v')
 {}
 
+lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LearnerValidReceivedAccepts(c, v)
+  requires LearnedImpliesQuorumOfAccepts(c, v)
+  requires Next(c, v, v')
+  ensures LearnedImpliesQuorumOfAccepts(c, v')
+{
+  forall lnr:LearnerId, val:Value |
+    && c.ValidLearnerIdx(lnr) 
+    && v'.learners[lnr].HasLearnedValue(val)
+  ensures
+    exists b: LeaderId ::
+      && var vb := VB(val, b);
+      && ChosenAtLearner(c, v', vb, lnr)
+  {
+    var sysStep :| NextStep(c, v, v', sysStep);
+    if sysStep.P2bStep? {
+      if sysStep.learner == lnr {
+        assert v.learners[lnr].HasLearnedValue(val);  // trigger
+      }
+    }
+  }
+}
+
 lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
 {}
 
-lemma InvNextAcceptorValidPromisedAndAccepted(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
+  requires v.WF(c)
+  requires LearnerReceivedAcceptImpliesAccepted(c, v)
   requires Next(c, v, v')
-  ensures AcceptorValidPromisedAndAccepted(c, v')
+  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
 {
-  assert AcceptorValidPromisedAndAccepted(c, v');
+  assert LearnerReceivedAcceptImpliesAccepted(c, v');
 }
 
-lemma InvNextAcceptorAcceptedImpliesProposed(c: Constants, v: Variables, v': Variables)
+lemma InvNextAcceptorValidBundle(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)
   requires AcceptorValidPromisedAndAccepted(c, v)
   requires AcceptorAcceptedImpliesProposed(c, v)
   requires Next(c, v, v')
-  requires AcceptorValidPromisedAndAccepted(c, v')
+  ensures AcceptorValidPromisedAndAccepted(c, v')
   ensures AcceptorAcceptedImpliesProposed(c, v')
-{
-  forall acc:AcceptorId |
-    && c.ValidAcceptorIdx(acc)
-    && v'.acceptors[acc].acceptedVB.MVBSome?
-  ensures
-    var vb := v'.acceptors[acc].acceptedVB.value;
-    && v'.LeaderCanPropose(c, vb.b)
-    && v'.leaders[vb.b].Value() == vb.v
-  {
-    var vb := v'.acceptors[acc].acceptedVB.value;
-    var dsStep :|  NextStep(c, v, v', dsStep);
-    if dsStep.P2aStep? {
-      assert v'.LeaderCanPropose(c, vb.b);
-      assert v'.leaders[vb.b].Value() == vb.v;
-    } else if dsStep.P1bStep? {
-      assert v'.LeaderCanPropose(c, vb.b);
-      assert v'.leaders[vb.b].Value() == vb.v;
-    } else if dsStep.P2aStep? {
-      assert v'.LeaderCanPropose(c, vb.b);
-      assert v'.leaders[vb.b].Value() == vb.v;
-    } else if dsStep.P2bStep? {
-      assert v'.LeaderCanPropose(c, vb.b);
-      assert v'.leaders[vb.b].Value() == vb.v;
-    }
-  }
-}
+{}
 
 lemma InvNextLeaderValidReceivedPromises(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -355,51 +354,7 @@ lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variabl
   requires LeaderReceivedPromisesImpliesAcceptorState(c, v)
   requires Next(c, v, v')
   ensures LeaderReceivedPromisesImpliesAcceptorState(c, v')
-{
-  forall ldr:LeaderId, acc:AcceptorId |
-    && c.ValidLeaderIdx(ldr)
-    && c.ValidAcceptorIdx(acc)
-    && acc in v'.leaders[ldr].ReceivedPromises()
-  ensures
-    v'.acceptors[acc].HasPromisedAtLeast(ldr)
-  {
-    //trigger
-    assert v'.acceptors[acc].HasPromisedAtLeast(ldr);
-  }
-}
-
-lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires LearnerReceivedAcceptImpliesAccepted(c, v)
-  requires Next(c, v, v')
-  ensures LearnerReceivedAcceptImpliesAccepted(c, v')
-{
-  assert LearnerReceivedAcceptImpliesAccepted(c, v');
-}
-
-lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires LearnerValidReceivedAccepts(c, v)
-  requires LearnedImpliesQuorumOfAccepts(c, v)
-  requires Next(c, v, v')
-  ensures LearnedImpliesQuorumOfAccepts(c, v')
-{
-  forall lnr:LearnerId, val:Value |
-    && c.ValidLearnerIdx(lnr) 
-    && v'.learners[lnr].HasLearnedValue(val)
-  ensures
-    exists b: LeaderId ::
-      && var vb := VB(val, b);
-      && ChosenAtLearner(c, v', vb, lnr)
-  {
-    var sysStep :| NextStep(c, v, v', sysStep);
-    if sysStep.P2bStep? {
-      if sysStep.learner == lnr {
-        assert v.learners[lnr].HasLearnedValue(val);  // trigger
-      }
-    }
-  }
-}
+{}
 
 lemma InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
@@ -648,6 +603,12 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
   var bal :| ChosenAtLearner(c, v, VB(val, bal), lnr);
   return VB(val, bal);
 }
+
+lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ApplicationInv(c, v)
+  ensures AtMostOneChosenVal(c, v)
+{}
 
 // If only one value can be chosen, then Agreement must be satisfied
 lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
