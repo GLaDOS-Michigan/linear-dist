@@ -1,6 +1,6 @@
 include "spec.dfy"
 
-module ToylockProof {
+module LockServerProof {
   
 import opened Types
 import opened UtilitiesLibrary
@@ -49,9 +49,4 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {}
-
-
-/***************************************************************************************
-*                                 InvNext Proofs                                       *
-***************************************************************************************/
-} // end module ToylockProof
+} // end module LockServerProof
