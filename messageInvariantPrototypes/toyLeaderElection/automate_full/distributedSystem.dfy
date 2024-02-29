@@ -22,46 +22,37 @@ module DistributedSystem {
   import opened Types
   import opened UtilitiesLibrary
   import opened Network
-  import ServerHost
-  import ClientHost
+  import Host
 
-  datatype Constants = Constants(clients: seq<ClientHost.Constants>, servers: seq<ServerHost.Constants>) {
+  datatype Constants = Constants(hosts: seq<Host.Constants>) {
     ghost predicate WF()
       decreases this
     {
-      ClientHost.GroupWFConstants(clients) &&
-      ServerHost.GroupWFConstants(servers)
+      Host.GroupWFConstants(hosts)
     }
 
-    ghost predicate ValidClientIdx(idx: nat)
-      decreases this, idx
+    ghost predicate ValidHostId(id: HostId)
+      decreases this, id
     {
-      idx < |clients|
-    }
-
-    ghost function GetServer(): ServerHost.Constants
-      requires WF()
-      decreases this
-    {
-      servers[0]
+      id < |hosts|
     }
   }
   // end datatype Constants
 
-  datatype Hosts = Hosts(clients: seq<ClientHost.Variables>, servers: seq<ServerHost.Variables>) {
+  datatype Hosts = Hosts(hosts: seq<Host.Variables>) {
     ghost predicate WF(c: Constants)
       decreases this, c
     {
       c.WF() &&
-      ClientHost.GroupWF(c.clients, clients) &&
-      ServerHost.GroupWF(c.servers, servers)
+      Host.GroupWF(c.hosts, hosts)
     }
 
-    ghost function GetServer(c: Constants): ServerHost.Variables
+    ghost predicate IsLeader(c: Constants, h: HostId)
       requires WF(c)
-      decreases this, c
+      requires c.ValidHostId(h)
+      decreases this, c, h
     {
-      servers[0]
+      hosts[h].isLeader
     }
   }
   // end datatype Hosts
@@ -105,8 +96,7 @@ module DistributedSystem {
   ghost predicate InitHosts(c: Constants, h: Hosts)
     requires h.WF(c)
   {
-    && ClientHost.GroupInit(c.clients, h.clients)
-    && ServerHost.GroupInit(c.servers, h.servers)
+    && Host.GroupInit(c.hosts, h.hosts)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -118,36 +108,23 @@ module DistributedSystem {
   }
 
   datatype Step = 
-    | ClientHostStep(actor: nat, msgOps: MessageOps)
-    | ServerHostStep(actor: nat, msgOps: MessageOps)
+    | HostStep(actor: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
     && Network.Next(n, n', step.msgOps)
     && match step
-      case ClientHostStep(actor, msgOps) => NextClientHostStep(c, h, h', actor, msgOps)
-      case ServerHostStep(actor, msgOps) => NextServerHostStep(c, h, h', actor, msgOps)
+      case HostStep(actor, msgOps) => NextHostStep(c, h, h', actor, msgOps)
   }
 
-  ghost predicate NextClientHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+  ghost predicate NextHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && 0 <= actor < |h.clients|
-    && ClientHost.Next(c.clients[actor], h.clients[actor], h'.clients[actor], msgOps)
+    && 0 <= actor < |h.hosts|
+    && Host.Next(c.hosts[actor], h.hosts[actor], h'.hosts[actor], msgOps)
     // all other hosts UNCHANGED
-    && (forall other| 0 <= other < |h.clients| && other != actor :: h'.clients[other] == h.clients[other])
-    && h'.servers == h.servers
-  }
-
-  ghost predicate NextServerHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
-    requires h.WF(c) && h'.WF(c)
-  {
-    && 0 <= actor < |h.servers|
-    && ServerHost.Next(c.servers[actor], h.servers[actor], h'.servers[actor], msgOps)
-    // all other hosts UNCHANGED
-    && h'.clients == h.clients
-    && (forall other| 0 <= other < |h.servers| && other != actor :: h'.servers[other] == h.servers[other])
+    && (forall other| 0 <= other < |h.hosts| && other != actor :: h'.hosts[other] == h.hosts[other])
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)

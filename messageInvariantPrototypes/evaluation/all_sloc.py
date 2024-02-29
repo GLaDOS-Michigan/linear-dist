@@ -1,4 +1,5 @@
 import csv
+import os
 from sloc import count_sloc_between
 
 CSV_FILE = "protocols.csv"
@@ -9,15 +10,24 @@ def analyze_protocol(file_path):
     with open(file_path, 'r') as csvfile:
         csv_reader = csv.reader(csvfile)
         res = []
-        res.append("protocol,sync_spec,total_sync_proof,total_async_proof")
+        # async_full is the case where we use triggers
+        res.append("protocol,sync_spec,total_sync_proof,total_async_proof,total_async_full")
 
         for row in csv_reader:
             protocol = row[0]
 
-            async_roof_file_path = f"{ROOT_PATH}/{protocol}/automate/applicationProof.dfy"
+            async_proof_file_path = f"{ROOT_PATH}/{protocol}/automate/applicationProof.dfy"
+            async_full_proof_file_path = f"{ROOT_PATH}/{protocol}/automate_full/applicationProof.dfy"
             sync_proof_file_path = f"{ROOT_PATH}/{protocol}/centralized/applicationProof.dfy"
-            async_sloc = count_sloc_between(async_roof_file_path, 1, 1000000)
+
+            async_sloc = count_sloc_between(async_proof_file_path, 1, 1000000)
             sync_sloc = count_sloc_between(sync_proof_file_path, 1, 1000000)
+            
+            # if automate_full path exists, then we compute SLOC (minus triggers)
+            if os.path.isfile(async_full_proof_file_path):
+                async_full_sloc = count_sloc_between(async_full_proof_file_path, 1, 1000000)
+            else:
+                async_full_sloc = -1  # invalid
 
             spec_file_paths = [
                 f"{ROOT_PATH}/{protocol}/hosts.dfy",
@@ -29,7 +39,7 @@ def analyze_protocol(file_path):
             for fp in spec_file_paths:
                 spec_sloc += count_sloc_between(fp, 1, 1000000)
 
-            line = f"{protocol},{spec_sloc},{sync_sloc},{async_sloc}"
+            line = f"{protocol},{spec_sloc},{sync_sloc},{async_sloc},{async_full_sloc}"
             res.append(line)
     write_to_file(OUTPUT_PATH, "\n".join(res))
 

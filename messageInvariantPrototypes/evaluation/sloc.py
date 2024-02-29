@@ -16,8 +16,8 @@ def count_sloc_between(file_path, start_line, end_line):
             in_comment_block = True
 
         if not in_comment_block and start_line <= i <= end_line:
-            # Check if the line is not a comment or blank
-            if stripped_line and not stripped_line.startswith('//'):
+            # Check if the line is not a comment or blank or a trigger
+            if stripped_line and not stripped_line.startswith('//') and not stripped_line.startswith('{:trigger}'): 
                 sloc_count += 1
 
         if '*/' in stripped_line:
