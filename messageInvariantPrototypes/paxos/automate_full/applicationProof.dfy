@@ -375,7 +375,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
 
-  InvImpliesAtMostOneChosenVal(c, v');
+  assert AtMostOneChosenVal(c, v');  // this should be implied by invariants
   AtMostOneChosenImpliesSafety(c, v');
 }
 
@@ -385,9 +385,7 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 ***************************************************************************************/
 
 lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires MessageInv(c, v)
-  requires LearnerValidReceivedAccepts(c, v)
+  requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
 {
@@ -850,23 +848,21 @@ ghost predicate ChosenAtLearner(c: Constants, h: Hosts, vb: ValBal, lnr:LearnerI
 ghost predicate AtMostOneChosenVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall i, j, vb1: ValBal, vb2: ValBal 
-    {:trigger vb2.v, vb1.v, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
-    {:trigger vb2.v, vb1.b, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
-    {:trigger vb2.v, Chosen(c, v.History(i), vb1), v.ValidHistoryIdx(j)}
-    {:trigger vb1.v, vb2.b, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
-    {:trigger vb1.v, Chosen(c, v.History(j), vb2), v.ValidHistoryIdx(i)}
-    {:trigger vb2.b, vb1.b, v.ValidHistoryIdx(i), v.ValidHistoryIdx(j)}
-    {:trigger vb2.b, Chosen(c, v.History(i), vb1), v.ValidHistoryIdx(j)}
-    {:trigger vb1.b, Chosen(c, v.History(j), vb2), v.ValidHistoryIdx(i)}
-    {:trigger Chosen(c, v.History(i), vb1), Chosen(c, v.History(j), vb2)}
+  forall i, vb1: ValBal, vb2: ValBal 
+    {:trigger vb2.v, vb1.v, v.ValidHistoryIdx(i)}
+    {:trigger vb2.v, vb1.b, v.ValidHistoryIdx(i)}
+    {:trigger vb2.v, Chosen(c, v.History(i), vb1)}
+    {:trigger vb1.v, vb2.b, v.ValidHistoryIdx(i)}
+    {:trigger vb1.v, Chosen(c, v.History(i), vb2)}
+    {:trigger vb2.b, vb1.b, v.ValidHistoryIdx(i)}
+    {:trigger vb2.b, Chosen(c, v.History(i), vb1)}
+    {:trigger vb1.b, Chosen(c, v.History(i), vb2)}
+    {:trigger Chosen(c, v.History(i), vb2), Chosen(c, v.History(i), vb1)}
   :: (
     && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
     && vb1.b <= vb2.b 
-    && Chosen(c, v.History(i), vb1) 
-    && Chosen(c, v.History(j), vb2)
+    && Chosen(c, v.History(i), vb1)
+    && Chosen(c, v.History(i), vb2)
   ==>
     && c.ValidLeaderIdx(vb1.b)
     && c.ValidLeaderIdx(vb2.b)
@@ -908,39 +904,6 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
 {
   var bal :| ChosenAtLearner(c, v.Last(), VB(val, bal), lnr);
   return VB(val, bal);
-}
-
-lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires MessageInv(c, v)
-  requires MonotonicityInv(c, v)
-  requires ApplicationInv(c, v)
-  ensures AtMostOneChosenVal(c, v)
-{
-  forall i, j, vb1: ValBal, vb2: ValBal | 
-    && v.ValidHistoryIdx(i)
-    && v.ValidHistoryIdx(j)
-    && i <= j
-    && vb1.b <= vb2.b
-    && Chosen(c, v.History(i), vb1)
-    && Chosen(c, v.History(j), vb2)
-  ensures 
-    && c.ValidLeaderIdx(vb1.b)
-    && c.ValidLeaderIdx(vb2.b)
-    && vb1.v == vb2.v
-  {
-    // vb1 chosen at i implies that vb1 is also chosen at j, by LearnerReceivedAcceptsMonotonic.
-    // This means that a leader proposed vb1, and another proposed vb2, by LearnerReceivedAcceptImpliesProposed.
-    var lnr1: nat :| ChosenAtLearner(c, v.History(i), vb1, lnr1);
-    assert Chosen(c, v.History(j), vb1) by {
-      SetContainmentCardinality(v.History(i).learners[lnr1].receivedAccepts.m[vb1], v.History(j).learners[lnr1].receivedAccepts.m[vb1]);
-      assert ChosenAtLearner(c, v.History(j), vb1, lnr1);  // trigger
-    }
-    // There are then two cases. If vb1.b == vb2.b, then the conclusion holds via OneValuePerBallot
-    // Otherwise, leader 2 must hear leader 1's ballot, by ChosenImpliesProposingLeaderHearsChosenBallot.
-    // Then by ChosenValImpliesLeaderOnlyHearsVal, leader 2 must have same value as leader 1.
-    // assert vb1.v == vb2.v;
-  }
 }
 
 // If only one value can be chosen, then Agreement must be satisfied

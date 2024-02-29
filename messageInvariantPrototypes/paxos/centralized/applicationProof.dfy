@@ -385,7 +385,8 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
   ensures LearnedImpliesQuorumOfAccepts(c, v')
 {
   forall lnr:LearnerId, val:Value |
-    c.ValidLearnerIdx(lnr) && v'.learners[lnr].HasLearnedValue(val)
+    && c.ValidLearnerIdx(lnr) 
+    && v'.learners[lnr].HasLearnedValue(val)
   ensures
     exists b: LeaderId ::
       && var vb := VB(val, b);
