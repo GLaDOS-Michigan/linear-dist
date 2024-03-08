@@ -94,7 +94,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       Contract.Requires(expr != null);
       using (var wr = new System.IO.StringWriter()) {
         var pr = new Printer(wr, options);
-        pr.PrintExtendedExpr(expr, 0, true, false);
+        pr.PrintExtendedExpr(expr, 0, true, false, false);
         return wr.ToString();
       }
     }
@@ -146,7 +146,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       Contract.Requires(f != null);
       using var wr = new StringWriter();
       var pr = new Printer(wr, options);
-      pr.PrintFunction(f, 0, true);
+      pr.PrintFunction(f, 0, true, false);
       return ToStringWithoutNewline(wr);
     }
 
@@ -715,10 +715,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
           state = 1;
         } else if (m is Function) {
           if (state != 0) { wr.WriteLine(); }
-          PrintFunction((Function)m, indent, false);
+          PrintFunction((Function)m, indent, false, false);
           if (m is ExtremePredicate fixp && fixp.PrefixPredicate != null) {
             Indent(indent); wr.WriteLine("/*** (note, what is printed here does not show substitutions of calls to prefix predicates)");
-            PrintFunction(fixp.PrefixPredicate, indent, false);
+            PrintFunction(fixp.PrefixPredicate, indent, false, false);
             Indent(indent); wr.WriteLine("***/");
           }
           state = 2;
@@ -906,7 +906,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
       wr.WriteLine();
     }
 
-    public void PrintFunction(Function f, int indent, bool printSignatureOnly) {
+    // kondoTransform is Kondo flag for turning sync app inv predicate into async
+    public void PrintFunction(Function f, int indent, bool printSignatureOnly, bool kondoTransform) {
       Contract.Requires(f != null);
 
       if (PrintModeSkipFunctionOrMethod(f.IsGhost, f.Attributes, f.Name)) { return; }
@@ -940,7 +941,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       if (f.Body != null && !printSignatureOnly) {
         Indent(indent);
         wr.WriteLine("{");
-        PrintExtendedExpr(f.Body, ind, true, false);
+        PrintExtendedExpr(f.Body, ind, true, false, kondoTransform);
         Indent(indent);
         wr.Write("}");
         if (f.ByMethodBody != null) {
@@ -1932,147 +1933,159 @@ NoGhost - disable printing of functions, ghost methods, and proof
     /// PrintExtendedExpr prints an expression, but formats top-level if-then-else and match expressions across several lines.
     /// Its intended use is thus to print the body of a function.
     /// </summary>
-    public void PrintExtendedExpr(Expression expr, int indent, bool isRightmost, bool endWithCloseParen) {
+    public void PrintExtendedExpr(Expression expr, int indent, bool isRightmost, bool endWithCloseParen, bool kondoTransform) {
       Contract.Requires(expr != null);
-      if (expr is ITEExpr) {
-        Indent(indent);
-        while (true) {
-          var ite = (ITEExpr)expr;
-          wr.Write("if ");
-          PrintExpression(ite.Test, false);
-          wr.WriteLine(" then");
-          PrintExtendedExpr(ite.Thn, indent + IndentAmount, true, false);
-          expr = ite.Els;
-          if (expr is ITEExpr) {
-            Indent(indent); wr.Write("else ");
-          } else {
-            Indent(indent); wr.WriteLine("else");
-            Indent(indent + IndentAmount);
-            PrintExpression(expr, isRightmost, false);
-            wr.WriteLine(endWithCloseParen ? ")" : "");
-            return;
-          }
-        }
-
-      } else if (expr is NestedMatchExpr) {
-        var e = (NestedMatchExpr)expr;
-        if (e.Flattened != null && options.DafnyPrintResolvedFile != null) {
-          wr.WriteLine();
-          if (!printingDesugared) {
-            Indent(indent); wr.WriteLine("/*---------- flattened ----------");
-          }
-
-          var savedDesugarMode = printingDesugared;
-          printingDesugared = true;
-          PrintExtendedExpr(e.Flattened, indent, isRightmost, endWithCloseParen);
-          printingDesugared = savedDesugarMode;
-
-          if (!printingDesugared) {
-            Indent(indent); wr.WriteLine("---------- end flattened ----------*/");
-          }
-        }
-        if (!printingDesugared) {
+      if (kondoTransform) {
+        if (!(expr is ForallExpr)) {
           Indent(indent);
-          var parensNeeded = !isRightmost && !e.UsesOptionalBraces;
-          if (parensNeeded) { wr.Write("("); }
-          wr.Write("match ");
-          PrintExpression(e.Source, isRightmost && e.Cases.Count == 0, false);
-          if (e.UsesOptionalBraces) {
-            wr.WriteLine(" {");
-          } else if (parensNeeded && e.Cases.Count == 0) {
-            wr.WriteLine(")");
-          } else {
-            wr.WriteLine();
-          }
-          int i = 0;
-          int ind = indent + (e.UsesOptionalBraces ? IndentAmount : 0);
-          foreach (var mc in e.Cases) {
-            bool isLastCase = i == e.Cases.Count - 1;
-            Indent(ind);
-            wr.Write("case");
-            PrintAttributes(mc.Attributes);
-            wr.Write(" ");
-            PrintExtendedPattern(mc.Pat);
-            wr.WriteLine(" =>");
-            PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen));
-            i++;
-          }
-          if (e.UsesOptionalBraces) {
-            Indent(indent);
-            wr.WriteLine("}");
-          }
-        }
-      } else if (expr is MatchExpr) {
-        var e = (MatchExpr)expr;
-        if (options.DafnyPrintResolvedFile == null && e.OrigUnresolved != null) {
-          PrintExtendedExpr(e.OrigUnresolved, indent, isRightmost, endWithCloseParen);
-        } else {
+          wr.WriteLine("forall i :: v.ValidHistoryIdx(i) ==> (");
+          PrintExtendedExpr(expr, indent + IndentAmount, isRightmost, endWithCloseParen, false);  // don't kondoTransform
           Indent(indent);
-          var parensNeeded = !isRightmost && !e.UsesOptionalBraces;
-          if (parensNeeded) { wr.Write("("); }
-          wr.Write("match ");
-          PrintExpression(e.Source, isRightmost && e.Cases.Count == 0, false);
-          if (e.UsesOptionalBraces) { wr.WriteLine(" {"); } else if (parensNeeded && e.Cases.Count == 0) { wr.WriteLine(")"); } else { wr.WriteLine(); }
-          int i = 0;
-          int ind = indent + (e.UsesOptionalBraces ? IndentAmount : 0);
-          foreach (var mc in e.Cases) {
-            bool isLastCase = i == e.Cases.Count - 1;
-            Indent(ind);
-            wr.Write("case");
-            PrintAttributes(mc.Attributes);
-            wr.Write(" ");
-            wr.Write(mc.Ctor.Name);
-            PrintMatchCaseArgument(mc);
-            wr.WriteLine(" =>");
-            PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen));
-            i++;
-          }
-          if (e.UsesOptionalBraces) {
-            Indent(indent);
-            wr.WriteLine("}");
-          }
-        }
-
-      } else if (expr is LetExpr) {
-        var e = (LetExpr)expr;
-        Indent(indent);
-        if (e.tok is AutoGeneratedToken) {
-          wr.Write("/* ");
-        }
-        if (e.LHSs.Exists(lhs => lhs != null && lhs.Var != null && lhs.Var.IsGhost)) { wr.Write("ghost "); }
-        wr.Write("var ");
-        string sep = "";
-        foreach (var lhs in e.LHSs) {
-          wr.Write(sep);
-          PrintCasePattern(lhs);
-          sep = ", ";
-        }
-        if (e.Exact) {
-          wr.Write(" := ");
+          wr.WriteLine(")");
         } else {
-          PrintAttributes(e.Attributes);
-          wr.Write(" :| ");
+          // TODO
         }
-        PrintExpressionList(e.RHSs, true);
-        wr.Write(";");
-        if (e.tok is AutoGeneratedToken) {
-          wr.Write(" */");
-        }
-        wr.WriteLine();
-        PrintExtendedExpr(e.Body, indent, isRightmost, endWithCloseParen);
-      } else if (expr is StmtExpr && isRightmost) {
-        var e = (StmtExpr)expr;
-        Indent(indent);
-        PrintStatement(e.S, indent);
-        wr.WriteLine();
-        PrintExtendedExpr(e.E, indent, isRightmost, endWithCloseParen);
-
-      } else if (expr is ParensExpression) {
-        PrintExtendedExpr(((ParensExpression)expr).E, indent, isRightmost, endWithCloseParen);
       } else {
-        Indent(indent);
-        PrintExpression(expr, false, indent);
-        wr.WriteLine(endWithCloseParen ? ")" : "");
+        if (expr is ITEExpr) {
+          Indent(indent);
+          while (true) {
+            var ite = (ITEExpr)expr;
+            wr.Write("if ");
+            PrintExpression(ite.Test, false);
+            wr.WriteLine(" then");
+            PrintExtendedExpr(ite.Thn, indent + IndentAmount, true, false, false);
+            expr = ite.Els;
+            if (expr is ITEExpr) {
+              Indent(indent); wr.Write("else ");
+            } else {
+              Indent(indent); wr.WriteLine("else");
+              Indent(indent + IndentAmount);
+              PrintExpression(expr, isRightmost, false);
+              wr.WriteLine(endWithCloseParen ? ")" : "");
+              return;
+            }
+          }
+
+        } else if (expr is NestedMatchExpr) {
+          var e = (NestedMatchExpr)expr;
+          if (e.Flattened != null && options.DafnyPrintResolvedFile != null) {
+            wr.WriteLine();
+            if (!printingDesugared) {
+              Indent(indent); wr.WriteLine("/*---------- flattened ----------");
+            }
+
+            var savedDesugarMode = printingDesugared;
+            printingDesugared = true;
+            PrintExtendedExpr(e.Flattened, indent, isRightmost, endWithCloseParen, false);
+            printingDesugared = savedDesugarMode;
+
+            if (!printingDesugared) {
+              Indent(indent); wr.WriteLine("---------- end flattened ----------*/");
+            }
+          }
+          if (!printingDesugared) {
+            Indent(indent);
+            var parensNeeded = !isRightmost && !e.UsesOptionalBraces;
+            if (parensNeeded) { wr.Write("("); }
+            wr.Write("match ");
+            PrintExpression(e.Source, isRightmost && e.Cases.Count == 0, false);
+            if (e.UsesOptionalBraces) {
+              wr.WriteLine(" {");
+            } else if (parensNeeded && e.Cases.Count == 0) {
+              wr.WriteLine(")");
+            } else {
+              wr.WriteLine();
+            }
+            int i = 0;
+            int ind = indent + (e.UsesOptionalBraces ? IndentAmount : 0);
+            foreach (var mc in e.Cases) {
+              bool isLastCase = i == e.Cases.Count - 1;
+              Indent(ind);
+              wr.Write("case");
+              PrintAttributes(mc.Attributes);
+              wr.Write(" ");
+              PrintExtendedPattern(mc.Pat);
+              wr.WriteLine(" =>");
+              PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen), false);
+              i++;
+            }
+            if (e.UsesOptionalBraces) {
+              Indent(indent);
+              wr.WriteLine("}");
+            }
+          }
+        } else if (expr is MatchExpr) {
+          var e = (MatchExpr)expr;
+          if (options.DafnyPrintResolvedFile == null && e.OrigUnresolved != null) {
+            PrintExtendedExpr(e.OrigUnresolved, indent, isRightmost, endWithCloseParen, false);
+          } else {
+            Indent(indent);
+            var parensNeeded = !isRightmost && !e.UsesOptionalBraces;
+            if (parensNeeded) { wr.Write("("); }
+            wr.Write("match ");
+            PrintExpression(e.Source, isRightmost && e.Cases.Count == 0, false);
+            if (e.UsesOptionalBraces) { wr.WriteLine(" {"); } else if (parensNeeded && e.Cases.Count == 0) { wr.WriteLine(")"); } else { wr.WriteLine(); }
+            int i = 0;
+            int ind = indent + (e.UsesOptionalBraces ? IndentAmount : 0);
+            foreach (var mc in e.Cases) {
+              bool isLastCase = i == e.Cases.Count - 1;
+              Indent(ind);
+              wr.Write("case");
+              PrintAttributes(mc.Attributes);
+              wr.Write(" ");
+              wr.Write(mc.Ctor.Name);
+              PrintMatchCaseArgument(mc);
+              wr.WriteLine(" =>");
+              PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen), false);
+              i++;
+            }
+            if (e.UsesOptionalBraces) {
+              Indent(indent);
+              wr.WriteLine("}");
+            }
+          }
+
+        } else if (expr is LetExpr) {
+          var e = (LetExpr)expr;
+          Indent(indent);
+          if (e.tok is AutoGeneratedToken) {
+            wr.Write("/* ");
+          }
+          if (e.LHSs.Exists(lhs => lhs != null && lhs.Var != null && lhs.Var.IsGhost)) { wr.Write("ghost "); }
+          wr.Write("var ");
+          string sep = "";
+          foreach (var lhs in e.LHSs) {
+            wr.Write(sep);
+            PrintCasePattern(lhs);
+            sep = ", ";
+          }
+          if (e.Exact) {
+            wr.Write(" := ");
+          } else {
+            PrintAttributes(e.Attributes);
+            wr.Write(" :| ");
+          }
+          PrintExpressionList(e.RHSs, true);
+          wr.Write(";");
+          if (e.tok is AutoGeneratedToken) {
+            wr.Write(" */");
+          }
+          wr.WriteLine();
+          PrintExtendedExpr(e.Body, indent, isRightmost, endWithCloseParen,false);
+        } else if (expr is StmtExpr && isRightmost) {
+          var e = (StmtExpr)expr;
+          Indent(indent);
+          PrintStatement(e.S, indent);
+          wr.WriteLine();
+          PrintExtendedExpr(e.E, indent, isRightmost, endWithCloseParen, false);
+
+        } else if (expr is ParensExpression) {
+          PrintExtendedExpr(((ParensExpression)expr).E, indent, isRightmost, endWithCloseParen, false);
+        } else {
+          Indent(indent);
+          PrintExpression(expr, false, indent);
+          wr.WriteLine(endWithCloseParen ? ")" : "");
+        }
       }
     }
 
@@ -2123,7 +2136,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
     /// <summary>
     /// An indent of -1 means print the entire expression on one line.
     /// </summary>
-    void PrintExpr(Expression expr, int contextBindingStrength, bool fragileContext, bool isRightmost, bool isFollowedBySemicolon, int indent, string keyword = null, int resolv_count = 2) {
+    // kondoHistory turns v to v.History(i)
+    void PrintExpr(Expression expr, int contextBindingStrength, bool fragileContext, bool isRightmost, bool isFollowedBySemicolon, int indent, string keyword = null, int resolv_count = 2, bool kondoHistory = true) {
       Contract.Requires(-1 <= indent);
       Contract.Requires(expr != null);
 
@@ -2180,7 +2194,6 @@ NoGhost - disable printing of functions, ghost methods, and proof
         } else {
           wr.Write(e.Name);
         }
-
       } else if (expr is DatatypeValue) {
         var dtv = (DatatypeValue)expr;
         bool printParens;
@@ -2219,7 +2232,11 @@ NoGhost - disable printing of functions, ghost methods, and proof
 
       } else if (expr is NameSegment) {
         var e = (NameSegment)expr;
-        wr.Write(e.Name);
+        if (kondoHistory && (e.Name.Equals("v") || e.Name.Equals("v'"))){
+          wr.Write(e.Name + ".History(i)");
+        } else {
+          wr.Write(e.Name);
+        }
         if (e.OptTypeArguments != null) {
           PrintTypeInstantiation(e.OptTypeArguments);
         }

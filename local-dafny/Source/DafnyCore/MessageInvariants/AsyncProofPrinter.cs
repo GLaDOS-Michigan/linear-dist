@@ -52,12 +52,24 @@ public static class AsyncProofPrinter {
 
     // Print Application Invariants
     foreach (Function appInv in file.GetAppInvPredicates()) {
-      res.AppendLine(appInv.FullDafnyName);
+      res.AppendLine(PrintInvariantPredicate(appInv, options));
     }
 
     return res.ToString();
   } // end function PrintAsyncProofModuleBody 
+  
+  // Transform a centralized predicate into async one
+  private static string PrintInvariantPredicate(Function centralizedAppPred, DafnyOptions options) {
+    var res = new StringBuilder();
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintFunction(centralizedAppPred, 0, false, true);
+    var pred = wr.ToString();
 
+    pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
+    res.Append(pred);
+    return res.ToString();
+  }
 
   private static string StripTriggerAnnotations(string input) {
     // Define the pattern to remove
