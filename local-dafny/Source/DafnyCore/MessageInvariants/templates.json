@@ -305,5 +305,55 @@
       "    }",
       "  }",
       "}"
+    ], 
+    "ApplicationInvHeader":
+    [
+      "ghost predicate ApplicationInv(c: Constants, v: Variables)",
+      "  requires v.WF(c)",
+      "{"
+    ],
+    "Inv":
+    [
+      "ghost predicate Inv(c: Constants, v: Variables)",
+      "{",
+      "  && v.WF(c)",
+      "  && MessageInv(c, v)",
+      "  && MonotonicityInv(c, v)",
+      "  && ApplicationInv(c, v)",
+      "  && Safety(c, v)",
+      "}"
+    ],
+    "ObligationsSeparator":
+    [
+      "/***************************************************************************************",
+      "*                                    Obligations                                       *",
+      "***************************************************************************************/"
+    ],
+    "InvImpliesSafety":
+    [
+      "lemma InvImpliesSafety(c: Constants, v: Variables)",
+      "  requires Inv(c, v)",
+      "  ensures Safety(c, v)",
+      "{}"
+    ],
+    "InitImpliesInv":
+    [
+      "lemma InitImpliesInv(c: Constants, v: Variables)",
+      "  requires Init(c, v)",
+      "  ensures Inv(c, v)",
+      "{",
+      "  InitImpliesMessageInv(c, v);",
+      "}"
+    ],
+    "InvInductiveHeader":
+    [
+      "lemma InvInductive(c: Constants, v: Variables, v': Variables)",
+      "  requires Inv(c, v)",
+      "  requires Next(c, v, v')",
+      "  ensures Inv(c, v')",
+      "{",
+      "  VariableNextProperties(c, v, v');",
+      "  MonotonicityInvInductive(c, v, v');",
+      "  MessageInvInductive(c, v, v');"
     ]
 }

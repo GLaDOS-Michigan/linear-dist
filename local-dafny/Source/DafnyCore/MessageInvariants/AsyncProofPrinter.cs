@@ -50,10 +50,32 @@ public static class AsyncProofPrinter {
     }
     res.AppendLine();
 
-    // Print Application Invariants
+    // Print Application Invariant predicates
     foreach (Function appInv in file.GetAppInvPredicates()) {
       res.AppendLine(PrintInvariantPredicate(appInv, options));
     }
+
+    // Print Application Invariant bundle
+    res.Append(GetFromTemplate("ApplicationInvHeader", 0));
+    foreach (Function appInv in file.GetAppInvPredicates()) {
+      res.AppendLine("  && " + appInv.Name + "(c, v)");
+    }
+    res.AppendLine("}");
+    res.AppendLine();
+
+    // Print Inv bundle
+    res.AppendLine(GetFromTemplate("Inv", 0));
+
+    // Print proof obligations
+    res.AppendLine(GetFromTemplate("ObligationsSeparator", 0));
+    res.AppendLine(GetFromTemplate("InvImpliesSafety", 0));
+    res.AppendLine(GetFromTemplate("InitImpliesInv", 0));
+    
+    res.Append(GetFromTemplate("InvInductiveHeader", 0));
+
+
+    // TODO
+    res.Append("}");
 
     return res.ToString();
   } // end function PrintAsyncProofModuleBody 
