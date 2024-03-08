@@ -22,83 +22,46 @@ module DistributedSystem {
   import opened Types
   import opened UtilitiesLibrary
   import opened Network
-  import LeaderHost
-  import AcceptorHost
-  import LearnerHost
+  import ServerHost
+  import ClientHost
 
-  datatype Constants = Constants(f: nat, leaders: seq<LeaderHost.Constants>, acceptors: seq<AcceptorHost.Constants>, learners: seq<LearnerHost.Constants>) {
+  datatype Constants = Constants(clients: seq<ClientHost.Constants>, servers: seq<ServerHost.Constants>) {
     ghost predicate WF()
       decreases this
     {
-      0 < f &&
-      UniqueIds()
+      ClientHost.GroupWFConstants(clients) &&
+      ServerHost.GroupWFConstants(servers)
     }
 
-    ghost predicate UniqueIds()
+    ghost predicate ValidClientIdx(idx: nat)
+      decreases this, idx
+    {
+      idx < |clients|
+    }
+
+    ghost function GetServer(): ServerHost.Constants
+      requires WF()
       decreases this
     {
-      UniqueLeaderIds() &&
-      UniqueAcceptorIds() &&
-      UniqueLearnerIds()
-    }
-
-    ghost predicate ValidLeaderIdx(id: int)
-      decreases this, id
-    {
-      0 <= id < |leaders|
-    }
-
-    ghost predicate ValidAcceptorIdx(id: int)
-      decreases this, id
-    {
-      0 <= id < |acceptors|
-    }
-
-    ghost predicate ValidLearnerIdx(id: int)
-      decreases this, id
-    {
-      0 <= id < |learners|
-    }
-
-    ghost predicate UniqueLeaderIds()
-      decreases this
-    {
-      forall i: int, j: int | ValidLeaderIdx(i) && ValidLeaderIdx(j) && leaders[i].id == leaders[j].id :: 
-        i == j
-    }
-
-    ghost predicate UniqueAcceptorIds()
-      decreases this
-    {
-      forall i: int, j: int | ValidAcceptorIdx(i) && ValidAcceptorIdx(j) && acceptors[i].id == acceptors[j].id :: 
-        i == j
-    }
-
-    ghost predicate UniqueLearnerIds()
-      decreases this
-    {
-      forall i: int, j: int | ValidLearnerIdx(i) && ValidLearnerIdx(j) && learners[i].id == learners[j].id :: 
-        i == j
+      servers[0]
     }
   }
   // end datatype Constants
 
-  datatype Hosts = Hosts(leaders: seq<LeaderHost.Variables>, acceptors: seq<AcceptorHost.Variables>, learners: seq<LearnerHost.Variables>) {
+  datatype Hosts = Hosts(clients: seq<ClientHost.Variables>, servers: seq<ServerHost.Variables>) {
     ghost predicate WF(c: Constants)
       decreases this, c
     {
       c.WF() &&
-      LeaderHost.GroupWF(c.leaders, leaders, c.f) &&
-      AcceptorHost.GroupWF(c.acceptors, acceptors, c.f) &&
-      LearnerHost.GroupWF(c.learners, learners, c.f)
+      ClientHost.GroupWF(c.clients, clients) &&
+      ServerHost.GroupWF(c.servers, servers)
     }
 
-    ghost predicate LeaderCanPropose(c: Constants, ldr: LeaderId)
+    ghost function GetServer(c: Constants): ServerHost.Variables
       requires WF(c)
-      requires c.ValidLeaderIdx(ldr)
-      decreases this, c, ldr
+      decreases this, c
     {
-      leaders[ldr].CanPropose(c.leaders[ldr])
+      servers[0]
     }
   }
   // end datatype Hosts
@@ -119,8 +82,7 @@ module DistributedSystem {
     ghost predicate WF(c: Constants) {
       && c.WF()
       && 0 < |history|
-      && History(0).WF(c)   // useful fact
-      && (forall i | ValidHistoryIdx(i) :: History(i).WF(c))
+      && (forall i | ValidHistoryIdx(i) :: history[i].WF(c))
     }
   
     ghost function Last() : (h: Hosts)
@@ -143,9 +105,8 @@ module DistributedSystem {
   ghost predicate InitHosts(c: Constants, h: Hosts)
     requires h.WF(c)
   {
-    && LeaderHost.GroupInit(c.leaders, h.leaders, c.f)
-    && AcceptorHost.GroupInit(c.acceptors, h.acceptors, c.f)
-    && LearnerHost.GroupInit(c.learners, h.learners, c.f)
+    && ClientHost.GroupInit(c.clients, h.clients)
+    && ServerHost.GroupInit(c.servers, h.servers)
   }
 
   ghost predicate Init(c: Constants, v: Variables)
@@ -157,51 +118,36 @@ module DistributedSystem {
   }
 
   datatype Step = 
-    | LeaderHostStep(actor: nat, msgOps: MessageOps)
-    | AcceptorHostStep(actor: nat, msgOps: MessageOps)
-    | LearnerHostStep(actor: nat, msgOps: MessageOps)
+    | ClientHostStep(actor: nat, msgOps: MessageOps)
+    | ServerHostStep(actor: nat, msgOps: MessageOps)
 
   ghost predicate NextStep(c: Constants, h: Hosts, h': Hosts, n: Network.Variables, n': Network.Variables, step: Step)
     requires h.WF(c) && h'.WF(c)
   {
     && Network.Next(n, n', step.msgOps)
     && match step
-      case LeaderHostStep(actor, msgOps) => NextLeaderHostStep(c, h, h', actor, msgOps)
-      case AcceptorHostStep(actor, msgOps) => NextAcceptorHostStep(c, h, h', actor, msgOps)
-      case LearnerHostStep(actor, msgOps) => NextLearnerHostStep(c, h, h', actor, msgOps)
+      case ClientHostStep(actor, msgOps) => NextClientHostStep(c, h, h', actor, msgOps)
+      case ServerHostStep(actor, msgOps) => NextServerHostStep(c, h, h', actor, msgOps)
   }
 
-  ghost predicate NextLeaderHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+  ghost predicate NextClientHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && 0 <= actor < |h.leaders|
-    && LeaderHost.Next(c.leaders[actor], h.leaders[actor], h'.leaders[actor], msgOps)
+    && 0 <= actor < |h.clients|
+    && ClientHost.Next(c.clients[actor], h.clients[actor], h'.clients[actor], msgOps)
     // all other hosts UNCHANGED
-    && (forall other| 0 <= other < |h.leaders| && other != actor :: h'.leaders[other] == h.leaders[other])
-    && h'.acceptors == h.acceptors
-    && h'.learners == h.learners
+    && (forall other| 0 <= other < |h.clients| && other != actor :: h'.clients[other] == h.clients[other])
+    && h'.servers == h.servers
   }
 
-  ghost predicate NextAcceptorHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
+  ghost predicate NextServerHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
     requires h.WF(c) && h'.WF(c)
   {
-    && 0 <= actor < |h.acceptors|
-    && AcceptorHost.Next(c.acceptors[actor], h.acceptors[actor], h'.acceptors[actor], msgOps)
+    && 0 <= actor < |h.servers|
+    && ServerHost.Next(c.servers[actor], h.servers[actor], h'.servers[actor], msgOps)
     // all other hosts UNCHANGED
-    && h'.leaders == h.leaders
-    && (forall other| 0 <= other < |h.acceptors| && other != actor :: h'.acceptors[other] == h.acceptors[other])
-    && h'.learners == h.learners
-  }
-
-  ghost predicate NextLearnerHostStep(c: Constants, h: Hosts, h': Hosts, actor: nat, msgOps: MessageOps)
-    requires h.WF(c) && h'.WF(c)
-  {
-    && 0 <= actor < |h.learners|
-    && LearnerHost.Next(c.learners[actor], h.learners[actor], h'.learners[actor], msgOps)
-    // all other hosts UNCHANGED
-    && h'.leaders == h.leaders
-    && h'.acceptors == h.acceptors
-    && (forall other| 0 <= other < |h.learners| && other != actor :: h'.learners[other] == h.learners[other])
+    && h'.clients == h.clients
+    && (forall other| 0 <= other < |h.servers| && other != actor :: h'.servers[other] == h.servers[other])
   }
 
   ghost predicate Next(c: Constants, v: Variables, v': Variables)

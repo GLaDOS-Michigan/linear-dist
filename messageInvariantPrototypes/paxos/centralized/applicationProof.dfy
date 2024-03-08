@@ -247,17 +247,19 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  assert OneValuePerBallotLeaderAndLearners(c, v);
   InvNextLearnerValidReceivedAccepts(c, v, v');
+  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLearnerReceivedAcceptImpliesProposed(c, v, v');
+  InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
+
   InvNextAcceptorValidBundle(c, v, v');
+
   InvNextLeaderValidReceivedPromises(c, v, v');
   InvNextLeaderHighestHeardUpperBound(c, v, v');
   InvNextLeaderHearedImpliesProposed(c, v, v');
   InvNextLeaderReceivedPromisesImpliesAcceptorState(c, v, v');
-  InvNextLearnerReceivedAcceptImpliesAccepted(c, v, v');
-  InvNextLearnedImpliesQuorumOfAccepts(c, v, v');
   InvNextLeaderHighestHeardToPromisedRangeHasNoAccepts(c, v, v');
+
   InvNextChosenImpliesProposingLeaderHearsChosenBallot(c, v, v');
   InvNextChosenValImpliesLeaderOnlyHearsVal(c, v, v');
   InvNextChosenValImpliesAcceptorOnlyAcceptsVal(c, v, v');
@@ -273,7 +275,8 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
 
 
 lemma InvNextLearnerValidReceivedAccepts(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+  requires v.WF(c)
+  requires LearnerValidReceivedAccepts(c, v)
   requires Next(c, v, v')
   ensures LearnerValidReceivedAccepts(c, v')
 {}

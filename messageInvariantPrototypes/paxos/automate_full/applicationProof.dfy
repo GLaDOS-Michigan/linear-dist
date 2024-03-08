@@ -431,10 +431,15 @@ lemma InvNextLearnedImpliesQuorumOfAccepts(c: Constants, v: Variables, v': Varia
 }
  
 lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires Inv(c, v)
+  requires v.WF(c)
+  requires ValidMessages(c, v)
+  requires SendAcceptValidity(c, v)
+  requires MonotonicityInv(c, v)
+  requires ApplicationInv(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesProposed(c, v')
 {
+  // Note: can't requires all of MessageInv(c, v), will time out
   VariableNextProperties(c, v, v');
 }
 
@@ -482,9 +487,6 @@ lemma InvNextLeaderHighestHeardUpperBound(c: Constants, v: Variables, v': Variab
 }
 
 lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires MessageInv(c, v)
-  requires MonotonicityInv(c, v)
   requires Inv(c, v)
   requires Next(c, v, v')
   requires AcceptorValidPromisedAndAccepted(c, v')
