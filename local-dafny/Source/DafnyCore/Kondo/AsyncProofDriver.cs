@@ -58,15 +58,13 @@ public class AsyncProofDriver {
 
   // Resolve list of non-invariant functions and predicates
   private void ResolveHelperFunctions(ModuleDefinition centralizedProof) {
-
-    // get the app inv bundle from centralized
-    // var appInv = GetPredicate(centralizedProof, "ApplicationInv");  
-    
-    // // extract the conjunct names, and add Function to proofFile
-    // foreach (var exp in Expression.Conjuncts(appInv.Body)) {
-    //   var predName = exp.ToString().Split('(')[0];  // this is janky
-    //   proofFile.AddAppInv(GetPredicate(predName));
-    // }
+    var appInvs = proofFile.GetAppInvPredicates(); // previously resolved application invariants
+    string[] reservedNames = {"Inv", "ApplicationInv"};
+    foreach (var topLevelDecl in ModuleDefinition.AllFunctions(centralizedProof.TopLevelDecls.ToList())) {
+      if (!appInvs.Contains(topLevelDecl) && !reservedNames.Contains(topLevelDecl.Name)) {
+        proofFile.AddHelperFunction(topLevelDecl);
+      }
+    }
   }
 
 

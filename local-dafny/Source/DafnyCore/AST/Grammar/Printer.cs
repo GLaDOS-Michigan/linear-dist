@@ -1944,6 +1944,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
           wr.WriteLine(")");
         } else {
           // TODO
+          PrintExtendedExpr(expr, indent, isRightmost, endWithCloseParen, false);
         }
       } else {
         if (expr is ITEExpr) {

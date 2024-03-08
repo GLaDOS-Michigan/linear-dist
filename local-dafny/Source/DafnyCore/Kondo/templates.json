@@ -355,5 +355,11 @@
       "  VariableNextProperties(c, v, v');",
       "  MonotonicityInvInductive(c, v, v');",
       "  MessageInvInductive(c, v, v');"
+    ],
+    "HelerFunctionsSeparator":
+    [
+      "/***************************************************************************************",
+      "*                                  Helper Functions                                    *",
+      "***************************************************************************************/"
     ]
 }

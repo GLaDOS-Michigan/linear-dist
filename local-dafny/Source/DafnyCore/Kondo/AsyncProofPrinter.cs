@@ -73,11 +73,21 @@ public static class AsyncProofPrinter {
     res.AppendLine(GetFromTemplate("InitImpliesInv", 0));
     
     res.Append(GetFromTemplate("InvInductiveHeader", 0));
-
-
     // TODO
-    res.Append("}");
+    res.AppendLine("}");
 
+    // Print helper functions
+    if (file.GetHelperFunctions().Count != 0) {
+      res.AppendLine();
+      res.AppendLine(GetFromTemplate("HelerFunctionsSeparator", 0));
+      foreach (Function f in file.GetHelperFunctions()) {
+        var wr = new StringWriter();
+        var printer = new Printer(wr, options);
+        printer.PrintFunction(f, 0, false, false);
+        res.AppendLine(wr.ToString());
+        res.AppendLine();
+      }
+    }
     return res.ToString();
   } // end function PrintAsyncProofModuleBody 
   
@@ -89,7 +99,7 @@ public static class AsyncProofPrinter {
     printer.PrintFunction(centralizedAppPred, 0, false, true);
     var pred = wr.ToString();
 
-    pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
+    // pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
     res.Append(pred);
     return res.ToString();
   }
