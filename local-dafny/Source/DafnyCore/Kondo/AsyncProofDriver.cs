@@ -27,7 +27,7 @@ public class AsyncProofDriver {
     var centralizedProof = GetProofModule();
     ResolveApplicationInvariants(centralizedProof);
     ResolveHelperFunctions(centralizedProof);
-
+    ResolveInvNextLemmas(centralizedProof);
   } // end method Resolve()
 
   // Resolve list of application invariant predicates
@@ -67,6 +67,14 @@ public class AsyncProofDriver {
     }
   }
 
+  private void ResolveInvNextLemmas(ModuleDefinition centralizedProof) {
+    Console.WriteLine("HELLO");
+    foreach (var topLevelDecl in ModuleDefinition.AllCallables(centralizedProof.TopLevelDecls.ToList())) {
+      if (topLevelDecl is Lemma && ((Lemma) topLevelDecl).Name.Contains("InvNext")) {
+        proofFile.AddInvNextLemma((Lemma) topLevelDecl);
+      }
+    }
+  }
 
   // Returns the centralized Proof module
   private ModuleDefinition GetProofModule() {

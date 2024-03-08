@@ -16,6 +16,7 @@ using System.Linq;
 using DafnyCore;
 using JetBrains.Annotations;
 using Bpl = Microsoft.Boogie;
+using System.Net;
 
 namespace Microsoft.Dafny {
 
@@ -61,6 +62,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
     private readonly PrintFlags printFlags;
 
     bool kondoTransformForall = false;  // add history to the next forall expr
+    bool kondoTransformV = false;       // add history to v and v' variables
+    bool kondoTransformStmt = false;    // add "VariableNextProperties" to block statement
 
     [ContractInvariantMethod]
     void ObjectInvariant() {
@@ -156,7 +159,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       Contract.Requires(m != null);
       using (var wr = new System.IO.StringWriter()) {
         var pr = new Printer(wr, options);
-        pr.PrintMethod(m, 0, true);
+        pr.PrintMethod(m, 0, true, false);
         return ToStringWithoutNewline(wr);
       }
     }
@@ -703,11 +706,11 @@ NoGhost - disable printing of functions, ghost methods, and proof
           // omit this declaration
         } else if (m is Method) {
           if (state != 0) { wr.WriteLine(); }
-          PrintMethod((Method)m, indent, false);
+          PrintMethod((Method)m, indent, false, false);
           var com = m as ExtremeLemma;
           if (com != null && com.PrefixLemma != null) {
             Indent(indent); wr.WriteLine("/***");
-            PrintMethod(com.PrefixLemma, indent, false);
+            PrintMethod(com.PrefixLemma, indent, false, false);
             Indent(indent); wr.WriteLine("***/");
           }
           state = 2;
@@ -983,7 +986,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
              && tok.Uri != null && fileBeingPrinted != null && tok.Uri.LocalPath != fileBeingPrinted;
     }
 
-    public void PrintMethod(Method method, int indent, bool printSignatureOnly) {
+    // kondoMethod is flag to do kondo things:
+    //  - add `VariableNextProperties(c, v, v');` statement
+    //  - transform v to v.History(i) in expressions (TODO)
+    public void PrintMethod(Method method, int indent, bool printSignatureOnly, bool kondoMethod) {
       Contract.Requires(method != null);
 
       if (PrintModeSkipFunctionOrMethod(method.IsGhost, method.Attributes, method.Name)) { return; }
@@ -1030,6 +1036,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
 
       if (method.Body != null && !printSignatureOnly) {
         Indent(indent);
+        if (kondoMethod) {
+          kondoTransformStmt = true;
+          kondoTransformV = true;
+        }
         PrintStatement(method.Body, indent);
         wr.WriteLine();
       }
@@ -1322,6 +1332,11 @@ NoGhost - disable printing of functions, ghost methods, and proof
       } else if (stmt is BlockStmt) {
         wr.WriteLine("{");
         int ind = indent + IndentAmount;
+        if (kondoTransformStmt) {
+          Indent(ind);
+          wr.WriteLine("VariableNextProperties(c, v, v');");
+          kondoTransformStmt = false;
+        }
         foreach (Statement s in ((BlockStmt)stmt).Body) {
           Indent(ind);
           PrintStatement(s, ind);
@@ -1946,8 +1961,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
           wr.WriteLine(")");
         } else {
           // Add history index i to the forall
-          kondoTransformForall = true;
+          kondoTransformForall = true;  // set to false at site where first ForallExpr is printed
+          kondoTransformV = true;
           PrintExtendedExpr(expr, indent, isRightmost, endWithCloseParen, false);
+          kondoTransformV = false;
         }
       } else {
         if (expr is ITEExpr) {
@@ -2141,7 +2158,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
     /// An indent of -1 means print the entire expression on one line.
     /// </summary>
     // kondoHistory turns v to v.History(i)
-    void PrintExpr(Expression expr, int contextBindingStrength, bool fragileContext, bool isRightmost, bool isFollowedBySemicolon, int indent, string keyword = null, int resolv_count = 2, bool kondoHistory = true) {
+    void PrintExpr(Expression expr, int contextBindingStrength, bool fragileContext, bool isRightmost, bool isFollowedBySemicolon, int indent, string keyword = null, int resolv_count = 2) {
       Contract.Requires(-1 <= indent);
       Contract.Requires(expr != null);
 
@@ -2236,7 +2253,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
 
       } else if (expr is NameSegment) {
         var e = (NameSegment)expr;
-        if (kondoHistory && (e.Name.Equals("v") || e.Name.Equals("v'"))){
+        if (kondoTransformV && (e.Name.Equals("v") || e.Name.Equals("v'"))){
           wr.Write(e.Name + ".History(i)");
         } else {
           wr.Write(e.Name);

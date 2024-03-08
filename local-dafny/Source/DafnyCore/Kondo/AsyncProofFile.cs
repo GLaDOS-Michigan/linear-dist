@@ -1,6 +1,7 @@
-// using System;
+using System;
 using System.Collections.Generic;
-// using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Diagnostics;
 // using System.Runtime.CompilerServices;
 
 namespace Microsoft.Dafny {
@@ -8,12 +9,14 @@ namespace Microsoft.Dafny {
 public class AsyncProofFile {
   private readonly List<Function> appInvPredicates;  // ApplicationInv predicates
   private readonly List<Function> helperFunctions;   // functions and predicates that are not invariants
+  private readonly List<Lemma> invNextLemmas;     
 
   // Constructor
   public AsyncProofFile()
   {
     appInvPredicates = new List<Function>();
     helperFunctions = new List<Function>();
+    invNextLemmas = new List<Lemma>();
   }
 
   public void AddAppInv(Function predicate) {
@@ -30,6 +33,15 @@ public class AsyncProofFile {
 
   public List<Function> GetHelperFunctions() {
     return helperFunctions;
+  }
+
+  public void AddInvNextLemma(Lemma lemma) {
+    Debug.Assert(lemma.Name.Contains("InvNext"), String.Format("Lemma {0} is not an InvNext lemma", lemma.Name));
+    invNextLemmas.Add(lemma);
+  }
+
+  public List<Lemma> GetInvNextLemmas() {
+    return invNextLemmas;
   }
 } // end class DistributedSystemFile
 

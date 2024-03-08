@@ -73,19 +73,33 @@ public static class AsyncProofPrinter {
     res.AppendLine(GetFromTemplate("InitImpliesInv", 0));
     
     res.Append(GetFromTemplate("InvInductiveHeader", 0));
-    // TODO
+    // Print InvNext Lemma calls
+    foreach (Lemma lemma in file.GetInvNextLemmas()) {
+      res.AppendLine($"  {lemma.Name}(c, v, v');");
+    }
     res.AppendLine("}");
+
+    // Print InvNext Lemmas 
+    if (file.GetInvNextLemmas().Count != 0) {
+      res.AppendLine();
+      res.AppendLine(GetFromTemplate("InvNextLemmasSeparator", 0));
+      foreach (Lemma lemma in file.GetInvNextLemmas()) {
+        var wr = new StringWriter();
+        var printer = new Printer(wr, options);
+        printer.PrintMethod(lemma, 0, false, true);
+        res.AppendLine(wr.ToString());
+      }
+    }
 
     // Print helper functions
     if (file.GetHelperFunctions().Count != 0) {
       res.AppendLine();
-      res.AppendLine(GetFromTemplate("HelerFunctionsSeparator", 0));
+      res.AppendLine(GetFromTemplate("HelperFunctionsSeparator", 0));
       foreach (Function f in file.GetHelperFunctions()) {
         var wr = new StringWriter();
         var printer = new Printer(wr, options);
         printer.PrintFunction(f, 0, false, false);
         res.AppendLine(wr.ToString());
-        res.AppendLine();
       }
     }
     return res.ToString();
