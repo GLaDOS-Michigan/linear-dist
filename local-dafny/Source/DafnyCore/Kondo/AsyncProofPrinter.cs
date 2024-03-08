@@ -99,14 +99,19 @@ public static class AsyncProofPrinter {
     printer.PrintFunction(centralizedAppPred, 0, false, true);
     var pred = wr.ToString();
 
-    // pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
+    pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
+
+    // TODO: Ignore triggers for now
+    pred = StripTriggerAnnotations(pred);
+    pred = StripTriggerAnnotations(pred);
+
     res.Append(pred);
     return res.ToString();
   }
 
   private static string StripTriggerAnnotations(string input) {
     // Define the pattern to remove
-    string pattern = @"\{:trigger [^\}]*\} ";
+    string pattern = @"\{:trigger [^\}]*\}";
     // Use Regex.Replace to remove all occurrences of the pattern
     string resultString = Regex.Replace(input, pattern, "");
     return resultString;

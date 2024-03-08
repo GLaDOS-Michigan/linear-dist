@@ -60,6 +60,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
     bool printingDesugared = false;
     private readonly PrintFlags printFlags;
 
+    bool kondoTransformForall = false;  // add history to the next forall expr
+
     [ContractInvariantMethod]
     void ObjectInvariant() {
       Contract.Invariant(wr != null);
@@ -1943,7 +1945,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
           Indent(indent);
           wr.WriteLine(")");
         } else {
-          // TODO
+          // Add history index i to the forall
+          kondoTransformForall = true;
           PrintExtendedExpr(expr, indent, isRightmost, endWithCloseParen, false);
         }
       } else {
@@ -3012,9 +3015,18 @@ NoGhost - disable printing of functions, ghost methods, and proof
         PrintType(": ", bv.Type);
         sep = ", ";
       }
+      if (kondoTransformForall) {
+        wr.Write("{0}i: nat", sep);
+      }
+      wr.WriteLine();
       PrintAttributes(attrs);
+      wr.WriteLine();
       if (range != null) {
         wr.Write(" | ");
+        if (kondoTransformForall) {
+          kondoTransformForall = false;
+          wr.Write("v.ValidHistoryIdx(i) && ");
+        }
         PrintExpression(range, false);
       }
     }
