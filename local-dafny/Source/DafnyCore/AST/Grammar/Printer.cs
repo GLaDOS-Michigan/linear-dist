@@ -1956,6 +1956,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
         if (!(expr is ForallExpr)) {
           Indent(indent);
           wr.WriteLine("forall i :: v.ValidHistoryIdx(i) ==> (");
+          kondoTransformV = true;
           PrintExtendedExpr(expr, indent + IndentAmount, isRightmost, endWithCloseParen, false);  // don't kondoTransform
           Indent(indent);
           wr.WriteLine(")");

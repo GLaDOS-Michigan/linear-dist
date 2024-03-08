@@ -68,7 +68,6 @@ public class AsyncProofDriver {
   }
 
   private void ResolveInvNextLemmas(ModuleDefinition centralizedProof) {
-    Console.WriteLine("HELLO");
     foreach (var topLevelDecl in ModuleDefinition.AllCallables(centralizedProof.TopLevelDecls.ToList())) {
       if (topLevelDecl is Lemma && ((Lemma) topLevelDecl).Name.Contains("InvNext")) {
         proofFile.AddInvNextLemma((Lemma) topLevelDecl);

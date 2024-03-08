@@ -115,24 +115,38 @@ public static class AsyncProofPrinter {
 
     pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
 
-    // TODO: Ignore triggers for now
-    pred = StripTriggerAnnotations(pred);
-    pred = StripTriggerAnnotations(pred);
+    // Format Kondo triggers
+    string pattern = @"\{:trigger [^\}]*\}";
+    var syncTriggers = Regex.Matches(pred, pattern).Cast<Match>().Select(match => match.Value).ToList();;
+    foreach (var st in syncTriggers) {
+      pred = pred.Replace(st, TransformTrigger(st));
+    }
 
     res.Append(pred);
     return res.ToString();
   }
 
-  private static string StripTriggerAnnotations(string input) {
-    // Define the pattern to remove
-    string pattern = @"\{:trigger [^\}]*\}";
-    // Use Regex.Replace to remove all occurrences of the pattern
-    string resultString = Regex.Replace(input, pattern, "");
-    return resultString;
+  // Transform sync trigger into corresponding async trigger
+  private static string TransformTrigger(string trigger) {
+    // add v.ValidHistoryIdx(i) if i not present
+    var res = trigger;
+    if (!res.Contains("History(i)")) {
+      int indexToInsert = res.Length - 1;
+      res = res.Insert(indexToInsert, ", v.ValidHistoryIdx(i)");
+    }
+    return res;
   }
 
-  private static string ValidActorIdx(string actor, string field) {
-    return string.Format("0 <= {0} < |h.{1}|", actor, field);
-  }
+  // private static string StripTriggerAnnotations(string input) {
+  //   // Define the pattern to remove
+  //   string pattern = @"\{:trigger [^\}]*\}";
+  //   // Use Regex.Replace to remove all occurrences of the pattern
+  //   string resultString = Regex.Replace(input, pattern, "");
+  //   return resultString;
+  // }
+
+  // private static string ValidActorIdx(string actor, string field) {
+  //   return string.Format("0 <= {0} < |h.{1}|", actor, field);
+  // }
 } // end class MessageInvariantsFile
 } //end namespace Microsoft.Dafny
