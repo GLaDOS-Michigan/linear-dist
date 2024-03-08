@@ -16,6 +16,7 @@ using Microsoft.Dafny;
 using Microsoft.Dafny.Compilers;
 using Microsoft.Dafny.Plugins;
 using Bpl = Microsoft.Boogie;
+using System.Windows.Markup;
 
 namespace Microsoft.Dafny {
   public enum FunctionSyntaxOptions {
@@ -335,9 +336,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
     public HashSet<string> LibraryFiles { get; set; } = new();
     public ContractTestingMode TestContracts = ContractTestingMode.None;
 
-    public bool genAsync = false;
-    public bool msgInvs = false;
-    public bool ownershipInvs = false;
+    public bool genAsync = false;       // generate async distributed system
+    public bool msgInvs = false;        // generate Message and Monotonicity Invariants
+    public bool ownershipInvs = false;  // generate Ownership Invariants
+    public bool genAsyncProof = false;  // generate async proof draft
 
     public bool ForbidNondeterminism { get; set; }
 
@@ -805,6 +807,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
 
         case "ownerInvs":
           ownershipInvs = true;
+          return true;
+
+        case "genAsyncProof":
+          genAsyncProof = true;
           return true;
       }
 

@@ -69,9 +69,19 @@ namespace Microsoft.Dafny {
         options.DafnyVerify = false;
         options.Compile = false;
 
-        var msgInvDriver = new RegularInvariantsDriver(options, program);
-        msgInvDriver.Resolve();
-        msgInvDriver.WriteToFile();
+        var regInvDriver = new RegularInvariantsDriver(options, program);
+        regInvDriver.Resolve();
+        regInvDriver.WriteToFile();
+      }
+      
+      if (options.genAsyncProof) {
+        // Don't verify or compile when generating msgInvs
+        options.DafnyVerify = false;
+        options.Compile = false;
+
+        var asyncProofDriver = new AsyncProofDriver(options, program);
+        asyncProofDriver.Resolve();
+        asyncProofDriver.WriteToFile();
       }
       return res;
     }
