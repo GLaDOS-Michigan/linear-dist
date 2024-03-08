@@ -10,8 +10,8 @@ namespace Microsoft.Dafny
 {
 public static class AsyncProofPrinter {
 
-  private static readonly string[] Includes = {"../hosts.dfy"};
-  private static readonly string[] Imports = {"Types", "UtilitiesLibrary", "Network"};
+  private static readonly string[] Includes = {"monotonicityInvariantsAutogen.dfy", "messageInvariantsAutogen.dfy"};
+  private static readonly string[] Imports = {"Types", "UtilitiesLibrary", "DistributedSystem", "MonotonicityInvariants", "MessageInvariants", "Obligations"};
   private static readonly string TemplatePath = "/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Source/DafnyCore/MessageInvariants/templates.json";
 
   private static readonly Dictionary<string, string[]> Template = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(File.ReadAllText(TemplatePath));
@@ -37,8 +37,26 @@ public static class AsyncProofPrinter {
     }
     res.AppendLine();
 
+    res.AppendLine("module ProofDraft {");
+    res.AppendLine(PrintAsyncProofModuleBody(file, options));
+    res.AppendLine("} // end module DistributedSystem");
     return res.ToString();
-  } // end function PrintDistributedSystemModuleBody
+  }
+
+  private static string PrintAsyncProofModuleBody(AsyncProofFile file, DafnyOptions options) {
+    var res = new StringBuilder();
+    foreach (string i in Imports) {
+      res.AppendLine(String.Format("  import opened {0}", i));
+    }
+    res.AppendLine();
+
+    // Print Application Invariants
+    foreach (Function appInv in file.GetAppInvPredicates()) {
+      res.AppendLine(appInv.FullDafnyName);
+    }
+
+    return res.ToString();
+  } // end function PrintAsyncProofModuleBody 
 
 
   private static string StripTriggerAnnotations(string input) {

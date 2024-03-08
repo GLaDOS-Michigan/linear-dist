@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using JetBrains.Annotations;
 
 namespace Microsoft.Dafny
 {
@@ -24,8 +25,39 @@ public class AsyncProofDriver {
     Console.WriteLine(String.Format("Resolving invariants for {0}\n", program.FullName));
 
     var centralizedProof = GetProofModule();
+    ResolveApplicationInvariants(centralizedProof);
+
 
   } // end method Resolve()
+
+  // Resolve list of application invariant predicates
+  private void ResolveApplicationInvariants(ModuleDefinition centralizedProof) {
+
+    // get the app inv bundle from centralized
+    var appInv = GetPredicate("ApplicationInv");  
+    
+    // extract the conjunct names, and add Function to proofFile
+    foreach (var exp in Expression.Conjuncts(appInv.Body)) {
+      var predName = exp.ToString().Split('(')[0];  // this is janky
+      proofFile.AddAppInv(GetPredicate(predName));
+    }
+  }
+
+
+  // Returns the Dafny predicate with the given name
+  private Function GetPredicate(string predicateName) {
+    Function res = null;
+    foreach (var kvp in program.ModuleSigs) {
+      foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
+        if (topLevelDecl.Name.Equals(predicateName)) {  // identifying marker for Send Predicate
+          res = topLevelDecl;
+        }
+      }
+    }
+    Debug.Assert(res != null, String.Format("Predicate {0} not found ", predicateName));
+    return res;
+  }
+
 
   // Returns the centralized Proof module
   private ModuleDefinition GetProofModule() {
@@ -45,11 +77,6 @@ public class AsyncProofDriver {
     string proofString = AsyncProofPrinter.PrintAsyncProof(proofFile, options, program.FullName);
     string proofOutputFullname = Path.GetDirectoryName(program.FullName) + "/../automate_full/applicationProofDraftAutogen.dfy";
     Console.WriteLine(string.Format("Writing async proof draft to {0}", proofOutputFullname));
-    
-    // var wr = new StringWriter();
-    // var printer = new Printer(wr, options);
-    // printer.PrintModuleDefinition(program.Compilation, centralizedProof, null, 0, null, "dummy string");
-    
     File.WriteAllText(proofOutputFullname, proofString);
   }
 }  // end class MessageInvariantsDriver
