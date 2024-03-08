@@ -74,17 +74,10 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  ChordDominatesInductive(c, v, v');
-  ChordDominatesImpliesSafety(c, v');
+  InvNextChordDominates(c, v, v');
 }
 
-lemma ChordDominatesImpliesSafety(c: Constants, v: Variables)
-  requires v.WF(c)
-  requires ChordDominates(c, v)
-  ensures Safety(c, v)
-{}
-
-lemma ChordDominatesInductive(c: Constants, v: Variables, v': Variables)
+lemma InvNextChordDominates(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures ChordDominates(c, v')
