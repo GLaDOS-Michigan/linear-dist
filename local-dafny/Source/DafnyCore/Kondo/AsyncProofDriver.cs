@@ -11,7 +11,7 @@ public class AsyncProofDriver {
 
   private readonly DafnyOptions options;
   private readonly Program program;
-  private AsyncProofFile proofFile;
+  private readonly AsyncProofFile proofFile;
 
   // Constructor
   public AsyncProofDriver(DafnyOptions options, Program program)
@@ -26,7 +26,7 @@ public class AsyncProofDriver {
 
     var centralizedProof = GetProofModule();
     ResolveApplicationInvariants(centralizedProof);
-
+    ResolveHelperFunctions(centralizedProof);
 
   } // end method Resolve()
 
@@ -34,28 +34,39 @@ public class AsyncProofDriver {
   private void ResolveApplicationInvariants(ModuleDefinition centralizedProof) {
 
     // get the app inv bundle from centralized
-    var appInv = GetPredicate("ApplicationInv");  
+    var appInv = GetPredicate(centralizedProof, "ApplicationInv");  
     
     // extract the conjunct names, and add Function to proofFile
     foreach (var exp in Expression.Conjuncts(appInv.Body)) {
       var predName = exp.ToString().Split('(')[0];  // this is janky
-      proofFile.AddAppInv(GetPredicate(predName));
+      proofFile.AddAppInv(GetPredicate(centralizedProof, predName));
     }
   }
 
 
-  // Returns the Dafny predicate with the given name
-  private Function GetPredicate(string predicateName) {
+  // Returns the Dafny predicate with the given name in given module
+  private Function GetPredicate(ModuleDefinition centralizedProof, string predicateName) {
     Function res = null;
-    foreach (var kvp in program.ModuleSigs) {
-      foreach (var topLevelDecl in ModuleDefinition.AllFunctions(kvp.Value.ModuleDef.TopLevelDecls.ToList())) {
-        if (topLevelDecl.Name.Equals(predicateName)) {  // identifying marker for Send Predicate
-          res = topLevelDecl;
-        }
+    foreach (var topLevelDecl in ModuleDefinition.AllFunctions(centralizedProof.TopLevelDecls.ToList())) {
+      if (topLevelDecl.Name.Equals(predicateName)) {  // identifying marker for Send Predicate
+        res = topLevelDecl;
       }
     }
     Debug.Assert(res != null, String.Format("Predicate {0} not found ", predicateName));
     return res;
+  }
+
+  // Resolve list of non-invariant functions and predicates
+  private void ResolveHelperFunctions(ModuleDefinition centralizedProof) {
+
+    // get the app inv bundle from centralized
+    // var appInv = GetPredicate(centralizedProof, "ApplicationInv");  
+    
+    // // extract the conjunct names, and add Function to proofFile
+    // foreach (var exp in Expression.Conjuncts(appInv.Body)) {
+    //   var predName = exp.ToString().Split('(')[0];  // this is janky
+    //   proofFile.AddAppInv(GetPredicate(predName));
+    // }
   }
 
 
