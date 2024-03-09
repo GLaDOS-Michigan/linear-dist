@@ -1,0 +1,25 @@
+#!/bin/sh
+
+echo "Verifying clientServer"
+cd clientServer/automate_full
+./verify-auto-full
+cd - > /dev/null
+echo ""
+
+echo "Verifying ringLeaderElection"
+cd ringLeaderElection/automate_full
+./verify-auto-full
+cd - > /dev/null
+echo ""
+
+echo "Verifying toyLeaderElection"
+cd toyLeaderElection/automate_full
+./verify-auto-full
+cd - > /dev/null
+echo ""
+
+echo "Verifying twoPhaseCommit"
+cd twoPhaseCommit/automate_full
+./verify-auto-full
+cd - > /dev/null
+echo ""

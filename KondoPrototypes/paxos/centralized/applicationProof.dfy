@@ -223,7 +223,7 @@ ghost predicate Inv(c: Constants, v: Variables)
 {
   && v.WF(c)
   && ApplicationInv(c, v)
-  && Agreement(c, v)
+  && Safety(c, v)
 }
 
 
@@ -234,7 +234,7 @@ ghost predicate Inv(c: Constants, v: Variables)
 
 lemma InvImpliesSafety(c: Constants, v: Variables)
   requires Inv(c, v)
-  ensures Agreement(c, v)
+  ensures Safety(c, v)
 {}
 
 lemma InitImpliesInv(c: Constants, v: Variables)
@@ -612,15 +612,15 @@ lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
   ensures AtMostOneChosenVal(c, v)
 {}
 
-// If only one value can be chosen, then Agreement must be satisfied
+// If only one value can be chosen, then Safety must be satisfied
 lemma AtMostOneChosenImpliesSafety(c: Constants, v: Variables)
   requires v.WF(c)
   requires AtMostOneChosenVal(c, v)
   requires LearnedImpliesQuorumOfAccepts(c, v)
-  ensures Agreement(c, v)
+  ensures Safety(c, v)
 {
   // Proof by contradiction
-  if !Agreement(c, v) {
+  if !Safety(c, v) {
     var l1, l2 :| 
         && c.ValidLearnerIdx(l1)
         && c.ValidLearnerIdx(l2)
