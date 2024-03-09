@@ -131,11 +131,6 @@ lemma InvNextIsLeaderImpliesHasQuorum(c: Constants, v: Variables, v': Variables)
   ensures ReceivedVotesValid(c, v')
 {
   VariableNextProperties(c, v, v');
-  var allHosts := (set x | 0 <= x < |c.hosts|);
-  forall h: nat | c.ValidHostId(h) && v'.Last().IsLeader(c, h)
-  ensures
-    && SetIsQuorum(c.hosts[h].clusterSize, v'.Last().hosts[h].receivedVotes)
-  {}
 }
 
 lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variables)

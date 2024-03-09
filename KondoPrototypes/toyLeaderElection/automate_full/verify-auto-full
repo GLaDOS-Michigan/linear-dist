@@ -16,4 +16,4 @@ $dafnyAsyncProof "../centralized/applicationProof.dfy" > autoProof.log
 echo "Verifying $files"
 files="../../lib/* ../hosts.dfy ../types.dfy distributedSystem.dfy spec.dfy monotonicityInvariantsAutogen.dfy messageInvariantsAutogen.dfy applicationProofDraftAutogen.dfy"
 
-# time $dafnyVerify $files
+time $dafnyVerify $files

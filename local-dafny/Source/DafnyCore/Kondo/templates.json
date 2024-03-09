@@ -316,7 +316,6 @@
     [
       "ghost predicate Inv(c: Constants, v: Variables)",
       "{",
-      "  && v.WF(c)",
       "  && MessageInv(c, v)",
       "  && MonotonicityInv(c, v)",
       "  && ApplicationInv(c, v)",

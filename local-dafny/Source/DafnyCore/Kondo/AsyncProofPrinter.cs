@@ -101,8 +101,13 @@ public static class AsyncProofPrinter {
       foreach (Lemma lemma in file.GetHelperLemmas()) {
         wr = new StringWriter();
         printer = new Printer(wr, options);
-        printer.PrintMethod(lemma, 0, false, true);
-        res.AppendLine(wr.ToString());
+        printer.PrintMethod(lemma, 0, false, false);
+        var lemmaStr = wr.ToString();
+        // Change v to v.Last()
+        lemmaStr = lemmaStr.Replace("v.", "v.Last().");
+        lemmaStr = lemmaStr.Replace("v'.", "v'.Last().");
+        lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
+        res.AppendLine(lemmaStr);
       }
     }
 
