@@ -872,11 +872,6 @@ ghost predicate AtMostOneChosenVal(c: Constants, v: Variables)
   )
 }
 
-ghost predicate IsPrepareMessage(v: Variables, m: Message) {
-  && m.Prepare?
-  && m in v.network.sentMsgs
-}
-
 ghost predicate IsPromiseMessage(v: Variables, m: Message) {
   && m.Promise?
   && m in v.network.sentMsgs
@@ -886,12 +881,6 @@ ghost predicate IsProposeMessage(v: Variables, m: Message) {
   && m.Propose?
   && m in v.network.sentMsgs
 }
-
-ghost predicate IsAcceptMessage(v: Variables, m: Message) {
-  && m.Accept?
-  && m in v.network.sentMsgs
-}
-
 
 //// Helper Lemmas ////
 
@@ -910,8 +899,6 @@ lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Valu
 
 lemma InvImpliesAtMostOneChosenVal(c: Constants, v: Variables)
   requires v.WF(c)
-  requires MessageInv(c, v)
-  requires MonotonicityInv(c, v)
   requires ApplicationInv(c, v)
   ensures AtMostOneChosenVal(c, v)
 {}
