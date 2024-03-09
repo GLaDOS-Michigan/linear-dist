@@ -850,26 +850,11 @@ ghost predicate ChosenAtLearner(c: Constants, h: Hosts, vb: ValBal, lnr:LearnerI
 ghost predicate AtMostOneChosenVal(c: Constants, v: Variables) 
   requires v.WF(c)
 {
-  forall i, vb1: ValBal, vb2: ValBal 
-    {:trigger vb2.v, vb1.v, v.ValidHistoryIdx(i)}
-    {:trigger vb2.v, vb1.b, v.ValidHistoryIdx(i)}
-    {:trigger vb2.v, Chosen(c, v.History(i), vb1)}
-    {:trigger vb1.v, vb2.b, v.ValidHistoryIdx(i)}
-    {:trigger vb1.v, Chosen(c, v.History(i), vb2)}
-    {:trigger vb2.b, vb1.b, v.ValidHistoryIdx(i)}
-    {:trigger vb2.b, Chosen(c, v.History(i), vb1)}
-    {:trigger vb1.b, Chosen(c, v.History(i), vb2)}
-    {:trigger Chosen(c, v.History(i), vb2), Chosen(c, v.History(i), vb1)}
-  :: (
-    && v.ValidHistoryIdx(i)
-    && vb1.b <= vb2.b 
-    && Chosen(c, v.History(i), vb1)
-    && Chosen(c, v.History(i), vb2)
-  ==>
+  forall vb1, vb2 | Chosen(c, v.Last(), vb1) && Chosen(c, v.Last(), vb2) 
+  :: 
     && c.ValidLeaderIdx(vb1.b)
     && c.ValidLeaderIdx(vb2.b)
     && vb1.v == vb2.v
-  )
 }
 
 ghost predicate IsPromiseMessage(v: Variables, m: Message) {
