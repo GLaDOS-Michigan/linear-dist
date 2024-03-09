@@ -82,7 +82,7 @@ public static class AsyncProofPrinter {
       res.AppendLine();
       res.AppendLine(GetFromTemplate("InvNextLemmasSeparator", 0));
       foreach (Lemma lemma in file.GetInvNextLemmas()) {
-        res.AppendLine(FormatInvNextLemma(lemma, options));
+        res.AppendLine(FormatInvNextLemma(file, lemma, options));
       }
     }
 
@@ -91,7 +91,7 @@ public static class AsyncProofPrinter {
       res.AppendLine();
       res.AppendLine(GetFromTemplate("HelperLemmasSeparator", 0));
       foreach (Lemma lemma in file.GetHelperLemmas()) {
-        res.AppendLine(FormatHelperLemma(lemma, options));
+        res.AppendLine(FormatHelperLemma(file, lemma, options));
       }
     }
 
@@ -148,7 +148,7 @@ public static class AsyncProofPrinter {
   }
 
   // Transform a sync InvNext lemma into async one
-  private static string FormatInvNextLemma(Lemma syncLemma, DafnyOptions options) {
+  private static string FormatInvNextLemma(AsyncProofFile file, Lemma syncLemma, DafnyOptions options) {
     if (IsAsyncCompatible(syncLemma, options)) {
       var wr = new StringWriter();
       var printer = new Printer(wr, options);
@@ -160,6 +160,16 @@ public static class AsyncProofPrinter {
         var pattern = "requires v.WF(c)";
         var insertIdx = res.IndexOf(pattern) + pattern.Length + 1;
         res = res.Insert(insertIdx, "  requires MonotonicityInv(c, v)\n  requires MessageInv(c, v)\n");
+      }
+
+      // Don't use v.History(i) for AppInv calls
+      foreach (Function f in file.GetAppInvPredicates()) {
+        var pattern = @$"{f.Name}.*History\(i\)";  // match the entire lemma call
+        var matches = Regex.Matches(res, pattern).Cast<Match>().Select(match => match.Value).ToList();
+        foreach (string m in matches) {
+          var replacement = m.Replace(".History(i)", "");
+          res = res.Replace(m, replacement);
+        }
       }
       return res.ToString();
     }
@@ -193,7 +203,7 @@ public static class AsyncProofPrinter {
   }
 
   // Transform sync helper lemma into async one
-  private static string FormatHelperLemma(Lemma syncLemma, DafnyOptions options) {
+  private static string FormatHelperLemma(AsyncProofFile file, Lemma syncLemma, DafnyOptions options) {
     if (IsAsyncCompatible(syncLemma, options)) {
       var wr = new StringWriter();
       var printer = new Printer(wr, options);
@@ -207,12 +217,23 @@ public static class AsyncProofPrinter {
         linesList[i] = linesList[i].Replace("v.", "v.Last().");
         linesList[i] = linesList[i].Replace("v'.", "v'.Last().");
       }
-      var lemmaStr = String.Join("\n", linesList);
-      lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
-      lemmaStr = lemmaStr.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
-      lemmaStr = StripTriggerAnnotations(lemmaStr);
-      return lemmaStr;
-    } 
+      var res = String.Join("\n", linesList);
+      res = res.Replace("Last().WF(c)", "WF(c)");  // hacky
+      res = res.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
+      res = StripTriggerAnnotations(res);
+
+
+      // Don't use v.Last() for Lemma calls
+      foreach (Lemma l in file.GetHelperLemmas()) {
+        var pattern = @$"{l.Name}\(.*[Last\(\)]+.*;";  // match the entire lemma call
+        var matches = Regex.Matches(res, pattern).Cast<Match>().Select(match => match.Value).ToList();
+        foreach (string m in matches) {
+          var replacement = m.Replace(".Last()", "");
+          res = res.Replace(m, replacement);
+        }
+      }
+      return res;
+    }
     return FormatSyncSpecificLemma(syncLemma, options);
   }
 
