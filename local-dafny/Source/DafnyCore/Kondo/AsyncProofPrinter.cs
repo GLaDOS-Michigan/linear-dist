@@ -53,7 +53,7 @@ public static class AsyncProofPrinter {
 
     // Print Application Invariant predicates
     foreach (Function appInv in file.GetAppInvPredicates()) {
-      res.AppendLine(PrintInvariantPredicate(appInv, options));
+      res.AppendLine(FormatInvariantPredicate(appInv, options));
     }
 
     // Print Application Invariant bundle
@@ -87,10 +87,7 @@ public static class AsyncProofPrinter {
       res.AppendLine();
       res.AppendLine(GetFromTemplate("InvNextLemmasSeparator", 0));
       foreach (Lemma lemma in file.GetInvNextLemmas()) {
-        wr = new StringWriter();
-        printer = new Printer(wr, options);
-        printer.PrintMethod(lemma, 0, false, 1);
-        res.AppendLine(wr.ToString());
+        res.AppendLine(FormatInvNextLemma(lemma, options));
       }
     }
 
@@ -134,7 +131,7 @@ public static class AsyncProofPrinter {
   } // end function PrintAsyncProofModuleBody 
   
   // Transform a centralized predicate into async one
-  private static string PrintInvariantPredicate(Function centralizedAppPred, DafnyOptions options) {
+  private static string FormatInvariantPredicate(Function centralizedAppPred, DafnyOptions options) {
     var res = new StringBuilder();
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
@@ -151,6 +148,23 @@ public static class AsyncProofPrinter {
     }
 
     res.Append(pred);
+    return res.ToString();
+  }
+
+  // Transform a sync InvNext lemma into async one
+  private static string FormatInvNextLemma(Lemma lemma, DafnyOptions options) {
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintMethod(lemma, 0, false, 1);
+    var res = wr.ToString();
+    // If Inv(c, v) requirement is missing, it means that specific AppInvs are used.
+    // Insert Msg and Mono Invs
+    if (!res.Contains("requires Inv(c, v)")) {
+      var pattern = "requires v.WF(c)";
+      var insertIdx = res.IndexOf(pattern) + pattern.Length + 1;
+      res = res.Insert(insertIdx, "  requires MonotonicityInv(c, v)\n  requires MessageInv(c, v)\n");
+    }
+
     return res.ToString();
   }
 
