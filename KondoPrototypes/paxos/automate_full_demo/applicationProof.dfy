@@ -738,7 +738,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLeaderStep(
   NewChosenOnlyInLearnerStep(c, v, v', dsStep);
   if ldr == dsStep.actor {  // if the leader in question is now taking a step
     assert Chosen(c, v.Last(), vb);
-    var choosingAccs := SupportingAcceptorsForChosen(c, v, |v.history|-1, vb);
+    var choosingAccs := SupportingAcceptorsForChosen(c, v, vb);
     var h, h' := v.Last(), v'.Last();
     if h.leaders[ldr].HeardAtMost(vb.b) {
       //Ldr has yet to see ballot b in this step. By quorum intersection, it must see
@@ -780,7 +780,7 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
     var actor, msgOps := dsStep.actor, dsStep.msgOps;
     var lnr:LearnerId:| ChosenAtLearner(c, v'.Last(), vb, lnr);
     if lnr == actor {
-       var choosingAccs := SupportingAcceptorsForChosen(c, v', |v'.history|-1, vb);
+       var choosingAccs := SupportingAcceptorsForChosen(c, v', vb);
       // These properties of choosingAccs carry over to pre-state v
       assert v.Last().LeaderCanPropose(c, ldr);  // trigger
       if !v.Last().leaders[ldr].HeardAtLeast(vb.b) {
@@ -830,7 +830,7 @@ ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
 }
 
 // A learner holds an accept quorum for vb
-ghost predicate Chosen(c: Constants, h: Hosts, vb: ValBal) 
+ghost predicate Chosen(c: Constants, h: Hosts, vb: ValBal)
   requires h.WF(c)
 {
   exists lnr:LearnerId:: 
@@ -931,23 +931,22 @@ lemma NewChosenOnlyInLearnerStep(c: Constants, v: Variables, v': Variables, dsSt
 }
 
 // Suppose vb is chosen. Return the quorum of acceptors supporting the chosen vb
-lemma SupportingAcceptorsForChosen(c: Constants, v: Variables, i:int, vb: ValBal)
+lemma SupportingAcceptorsForChosen(c: Constants, v: Variables, vb: ValBal)
 returns (supportingAccs: set<AcceptorId>)
   requires v.WF(c)
-  requires v.ValidHistoryIdx(i)
-  requires Chosen(c, v.History(i), vb)
+  requires Chosen(c, v.Last(), vb)
   requires LearnerReceivedAcceptImpliesAccepted(c, v)
   ensures |supportingAccs| >= c.f+1
   ensures forall a | a in supportingAccs :: 
     && c.ValidAcceptorIdx(a)
-    && v.History(i).acceptors[a].HasAcceptedAtLeastBal(vb.b)
+    && v.Last().acceptors[a].HasAcceptedAtLeastBal(vb.b)
   ensures exists lnr :: 
     && c.ValidLearnerIdx(lnr)
-    && vb in v.History(i).learners[lnr].receivedAccepts.m
-    && supportingAccs <= v.History(i).learners[lnr].receivedAccepts.m[vb]
+    && vb in v.Last().learners[lnr].receivedAccepts.m
+    && supportingAccs <= v.Last().learners[lnr].receivedAccepts.m[vb]
 {
-  var lnr: LearnerId :| ChosenAtLearner(c, v.History(i), vb, lnr);  // skolemize!
-  supportingAccs := v.History(i).learners[lnr].receivedAccepts.m[vb];
+  var lnr: LearnerId :| ChosenAtLearner(c, v.Last(), vb, lnr);  // skolemize!
+  supportingAccs := v.Last().learners[lnr].receivedAccepts.m[vb];
   return supportingAccs;
 }
 
