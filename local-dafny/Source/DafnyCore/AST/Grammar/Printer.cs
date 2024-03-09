@@ -17,6 +17,7 @@ using DafnyCore;
 using JetBrains.Annotations;
 using Bpl = Microsoft.Boogie;
 using System.Net;
+using System.Diagnostics;
 
 namespace Microsoft.Dafny {
 
@@ -62,7 +63,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
     private readonly PrintFlags printFlags;
 
     bool kondoTransformForall = false;  // add history to the next forall expr
-    bool kondoTransformV = false;       // add history to v and v' variables
+    bool kondoTransformV = false;       // turn v to v.History(i)
+    bool kondoTransformVLast = false;   // turn v to v.Last()
     bool kondoTransformStmt = false;    // add "VariableNextProperties" to block statement
 
     [ContractInvariantMethod]
@@ -159,7 +161,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       Contract.Requires(m != null);
       using (var wr = new System.IO.StringWriter()) {
         var pr = new Printer(wr, options);
-        pr.PrintMethod(m, 0, true, false);
+        pr.PrintMethod(m, 0, true, 0);
         return ToStringWithoutNewline(wr);
       }
     }
@@ -706,11 +708,11 @@ NoGhost - disable printing of functions, ghost methods, and proof
           // omit this declaration
         } else if (m is Method) {
           if (state != 0) { wr.WriteLine(); }
-          PrintMethod((Method)m, indent, false, false);
+          PrintMethod((Method)m, indent, false, 0);
           var com = m as ExtremeLemma;
           if (com != null && com.PrefixLemma != null) {
             Indent(indent); wr.WriteLine("/***");
-            PrintMethod(com.PrefixLemma, indent, false, false);
+            PrintMethod(com.PrefixLemma, indent, false, 0);
             Indent(indent); wr.WriteLine("***/");
           }
           state = 2;
@@ -986,12 +988,17 @@ NoGhost - disable printing of functions, ghost methods, and proof
              && tok.Uri != null && fileBeingPrinted != null && tok.Uri.LocalPath != fileBeingPrinted;
     }
 
-    // kondoMethod is flag to do kondo things:
-    //  - add `VariableNextProperties(c, v, v');` statement
-    //  - transform v to v.History(i) in expressions (TODO)
-    public void PrintMethod(Method method, int indent, bool printSignatureOnly, bool kondoMethod) {
+    /* kondoMethod is flag to do kondo things:
+        0 => this is not a kondo lemma
+        1 => this is an InvNext lemma
+          - add `VariableNextProperties(c, v, v');` statement
+          - transform v to v.History(i) in expressions
+        2 => this is a helper lemma
+          - transform v to v.Last() in expressions
+    */
+    public void PrintMethod(Method method, int indent, bool printSignatureOnly, int kondoMethod) {
       Contract.Requires(method != null);
-
+      Debug.Assert(0 <= kondoMethod && kondoMethod <= 2, "Invalid kondoMethod flag");
       if (PrintModeSkipFunctionOrMethod(method.IsGhost, method.Attributes, method.Name)) { return; }
       Indent(indent);
       string k = method is Constructor ? "constructor" :
@@ -1036,9 +1043,11 @@ NoGhost - disable printing of functions, ghost methods, and proof
 
       if (method.Body != null && !printSignatureOnly) {
         Indent(indent);
-        if (kondoMethod) {
+        if (kondoMethod == 1) {
           kondoTransformStmt = true;
           kondoTransformV = true;
+        } else if (kondoMethod == 2) {
+          kondoTransformVLast = true;
         }
         PrintStatement(method.Body, indent);
         wr.WriteLine();
@@ -1965,7 +1974,6 @@ NoGhost - disable printing of functions, ghost methods, and proof
           kondoTransformForall = true;  // set to false at site where first ForallExpr is printed
           kondoTransformV = true;
           PrintExtendedExpr(expr, indent, isRightmost, endWithCloseParen, false);
-          kondoTransformV = false;
         }
       } else {
         if (expr is ITEExpr) {
@@ -2256,6 +2264,8 @@ NoGhost - disable printing of functions, ghost methods, and proof
         var e = (NameSegment)expr;
         if (kondoTransformV && (e.Name.Equals("v") || e.Name.Equals("v'"))){
           wr.Write(e.Name + ".History(i)");
+        } else if (kondoTransformVLast && (e.Name.Equals("v") || e.Name.Equals("v'"))) {
+          wr.Write(e.Name + ".Last()");
         } else {
           wr.Write(e.Name);
         }

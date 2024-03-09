@@ -75,7 +75,7 @@ public static class AsyncProofPrinter {
     // Print InvInductive proof body. Get directly from Sync
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
-    printer.PrintMethod(file.invInductiveLemma, 0, false, false);
+    printer.PrintMethod(file.invInductiveLemma, 0, false, 0);
     var invInductive = wr.ToString();
     // insert VariableNextProperties(c, v, v') into string
     int index = invInductive.IndexOf("{");
@@ -89,7 +89,7 @@ public static class AsyncProofPrinter {
       foreach (Lemma lemma in file.GetInvNextLemmas()) {
         wr = new StringWriter();
         printer = new Printer(wr, options);
-        printer.PrintMethod(lemma, 0, false, true);
+        printer.PrintMethod(lemma, 0, false, 1);
         res.AppendLine(wr.ToString());
       }
     }
@@ -101,12 +101,19 @@ public static class AsyncProofPrinter {
       foreach (Lemma lemma in file.GetHelperLemmas()) {
         wr = new StringWriter();
         printer = new Printer(wr, options);
-        printer.PrintMethod(lemma, 0, false, false);
-        var lemmaStr = wr.ToString();
-        // Change v to v.Last()
-        lemmaStr = lemmaStr.Replace("v.", "v.Last().");
-        lemmaStr = lemmaStr.Replace("v'.", "v'.Last().");
+        printer.PrintMethod(lemma, 0, false, 2);
+        var linesList = wr.ToString().Split("\n").ToList();
+        // hacky way to transform requires clauses, as I only wanna transform "v." and not "v"
+        for (int i = 0; i < linesList.Count; i++) {
+          if (linesList[i].Contains("decreases")) {
+            break;
+          } 
+          linesList[i] = linesList[i].Replace("v.", "v.Last().");
+          linesList[i] = linesList[i].Replace("v'.", "v'.Last().");
+        }
+        var lemmaStr = String.Join("\n", linesList);
         lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
+        lemmaStr = StripTriggerAnnotations(lemmaStr);
         res.AppendLine(lemmaStr);
       }
     }
@@ -157,13 +164,13 @@ public static class AsyncProofPrinter {
     return res;
   }
 
-  // private static string StripTriggerAnnotations(string input) {
-  //   // Define the pattern to remove
-  //   string pattern = @"\{:trigger [^\}]*\}";
-  //   // Use Regex.Replace to remove all occurrences of the pattern
-  //   string resultString = Regex.Replace(input, pattern, "");
-  //   return resultString;
-  // }
+  private static string StripTriggerAnnotations(string input) {
+    // Define the pattern to remove
+    string pattern = @"\{:trigger [^\}]*\}";
+    // Use Regex.Replace to remove all occurrences of the pattern
+    string resultString = Regex.Replace(input, pattern, "");
+    return resultString;
+  }
 
   // private static string ValidActorIdx(string actor, string field) {
   //   return string.Format("0 <= {0} < |h.{1}|", actor, field);

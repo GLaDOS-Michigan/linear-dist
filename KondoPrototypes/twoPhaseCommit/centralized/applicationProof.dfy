@@ -78,30 +78,30 @@ lemma InvInductive(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   ensures Inv(c, v')
 {
-  LeaderTallyReflectsPreferencesInductive(c, v, v');
-  AC1Proof(c, v, v');
-  AC3Proof(c, v, v');
-  AC4Proof(c, v, v');
+  InvNextLeaderTallyReflectsPreferences(c, v, v');
+  InvNextAC1(c, v, v');
+  InvNextAC3(c, v, v');
+  InvNextAC4(c, v, v');
 }
 
 /***************************************************************************************
 *                                        Proof                                         *
 ***************************************************************************************/
 
-lemma AC1Proof(c: Constants, v: Variables, v': Variables) 
+lemma InvNextAC1(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures SafetyAC1(c, v')
 {}
 
 
-lemma LeaderTallyReflectsPreferencesInductive(c: Constants, v: Variables, v': Variables) 
+lemma InvNextLeaderTallyReflectsPreferences(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures ApplicationInv(c, v')
 {}
 
-lemma AC3Proof(c: Constants, v: Variables, v': Variables)
+lemma InvNextAC3(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures AC3Contrapos(c, v')
@@ -130,7 +130,7 @@ lemma AC3ContraposLemma(c: Constants, v: Variables)
   }
 }
 
-lemma AC4Proof(c: Constants, v: Variables, v': Variables)
+lemma InvNextAC4(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')
   ensures SafetyAC4(c, v')
