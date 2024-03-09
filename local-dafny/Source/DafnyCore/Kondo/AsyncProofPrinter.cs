@@ -204,6 +204,7 @@ public static class AsyncProofPrinter {
 
   // Transform sync helper lemma into async one
   private static string FormatHelperLemma(AsyncProofFile file, Lemma syncLemma, DafnyOptions options) {
+    var res = "";
     if (IsAsyncCompatible(syncLemma, options)) {
       var wr = new StringWriter();
       var printer = new Printer(wr, options);
@@ -217,24 +218,35 @@ public static class AsyncProofPrinter {
         linesList[i] = linesList[i].Replace("v.", "v.Last().");
         linesList[i] = linesList[i].Replace("v'.", "v'.Last().");
       }
-      var res = String.Join("\n", linesList);
+      res = String.Join("\n", linesList);
       res = res.Replace("Last().WF(c)", "WF(c)");  // hacky
       res = res.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
       res = StripTriggerAnnotations(res);
-
-
-      // Don't use v.Last() for Lemma calls
-      foreach (Lemma l in file.GetHelperLemmas()) {
-        var pattern = @$"{l.Name}\(.*[Last\(\)]+.*;";  // match the entire lemma call
-        var matches = Regex.Matches(res, pattern).Cast<Match>().Select(match => match.Value).ToList();
-        foreach (string m in matches) {
-          var replacement = m.Replace(".Last()", "");
-          res = res.Replace(m, replacement);
-        }
-      }
-      return res;
+    } else {
+      res = FormatSyncSpecificLemma(syncLemma, options);
     }
-    return FormatSyncSpecificLemma(syncLemma, options);
+    // Don't use v.Last() for Lemma calls
+    foreach (Lemma l in file.GetHelperLemmas()) {
+      var pattern = @$"{l.Name}\(.*Last\(\),";
+      var matches = Regex.Matches(res, pattern).Cast<Match>().Select(match => match.Value).ToList();
+      foreach (string m in matches) {
+        var replacement = m.Replace(".Last()", "");
+        res = res.Replace(m, replacement);
+      }
+    }
+
+    // Use v.Last() for special predicate calls
+    foreach (Function sp in file.GetSpecialHelperFunctions()) {
+      var pattern = @$" {sp.Name}\(.*v,| {sp.Name}\(.*v',";
+      var matches = Regex.Matches(res, pattern).Cast<Match>().Select(match => match.Value).ToList();
+      foreach (string m in matches) {
+        Console.WriteLine(m);
+        var replacement = m.Replace("v,", "v.Last(),");
+        replacement = replacement.Replace("v',", "v'.Last(),");
+        res = res.Replace(m, replacement);
+      }
+    }
+    return res;
   }
 
   private static string FormatHelperFunction(Function function, DafnyOptions options) {
