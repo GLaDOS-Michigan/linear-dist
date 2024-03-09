@@ -2765,7 +2765,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
         if (parensNeeded) { wr.Write("("); }
         wr.Write(e is ForallExpr ? "forall" : "exists");
         wr.Write(" ");
-        PrintQuantifierDomain(e.BoundVars, e.Attributes, e.Range);
+        PrintQuantifierDomain(e.BoundVars, e.Attributes, e.Range, isExistential: e is ExistsExpr);
         if (keyword == null) {
           wr.Write(" :: ");
         } else {
@@ -3052,7 +3052,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       }
     }
 
-    private void PrintQuantifierDomain(List<BoundVar> boundVars, Attributes attrs, Expression range) {
+    private void PrintQuantifierDomain(List<BoundVar> boundVars, Attributes attrs, Expression range, bool isExistential = false) {
       Contract.Requires(boundVars != null);
       string sep = "";
       foreach (BoundVar bv in boundVars) {
@@ -3064,8 +3064,11 @@ NoGhost - disable printing of functions, ghost methods, and proof
         wr.Write("{0}i: nat", sep);
       }
       wr.WriteLine();
-      PrintAttributes(attrs);
-      wr.WriteLine();
+      if (!isExistential) {
+        // kondo: do not print triggers for existentials
+        PrintAttributes(attrs);
+        wr.WriteLine();
+      }
       if (range != null) {
         wr.Write(" | ");
         if (kondoTransformForall) {
