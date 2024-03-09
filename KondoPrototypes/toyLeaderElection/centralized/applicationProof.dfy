@@ -90,13 +90,7 @@ lemma InvNextIsLeaderImpliesHasQuorum(c: Constants, v: Variables, v': Variables)
   requires Next(c, v, v')
   requires ReceivedVotesValid(c, v')
   ensures IsLeaderImpliesHasQuorum(c, v')
-{
-  var allHosts := (set x | 0 <= x < |c.hosts|);
-  forall h: nat | c.ValidHostId(h) && v'.IsLeader(c, h)
-  ensures
-    && SetIsQuorum(c.hosts[h].clusterSize, v'.hosts[h].receivedVotes)
-  {}
-}
+{}
 
 lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variables) 
   requires Inv(c, v)

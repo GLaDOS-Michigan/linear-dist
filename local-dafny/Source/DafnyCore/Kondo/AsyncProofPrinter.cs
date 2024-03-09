@@ -11,7 +11,7 @@ namespace Microsoft.Dafny
 public static class AsyncProofPrinter {
 
   private static readonly string[] Includes = {"monotonicityInvariantsAutogen.dfy", "messageInvariantsAutogen.dfy"};
-  private static readonly string[] Imports = {"Types", "UtilitiesLibrary", "DistributedSystem", "MonotonicityInvariants", "MessageInvariants", "Obligations"};
+  private static readonly string[] Imports = {"Types", "UtilitiesLibrary", "MonotonicityLibrary", "DistributedSystem", "MonotonicityInvariants", "MessageInvariants", "Obligations"};
   private static readonly string TemplatePath = "/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Source/DafnyCore/Kondo/templates.json";
 
   private static readonly Dictionary<string, string[]> Template = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(File.ReadAllText(TemplatePath));
@@ -72,20 +72,35 @@ public static class AsyncProofPrinter {
     res.AppendLine(GetFromTemplate("InvImpliesSafety", 0));
     res.AppendLine(GetFromTemplate("InitImpliesInv", 0));
     
-    res.Append(GetFromTemplate("InvInductiveHeader", 0));
-    // Print InvNext Lemma calls
-    foreach (Lemma lemma in file.GetInvNextLemmas()) {
-      res.AppendLine($"  {lemma.Name}(c, v, v');");
-    }
-    res.AppendLine("}");
+    // Print InvInductive proof body. Get directly from Sync
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintMethod(file.invInductiveLemma, 0, false, false);
+    var invInductive = wr.ToString();
+    // insert VariableNextProperties(c, v, v') into string
+    int index = invInductive.IndexOf("{");
+    invInductive = invInductive.Insert(index+2, "  VariableNextProperties(c, v, v');\n  MonotonicityInvInductive(c, v, v');\n  MessageInvInductive(c, v, v');\n");
+    res.AppendLine(invInductive);
 
     // Print InvNext Lemmas 
     if (file.GetInvNextLemmas().Count != 0) {
       res.AppendLine();
       res.AppendLine(GetFromTemplate("InvNextLemmasSeparator", 0));
       foreach (Lemma lemma in file.GetInvNextLemmas()) {
-        var wr = new StringWriter();
-        var printer = new Printer(wr, options);
+        wr = new StringWriter();
+        printer = new Printer(wr, options);
+        printer.PrintMethod(lemma, 0, false, true);
+        res.AppendLine(wr.ToString());
+      }
+    }
+
+    // Print helper lemmas
+    if (file.GetHelperLemmas().Count != 0) {
+      res.AppendLine();
+      res.AppendLine(GetFromTemplate("HelperLemmasSeparator", 0));
+      foreach (Lemma lemma in file.GetHelperLemmas()) {
+        wr = new StringWriter();
+        printer = new Printer(wr, options);
         printer.PrintMethod(lemma, 0, false, true);
         res.AppendLine(wr.ToString());
       }
@@ -96,8 +111,8 @@ public static class AsyncProofPrinter {
       res.AppendLine();
       res.AppendLine(GetFromTemplate("HelperFunctionsSeparator", 0));
       foreach (Function f in file.GetHelperFunctions()) {
-        var wr = new StringWriter();
-        var printer = new Printer(wr, options);
+        wr = new StringWriter();
+        printer = new Printer(wr, options);
         printer.PrintFunction(f, 0, false, false);
         res.AppendLine(wr.ToString());
       }

@@ -22,12 +22,14 @@ public class AsyncProofDriver {
   }
 
   public void Resolve() {
-    Console.WriteLine(String.Format("Resolving invariants for {0}\n", program.FullName));
+    Console.WriteLine(String.Format("Resolving async proof for {0}\n", program.FullName));
 
     var centralizedProof = GetProofModule();
+    proofFile.invInductiveLemma = GetLemma(centralizedProof, "InvInductive");
     ResolveApplicationInvariants(centralizedProof);
     ResolveHelperFunctions(centralizedProof);
     ResolveInvNextLemmas(centralizedProof);
+    ResolveHelperLemmas(centralizedProof);
   } // end method Resolve()
 
   // Resolve list of application invariant predicates
@@ -56,6 +58,18 @@ public class AsyncProofDriver {
     return res;
   }
 
+  // Returns the Dafny predicate with the given name in given module
+  private Lemma GetLemma(ModuleDefinition centralizedProof, string lemmaName) {
+    Lemma res = null;
+    foreach (var topLevelDecl in ModuleDefinition.AllCallables(centralizedProof.TopLevelDecls.ToList())) {
+      if (topLevelDecl is Lemma && ((Lemma) topLevelDecl).Name.Equals(lemmaName)) {  // identifying marker for Send Predicate
+        res = (Lemma) topLevelDecl;
+      }
+    }
+    Debug.Assert(res != null, String.Format("Lemma {0} not found ", lemmaName));
+    return res;
+  }
+
   // Resolve list of non-invariant functions and predicates
   private void ResolveHelperFunctions(ModuleDefinition centralizedProof) {
     var appInvs = proofFile.GetAppInvPredicates(); // previously resolved application invariants
@@ -71,6 +85,15 @@ public class AsyncProofDriver {
     foreach (var topLevelDecl in ModuleDefinition.AllCallables(centralizedProof.TopLevelDecls.ToList())) {
       if (topLevelDecl is Lemma && ((Lemma) topLevelDecl).Name.Contains("InvNext")) {
         proofFile.AddInvNextLemma((Lemma) topLevelDecl);
+      }
+    }
+  }
+
+  private void ResolveHelperLemmas(ModuleDefinition centralizedProof) {
+    string[] reservedNames = {"InvImpliesSafety", "InitImpliesInv", "InvInductive"};
+    foreach (var topLevelDecl in ModuleDefinition.AllCallables(centralizedProof.TopLevelDecls.ToList())) {
+      if (topLevelDecl is Lemma && !((Lemma) topLevelDecl).Name.StartsWith("InvNext") && !reservedNames.Contains(((Lemma) topLevelDecl).Name)) {
+        proofFile.AddHelperLemma((Lemma) topLevelDecl);
       }
     }
   }
