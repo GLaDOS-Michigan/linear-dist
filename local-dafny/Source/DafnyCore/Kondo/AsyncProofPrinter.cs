@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
@@ -73,14 +74,7 @@ public static class AsyncProofPrinter {
     res.AppendLine(GetFromTemplate("InitImpliesInv", 0));
     
     // Print InvInductive proof body. Get directly from Sync
-    var wr = new StringWriter();
-    var printer = new Printer(wr, options);
-    printer.PrintMethod(file.invInductiveLemma, 0, false, 0);
-    var invInductive = wr.ToString();
-    // insert VariableNextProperties(c, v, v') into string
-    int index = invInductive.IndexOf("{");
-    invInductive = invInductive.Insert(index+2, "  VariableNextProperties(c, v, v');\n  MonotonicityInvInductive(c, v, v');\n  MessageInvInductive(c, v, v');\n");
-    res.AppendLine(invInductive);
+    res.AppendLine(FormatInvInductive(file.invInductiveLemma, options));
 
     // Print InvNext Lemmas 
     if (file.GetInvNextLemmas().Count != 0) {
@@ -96,23 +90,7 @@ public static class AsyncProofPrinter {
       res.AppendLine();
       res.AppendLine(GetFromTemplate("HelperLemmasSeparator", 0));
       foreach (Lemma lemma in file.GetHelperLemmas()) {
-        wr = new StringWriter();
-        printer = new Printer(wr, options);
-        printer.PrintMethod(lemma, 0, false, 2);
-        var linesList = wr.ToString().Split("\n").ToList();
-        // hacky way to transform requires clauses, as I only wanna transform "v." and not "v"
-        for (int i = 0; i < linesList.Count; i++) {
-          if (linesList[i].Contains("decreases")) {
-            break;
-          } 
-          linesList[i] = linesList[i].Replace("v.", "v.Last().");
-          linesList[i] = linesList[i].Replace("v'.", "v'.Last().");
-        }
-        var lemmaStr = String.Join("\n", linesList);
-        lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
-        lemmaStr = lemmaStr.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
-        lemmaStr = StripTriggerAnnotations(lemmaStr);
-        res.AppendLine(lemmaStr);
+        res.AppendLine(FormatHelperLemma(lemma, options));
       }
     }
 
@@ -121,21 +99,18 @@ public static class AsyncProofPrinter {
       res.AppendLine();
       res.AppendLine(GetFromTemplate("HelperFunctionsSeparator", 0));
       foreach (Function f in file.GetHelperFunctions()) {
-        wr = new StringWriter();
-        printer = new Printer(wr, options);
-        printer.PrintFunction(f, 0, false, 2);
-        res.AppendLine(wr.ToString());
+        res.AppendLine(FormatHelperFunction(f, options));
       }
     }
     return res.ToString();
   } // end function PrintAsyncProofModuleBody 
   
-  // Transform a centralized predicate into async one
-  private static string FormatInvariantPredicate(Function centralizedAppPred, DafnyOptions options) {
+  // Transform a sync predicate into async one
+  private static string FormatInvariantPredicate(Function syncAppPred, DafnyOptions options) {
     var res = new StringBuilder();
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
-    printer.PrintFunction(centralizedAppPred, 0, false, 1);
+    printer.PrintFunction(syncAppPred, 0, false, 1);
     var pred = wr.ToString();
 
     pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
@@ -151,6 +126,18 @@ public static class AsyncProofPrinter {
     return res.ToString();
   }
 
+  // Transform sync InvInductive lemma into async one
+  private static string FormatInvInductive(Lemma syncInvInductive, DafnyOptions options) {
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintMethod(syncInvInductive, 0, false, 0);
+    var invInductive = wr.ToString();
+    // insert VariableNextProperties(c, v, v') into string
+    int index = invInductive.IndexOf("{");
+    invInductive = invInductive.Insert(index+2, "  VariableNextProperties(c, v, v');\n  MonotonicityInvInductive(c, v, v');\n  MessageInvInductive(c, v, v');\n");
+    return invInductive;
+  }
+
   // Transform a sync InvNext lemma into async one
   private static string FormatInvNextLemma(Lemma lemma, DafnyOptions options) {
     var wr = new StringWriter();
@@ -164,8 +151,35 @@ public static class AsyncProofPrinter {
       var insertIdx = res.IndexOf(pattern) + pattern.Length + 1;
       res = res.Insert(insertIdx, "  requires MonotonicityInv(c, v)\n  requires MessageInv(c, v)\n");
     }
-
     return res.ToString();
+  }
+
+  // Transform sync helper lemma into async one
+  private static string FormatHelperLemma(Lemma syncLemma, DafnyOptions options) {
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintMethod(syncLemma, 0, false, 2);
+    var linesList = wr.ToString().Split("\n").ToList();
+    // hacky way to transform requires clauses, as I only wanna transform "v." and not "v"
+    for (int i = 0; i < linesList.Count; i++) {
+      if (linesList[i].Contains("decreases")) {
+        break;
+      } 
+      linesList[i] = linesList[i].Replace("v.", "v.Last().");
+      linesList[i] = linesList[i].Replace("v'.", "v'.Last().");
+    }
+    var lemmaStr = String.Join("\n", linesList);
+    lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
+    lemmaStr = lemmaStr.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
+    lemmaStr = StripTriggerAnnotations(lemmaStr);
+    return lemmaStr;
+  }
+
+  private static string FormatHelperFunction(Function function, DafnyOptions options) {
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintFunction(function, 0, false, 2);
+    return wr.ToString();
   }
 
   // Transform sync trigger into corresponding async trigger
