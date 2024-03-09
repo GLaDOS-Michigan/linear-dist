@@ -148,40 +148,72 @@ public static class AsyncProofPrinter {
   }
 
   // Transform a sync InvNext lemma into async one
-  private static string FormatInvNextLemma(Lemma lemma, DafnyOptions options) {
+  private static string FormatInvNextLemma(Lemma syncLemma, DafnyOptions options) {
+    if (IsAsyncCompatible(syncLemma, options)) {
+      var wr = new StringWriter();
+      var printer = new Printer(wr, options);
+      printer.PrintMethod(syncLemma, 0, false, 1);
+      var res = wr.ToString();
+      // If Inv(c, v) requirement is missing, it means that specific AppInvs are used.
+      // Insert Msg and Mono Invs
+      if (!res.Contains("requires Inv(c, v)")) {
+        var pattern = "requires v.WF(c)";
+        var insertIdx = res.IndexOf(pattern) + pattern.Length + 1;
+        res = res.Insert(insertIdx, "  requires MonotonicityInv(c, v)\n  requires MessageInv(c, v)\n");
+      }
+      return res.ToString();
+    }
+    return FormatSyncSpecificLemma(syncLemma, options);
+  }
+
+  // Identifies case 2 sync lemmas
+  private static bool IsAsyncCompatible(Lemma syncLemma, DafnyOptions options) {
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
-    printer.PrintMethod(lemma, 0, false, 1);
+    printer.PrintMethod(syncLemma, 0, false, 0);
+    var lemmaStr = wr.ToString();
+    return !lemmaStr.Contains("sysStep");
+  }
+
+  // Format a case 2 sync lemma
+  private static string FormatSyncSpecificLemma(Lemma syncLemma, DafnyOptions options) {
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    printer.PrintMethod(syncLemma, 0, true, 0);
+    wr.WriteLine(GetFromTemplate("SyncSpecificLemma", 2));
     var res = wr.ToString();
-    // If Inv(c, v) requirement is missing, it means that specific AppInvs are used.
-    // Insert Msg and Mono Invs
-    if (!res.Contains("requires Inv(c, v)")) {
-      var pattern = "requires v.WF(c)";
-      var insertIdx = res.IndexOf(pattern) + pattern.Length + 1;
-      res = res.Insert(insertIdx, "  requires MonotonicityInv(c, v)\n  requires MessageInv(c, v)\n");
+
+    // Comment out lines with sync-Specific syntax
+    string pattern = @"requires.*Step?|decreases.*Step";
+    var synclines = Regex.Matches(res, pattern).Cast<Match>().Select(match => match.Value).ToList();
+    foreach (var sl in synclines) {
+      res = res.Replace(sl, "// " + sl);
     }
     return res.ToString();
   }
 
   // Transform sync helper lemma into async one
   private static string FormatHelperLemma(Lemma syncLemma, DafnyOptions options) {
-    var wr = new StringWriter();
-    var printer = new Printer(wr, options);
-    printer.PrintMethod(syncLemma, 0, false, 2);
-    var linesList = wr.ToString().Split("\n").ToList();
-    // hacky way to transform requires clauses, as I only wanna transform "v." and not "v"
-    for (int i = 0; i < linesList.Count; i++) {
-      if (linesList[i].Contains("decreases")) {
-        break;
-      } 
-      linesList[i] = linesList[i].Replace("v.", "v.Last().");
-      linesList[i] = linesList[i].Replace("v'.", "v'.Last().");
-    }
-    var lemmaStr = String.Join("\n", linesList);
-    lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
-    lemmaStr = lemmaStr.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
-    lemmaStr = StripTriggerAnnotations(lemmaStr);
-    return lemmaStr;
+    if (IsAsyncCompatible(syncLemma, options)) {
+      var wr = new StringWriter();
+      var printer = new Printer(wr, options);
+      printer.PrintMethod(syncLemma, 0, false, 2);
+      var linesList = wr.ToString().Split("\n").ToList();
+      // hacky way to transform requires clauses, as I only wanna transform "v." and not "v"
+      for (int i = 0; i < linesList.Count; i++) {
+        if (linesList[i].Contains("decreases")) {
+          break;
+        } 
+        linesList[i] = linesList[i].Replace("v.", "v.Last().");
+        linesList[i] = linesList[i].Replace("v'.", "v'.Last().");
+      }
+      var lemmaStr = String.Join("\n", linesList);
+      lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
+      lemmaStr = lemmaStr.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
+      lemmaStr = StripTriggerAnnotations(lemmaStr);
+      return lemmaStr;
+    } 
+    return FormatSyncSpecificLemma(syncLemma, options);
   }
 
   private static string FormatHelperFunction(Function function, DafnyOptions options) {
