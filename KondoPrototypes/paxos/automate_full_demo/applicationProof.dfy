@@ -794,6 +794,10 @@ lemma InvNextChosenImpliesProposingLeaderHearsChosenBallotLearnerStep(
   }
 }
 
+/***************************************************************************************
+*                            Helper Definitions and Lemmas                             *
+***************************************************************************************/
+
 // Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
 lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
   requires v.WF(c)
@@ -819,10 +823,6 @@ lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables
   assert chosen.b <= ldr' < ldr;
   LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
 }
-
-/***************************************************************************************
-*                            Helper Definitions and Lemmas                             *
-***************************************************************************************/
 
 ghost predicate IsAcceptorQuorum(c: Constants, quorum: set<AcceptorId>) {
   && |quorum| >= c.f+1

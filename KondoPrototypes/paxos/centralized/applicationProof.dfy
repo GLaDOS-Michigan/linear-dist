@@ -527,33 +527,6 @@ lemma InvNextChosenValImpliesLeaderOnlyHearsVal(c: Constants, v: Variables, v': 
   }
 }
 
-// Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
-lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
-  requires v.WF(c)
-  requires Chosen(c, v, chosen)
-  requires c.ValidLeaderIdx(ldr)
-  requires v.leaders[ldr].highestHeardBallot.MNSome?
-  requires v.leaders[ldr].highestHeardBallot.value >= chosen.b
-  requires v.leaders[ldr].Value() != chosen.v
-  requires chosen.b < ldr
-  requires OneValuePerBallotLeaderAndLearners(c, v)
-  requires LeaderHighestHeardUpperBound(c, v)
-  requires LeaderHearedImpliesProposed(c, v)
-  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
-  ensures false
-{
-  /* 
-    Suppose leader L hears a value v' != vb.v. Then by LeaderHearedImpliesProposed, another leader L' 
-    such that vb.v <= L' < L must have proposed v', 
-    Then do recursion all the way down.
-  */
-  var ldr' := v.leaders[ldr].highestHeardBallot.value;
-  assert v.leaders[ldr'].Value() == v.leaders[ldr].Value();
-  assert chosen.b <= ldr' < ldr;
-  LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
-}
-
-
 /***************************************************************************************
 *                            Helper Definitions and Lemmas                             *
 ***************************************************************************************/
@@ -592,6 +565,32 @@ ghost predicate AtMostOneChosenVal(c: Constants, v: Variables)
 
 
 //// Helper Lemmas ////
+
+// Helper lemma for InvNextChosenValImpliesLeaderOnlyHearsVal
+lemma LeaderHearsDifferentValueFromChosenImpliesFalse(c: Constants, v: Variables, ldr:LeaderId, chosen: ValBal)
+  requires v.WF(c)
+  requires Chosen(c, v, chosen)
+  requires c.ValidLeaderIdx(ldr)
+  requires v.leaders[ldr].highestHeardBallot.MNSome?
+  requires v.leaders[ldr].highestHeardBallot.value >= chosen.b
+  requires v.leaders[ldr].Value() != chosen.v
+  requires chosen.b < ldr
+  requires OneValuePerBallotLeaderAndLearners(c, v)
+  requires LeaderHighestHeardUpperBound(c, v)
+  requires LeaderHearedImpliesProposed(c, v)
+  requires ChosenImpliesProposingLeaderHearsChosenBallot(c, v)
+  ensures false
+{
+  /* 
+    Suppose leader L hears a value v' != vb.v. Then by LeaderHearedImpliesProposed, another leader L' 
+    such that vb.v <= L' < L must have proposed v', 
+    Then do recursion all the way down.
+  */
+  var ldr' := v.leaders[ldr].highestHeardBallot.value;
+  assert v.leaders[ldr'].Value() == v.leaders[ldr].Value();
+  assert chosen.b <= ldr' < ldr;
+  LeaderHearsDifferentValueFromChosenImpliesFalse(c, v, ldr', chosen);
+}
 
 // A value being learned implies it was chosen at some ballot, and skolemize this ballot
 lemma LearnedImpliesChosen(c: Constants, v: Variables, lnr: LearnerId, val: Value) returns (vb: ValBal)
