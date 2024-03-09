@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Dafny.ProofObligationDescription;
 using Newtonsoft.Json;
 
 namespace Microsoft.Dafny
@@ -102,6 +103,14 @@ public static class AsyncProofPrinter {
         res.AppendLine(FormatHelperFunction(f, options));
       }
     }
+
+    // Print special helper functions
+    if (file.GetSpecialHelperFunctions().Count != 0) {
+      res.AppendLine();
+      foreach (Function f in file.GetSpecialHelperFunctions()) {
+        res.AppendLine(FormatSpecialHelperFunction(f, options));
+      }
+    }
     return res.ToString();
   } // end function PrintAsyncProofModuleBody 
   
@@ -180,6 +189,16 @@ public static class AsyncProofPrinter {
     var printer = new Printer(wr, options);
     printer.PrintFunction(function, 0, false, 2);
     return wr.ToString();
+  }
+
+  private static string FormatSpecialHelperFunction(Function function, DafnyOptions options) {
+    var wr = new StringWriter();
+    var printer = new Printer(wr, options);
+    wr.WriteLine("// I am special");
+    printer.PrintFunction(function, 0, false, 0);
+    var res = wr.ToString();
+    res = res.Replace("v: Variables", "v: Hosts");  // hacky
+    return res;
   }
 
   // Transform sync trigger into corresponding async trigger

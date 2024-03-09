@@ -74,11 +74,29 @@ public class AsyncProofDriver {
   private void ResolveHelperFunctions(ModuleDefinition centralizedProof) {
     var appInvs = proofFile.GetAppInvPredicates(); // previously resolved application invariants
     string[] reservedNames = {"Inv", "ApplicationInv"};
-    foreach (var topLevelDecl in ModuleDefinition.AllFunctions(centralizedProof.TopLevelDecls.ToList())) {
-      if (!appInvs.Contains(topLevelDecl) && !reservedNames.Contains(topLevelDecl.Name)) {
-        proofFile.AddHelperFunction(topLevelDecl);
+    foreach (var fn in ModuleDefinition.AllFunctions(centralizedProof.TopLevelDecls.ToList())) {
+      if (!appInvs.Contains(fn) && !reservedNames.Contains(fn.Name)) {
+        if (IsSpecialHelperFunction(fn)) {
+          proofFile.AddSpecialHelperFunction(fn);
+        } else {
+          proofFile.AddHelperFunction(fn);
+        }
       }
     }
+  }
+
+  // A special helper lemma is one that is called by an invariant predicate
+  private bool IsSpecialHelperFunction(Function fn) {
+    foreach (Function invFn in proofFile.GetAppInvPredicates()) {
+      var wr = new StringWriter();
+      var printer = new Printer(wr, options);
+      printer.PrintFunction(invFn, 0, false, 0);
+      var invFnStr = wr.ToString();
+      if (invFnStr.Contains($"{fn.Name}(")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void ResolveInvNextLemmas(ModuleDefinition centralizedProof) {

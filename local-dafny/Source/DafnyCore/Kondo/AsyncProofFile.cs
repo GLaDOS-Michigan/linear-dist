@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Diagnostics;
-// using System.Runtime.CompilerServices;
 
 namespace Microsoft.Dafny {
 
 public class AsyncProofFile {
   private readonly List<Function> appInvPredicates;  // ApplicationInv predicates
-  private readonly List<Function> helperFunctions;   // functions and predicates that are not invariants
+  private readonly List<Function> helperFunctions;   // functions and predicates that are not invariants, and not special
+  private readonly List<Function> specialHelperFunctions;   // these are called by appInvPredicates, e.g. Chosen in paxos
   private readonly List<Lemma> invNextLemmas;
   private readonly List<Lemma> helperLemmas;     
   public Lemma invInductiveLemma;  // InvInductive from sync
@@ -18,6 +17,7 @@ public class AsyncProofFile {
   {
     appInvPredicates = new List<Function>();
     helperFunctions = new List<Function>();
+    specialHelperFunctions = new List<Function>();
     invNextLemmas = new List<Lemma>();
     helperLemmas = new List<Lemma>();
   }
@@ -36,6 +36,14 @@ public class AsyncProofFile {
 
   public List<Function> GetHelperFunctions() {
     return helperFunctions;
+  }
+
+  public void AddSpecialHelperFunction(Function f) {
+    specialHelperFunctions.Add(f);
+  }
+
+  public List<Function> GetSpecialHelperFunctions() {
+    return specialHelperFunctions;
   }
 
   public void AddInvNextLemma(Lemma lemma) {
