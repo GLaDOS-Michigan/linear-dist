@@ -101,7 +101,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       Contract.Requires(expr != null);
       using (var wr = new System.IO.StringWriter()) {
         var pr = new Printer(wr, options);
-        pr.PrintExtendedExpr(expr, 0, true, false, false);
+        pr.PrintExtendedExpr(expr, 0, true, false, 0);
         return wr.ToString();
       }
     }
@@ -153,7 +153,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       Contract.Requires(f != null);
       using var wr = new StringWriter();
       var pr = new Printer(wr, options);
-      pr.PrintFunction(f, 0, true, false);
+      pr.PrintFunction(f, 0, true, 0);
       return ToStringWithoutNewline(wr);
     }
 
@@ -722,10 +722,10 @@ NoGhost - disable printing of functions, ghost methods, and proof
           state = 1;
         } else if (m is Function) {
           if (state != 0) { wr.WriteLine(); }
-          PrintFunction((Function)m, indent, false, false);
+          PrintFunction((Function)m, indent, false, 0);
           if (m is ExtremePredicate fixp && fixp.PrefixPredicate != null) {
             Indent(indent); wr.WriteLine("/*** (note, what is printed here does not show substitutions of calls to prefix predicates)");
-            PrintFunction(fixp.PrefixPredicate, indent, false, false);
+            PrintFunction(fixp.PrefixPredicate, indent, false, 0);
             Indent(indent); wr.WriteLine("***/");
           }
           state = 2;
@@ -913,8 +913,14 @@ NoGhost - disable printing of functions, ghost methods, and proof
       wr.WriteLine();
     }
 
-    // kondoTransform is Kondo flag for turning sync app inv predicate into async
-    public void PrintFunction(Function f, int indent, bool printSignatureOnly, bool kondoTransform) {
+    /* kondoFunction is flag to do kondo things:
+        0 => this is not a kondo function
+        1 => this is an invariant function
+          - transform v to v.History(i) in expressions
+        2 => this is a helper function
+          - transform v to v.Last() in expressions
+    */
+    public void PrintFunction(Function f, int indent, bool printSignatureOnly, int kondoFunction) {
       Contract.Requires(f != null);
 
       if (PrintModeSkipFunctionOrMethod(f.IsGhost, f.Attributes, f.Name)) { return; }
@@ -948,7 +954,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
       if (f.Body != null && !printSignatureOnly) {
         Indent(indent);
         wr.WriteLine("{");
-        PrintExtendedExpr(f.Body, ind, true, false, kondoTransform);
+        PrintExtendedExpr(f.Body, ind, true, false, kondoFunction);
         Indent(indent);
         wr.Write("}");
         if (f.ByMethodBody != null) {
@@ -1959,23 +1965,34 @@ NoGhost - disable printing of functions, ghost methods, and proof
     /// PrintExtendedExpr prints an expression, but formats top-level if-then-else and match expressions across several lines.
     /// Its intended use is thus to print the body of a function.
     /// </summary>
-    public void PrintExtendedExpr(Expression expr, int indent, bool isRightmost, bool endWithCloseParen, bool kondoTransform) {
+    
+    /* kondoFunction is flag to do kondo things:
+        0 => this is not a kondo function
+        1 => this is an invariant function
+          - transform v to v.History(i) in expressions
+        2 => this is a helper function
+          - transform v to v.Last() in expressions
+    */
+    public void PrintExtendedExpr(Expression expr, int indent, bool isRightmost, bool endWithCloseParen, int kondoFunction) {
       Contract.Requires(expr != null);
-      if (kondoTransform) {
+      if (kondoFunction == 1) {
         if (!(expr is ForallExpr)) {
           Indent(indent);
           wr.WriteLine("forall i :: v.ValidHistoryIdx(i) ==> (");
           kondoTransformV = true;
-          PrintExtendedExpr(expr, indent + IndentAmount, isRightmost, endWithCloseParen, false);  // don't kondoTransform
+          PrintExtendedExpr(expr, indent + IndentAmount, isRightmost, endWithCloseParen, 0);  // don't kondoTransform
           Indent(indent);
           wr.WriteLine(")");
         } else {
           // Add history index i to the forall
           kondoTransformForall = true;  // set to false at site where first ForallExpr is printed
           kondoTransformV = true;
-          PrintExtendedExpr(expr, indent, isRightmost, endWithCloseParen, false);
+          PrintExtendedExpr(expr, indent, isRightmost, endWithCloseParen, 0);
         }
       } else {
+        if (kondoFunction == 2) {
+          kondoTransformVLast = true;
+        }
         if (expr is ITEExpr) {
           Indent(indent);
           while (true) {
@@ -1983,7 +2000,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
             wr.Write("if ");
             PrintExpression(ite.Test, false);
             wr.WriteLine(" then");
-            PrintExtendedExpr(ite.Thn, indent + IndentAmount, true, false, false);
+            PrintExtendedExpr(ite.Thn, indent + IndentAmount, true, false, 0);
             expr = ite.Els;
             if (expr is ITEExpr) {
               Indent(indent); wr.Write("else ");
@@ -2006,7 +2023,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
 
             var savedDesugarMode = printingDesugared;
             printingDesugared = true;
-            PrintExtendedExpr(e.Flattened, indent, isRightmost, endWithCloseParen, false);
+            PrintExtendedExpr(e.Flattened, indent, isRightmost, endWithCloseParen, 0);
             printingDesugared = savedDesugarMode;
 
             if (!printingDesugared) {
@@ -2036,7 +2053,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
               wr.Write(" ");
               PrintExtendedPattern(mc.Pat);
               wr.WriteLine(" =>");
-              PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen), false);
+              PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen), 0);
               i++;
             }
             if (e.UsesOptionalBraces) {
@@ -2047,7 +2064,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
         } else if (expr is MatchExpr) {
           var e = (MatchExpr)expr;
           if (options.DafnyPrintResolvedFile == null && e.OrigUnresolved != null) {
-            PrintExtendedExpr(e.OrigUnresolved, indent, isRightmost, endWithCloseParen, false);
+            PrintExtendedExpr(e.OrigUnresolved, indent, isRightmost, endWithCloseParen, 0);
           } else {
             Indent(indent);
             var parensNeeded = !isRightmost && !e.UsesOptionalBraces;
@@ -2066,7 +2083,7 @@ NoGhost - disable printing of functions, ghost methods, and proof
               wr.Write(mc.Ctor.Name);
               PrintMatchCaseArgument(mc);
               wr.WriteLine(" =>");
-              PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen), false);
+              PrintExtendedExpr(mc.Body, ind + IndentAmount, isLastCase, isLastCase && (parensNeeded || endWithCloseParen), 0);
               i++;
             }
             if (e.UsesOptionalBraces) {
@@ -2101,16 +2118,16 @@ NoGhost - disable printing of functions, ghost methods, and proof
             wr.Write(" */");
           }
           wr.WriteLine();
-          PrintExtendedExpr(e.Body, indent, isRightmost, endWithCloseParen,false);
+          PrintExtendedExpr(e.Body, indent, isRightmost, endWithCloseParen,0);
         } else if (expr is StmtExpr && isRightmost) {
           var e = (StmtExpr)expr;
           Indent(indent);
           PrintStatement(e.S, indent);
           wr.WriteLine();
-          PrintExtendedExpr(e.E, indent, isRightmost, endWithCloseParen, false);
+          PrintExtendedExpr(e.E, indent, isRightmost, endWithCloseParen, 0);
 
         } else if (expr is ParensExpression) {
-          PrintExtendedExpr(((ParensExpression)expr).E, indent, isRightmost, endWithCloseParen, false);
+          PrintExtendedExpr(((ParensExpression)expr).E, indent, isRightmost, endWithCloseParen, 0);
         } else {
           Indent(indent);
           PrintExpression(expr, false, indent);

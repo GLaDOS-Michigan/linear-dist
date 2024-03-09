@@ -5,7 +5,7 @@ module Obligations {
   import opened DistributedSystem
 
   // All learners must learn the same value
-  ghost predicate Agreement(c: Constants, v: Variables)
+  ghost predicate Safety(c: Constants, v: Variables)
     requires v.WF(c)
   {
     forall l1, l2 |

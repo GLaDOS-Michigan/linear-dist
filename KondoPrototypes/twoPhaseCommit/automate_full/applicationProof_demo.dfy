@@ -1,10 +1,5 @@
 /// This file is auto-generated from /Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/KondoPrototypes/twoPhaseCommit/centralized/applicationProof.dfy
-/// Generated 03/08/2024 20:44 Pacific Standard Time
-
-/* Manual modifications:
-    - lemma InvNextAC3
-*/
-
+/// Generated 03/08/2024 21:17 Pacific Standard Time
 include "monotonicityInvariantsAutogen.dfy"
 include "messageInvariantsAutogen.dfy"
 

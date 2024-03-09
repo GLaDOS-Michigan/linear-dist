@@ -98,26 +98,26 @@ lemma InvNextHasVoteImpliesVoterNominates(c: Constants, v: Variables, v': Variab
   ensures HasVoteImpliesVoterNominates(c, v')
 {}
 
-lemma SafetyProof(c: Constants, v': Variables)
-  requires v'.WF(c)
-  requires ApplicationInv(c, v')
-  ensures Safety(c, v')
+lemma SafetyProof(c: Constants, v: Variables)
+  requires v.WF(c)
+  requires ApplicationInv(c, v)
+  ensures Safety(c, v)
 {
   /* Proof by contradiction: Assume two leaders were elected in v', L1 and L2.
   * Then by quorum intersection, there is a common rogueId in both L1.receivedVotes and
   * L2.receivedVotes. This violates HasVoteImpliesVoterNominates
   */
-  if !Safety(c, v') {
-    var l1: nat :| c.ValidHostId(l1) && v'.IsLeader(c, l1);
-    var l2: nat :| c.ValidHostId(l2) && v'.IsLeader(c, l2) && l2 != l1;
+  if !Safety(c, v) {
+    var l1: nat :| c.ValidHostId(l1) && v.IsLeader(c, l1);
+    var l2: nat :| c.ValidHostId(l2) && v.IsLeader(c, l2) && l2 != l1;
     var allHosts := (set x | 0 <= x < |c.hosts|);
     SetComprehensionSize(|c.hosts|);
 
-    var rv1, rv2 :=  v'.hosts[l1].receivedVotes, v'.hosts[l2].receivedVotes;
+    var rv1, rv2 :=  v.hosts[l1].receivedVotes, v.hosts[l2].receivedVotes;
     var rogueId := QuorumIntersection(allHosts, rv1, rv2);  // witness
 
-    assert v'.hosts[rogueId].nominee == WOSome(l1);  // trigger
-    assert v'.hosts[rogueId].nominee == WOSome(l2);  // trigger
+    assert v.hosts[rogueId].nominee == WOSome(l1);  // trigger
+    assert v.hosts[rogueId].nominee == WOSome(l2);  // trigger
     assert false;
   }
 }

@@ -51,9 +51,7 @@ ghost predicate LearnedImpliesQuorumOfAccepts(c: Constants, v: Variables)
     && c.ValidLearnerIdx(lnr)
     && v.learners[lnr].HasLearnedValue(val)
   ::
-    exists b: LeaderId ::
-      && var vb := VB(val, b);
-      && ChosenAtLearner(c, v, vb, lnr)
+    exists b: LeaderId :: ChosenAtLearner(c, v, VB(val, b), lnr)
 }
 
 // Each entry in a learner's receivedAccepts implies that an acceptor accepted it
@@ -312,8 +310,7 @@ lemma InvNextLearnerReceivedAcceptImpliesProposed(c: Constants, v: Variables, v'
 {}
 
 lemma InvNextLearnerReceivedAcceptImpliesAccepted(c: Constants, v: Variables, v': Variables)
-  requires v.WF(c)
-  requires LearnerReceivedAcceptImpliesAccepted(c, v)
+  requires Inv(c, v)
   requires Next(c, v, v')
   ensures LearnerReceivedAcceptImpliesAccepted(c, v')
 {
@@ -347,9 +344,7 @@ lemma InvNextLeaderHearedImpliesProposed(c: Constants, v: Variables, v': Variabl
   requires AcceptorValidPromisedAndAccepted(c, v')
   requires AcceptorAcceptedImpliesProposed(c, v')
   ensures LeaderHearedImpliesProposed(c, v')
-{
-  assert LeaderHearedImpliesProposed(c, v');
-}
+{}
 
 lemma InvNextLeaderReceivedPromisesImpliesAcceptorState(c: Constants, v: Variables, v': Variables)
   requires v.WF(c)

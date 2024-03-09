@@ -113,6 +113,7 @@ public static class AsyncProofPrinter {
         }
         var lemmaStr = String.Join("\n", linesList);
         lemmaStr = lemmaStr.Replace("Last().WF(c)", "WF(c)");  // hacky
+        lemmaStr = lemmaStr.Replace("Safety(c, v.Last())", "Safety(c, v)");  // hacky
         lemmaStr = StripTriggerAnnotations(lemmaStr);
         res.AppendLine(lemmaStr);
       }
@@ -125,7 +126,7 @@ public static class AsyncProofPrinter {
       foreach (Function f in file.GetHelperFunctions()) {
         wr = new StringWriter();
         printer = new Printer(wr, options);
-        printer.PrintFunction(f, 0, false, false);
+        printer.PrintFunction(f, 0, false, 2);
         res.AppendLine(wr.ToString());
       }
     }
@@ -137,7 +138,7 @@ public static class AsyncProofPrinter {
     var res = new StringBuilder();
     var wr = new StringWriter();
     var printer = new Printer(wr, options);
-    printer.PrintFunction(centralizedAppPred, 0, false, true);
+    printer.PrintFunction(centralizedAppPred, 0, false, 1);
     var pred = wr.ToString();
 
     pred = pred.Replace("History(i).WF(c)", "WF(c)");  // hacky
