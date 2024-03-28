@@ -1,9 +1,12 @@
 /// This file is auto-generated from /Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/KondoPrototypes/twoPhaseCommit/centralized/applicationProof.dfy
-/// Generated 03/08/2024 21:17 Pacific Standard Time
+/// Generated 03/27/2024 21:27 Pacific Standard Time
+
+/// It has been modified to fill the the body of lemma InvNextAC3
+
 include "monotonicityInvariantsAutogen.dfy"
 include "messageInvariantsAutogen.dfy"
 
-module ProofDraft {
+module Proof {
   import opened Types
   import opened UtilitiesLibrary
   import opened MonotonicityLibrary
@@ -136,7 +139,6 @@ lemma InvNextLeaderTallyReflectsPreferences(c: Constants, v: Variables, v': Vari
   VariableNextProperties(c, v, v');
 }
 
-// Manually modified lemma
 lemma InvNextAC3(c: Constants, v: Variables, v': Variables)
   requires Inv(c, v)
   requires Next(c, v, v')

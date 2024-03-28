@@ -12,8 +12,8 @@ $dafnyMsgInv "distributedSystem.dfy" > autoInvs.log
 # Generate Async proof draft
 $dafnyAsyncProof "../centralized/applicationProof.dfy" > autoProof.log
 
-# Verify files. In this case, the draft is good enough
+# Verify files. In this case, the draft is not enough
 echo "Verifying $files"
-files="../../lib/* ../hosts.dfy ../types.dfy distributedSystem.dfy spec.dfy monotonicityInvariantsAutogen.dfy messageInvariantsAutogen.dfy applicationProof_demo.dfy"
+files="../../lib/* ../hosts.dfy ../types.dfy distributedSystem.dfy spec.dfy monotonicityInvariantsAutogen.dfy messageInvariantsAutogen.dfy applicationProofDraftAutogen.dfy applicationProof_demo.dfy"
 
 time $dafnyVerify $files

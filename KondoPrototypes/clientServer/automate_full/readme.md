@@ -15,3 +15,5 @@ Generate async draft proof:
 ```bash
 /Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Scripts/dafny /genAsyncProof ../centralized/applicationProof.dfy
 ```
+
+In this case, the generated draft is the final proof.
