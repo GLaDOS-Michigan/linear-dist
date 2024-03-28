@@ -29,6 +29,7 @@ namespace Microsoft.Dafny
 
       // Header
       res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
+      res.AppendLine($"/// Generated {DateTime.Now.ToString("MM/dd/yyyy HH:mm")} {TimeZoneInfo.Local.StandardName}");
 
       // Module preamble 
       foreach (string i in includes) {
@@ -72,6 +73,7 @@ namespace Microsoft.Dafny
 
       // Header
       res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
+      res.AppendLine($"/// Generated {DateTime.Now.ToString("MM/dd/yyyy HH:mm")} {TimeZoneInfo.Local.StandardName}");
 
       // Module preamble 
       foreach (string i in includes) {
@@ -172,6 +174,7 @@ namespace Microsoft.Dafny
       
       var res = new StringBuilder();
       res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
+      res.AppendLine($"/// Generated {DateTime.Now.ToString("MM/dd/yyyy HH:mm")} {TimeZoneInfo.Local.StandardName}");
 
       // Module preamble 
       foreach (string i in includes) {

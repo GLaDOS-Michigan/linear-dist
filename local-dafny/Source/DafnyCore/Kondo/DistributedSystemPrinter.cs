@@ -30,6 +30,7 @@ public static class DistributedSystemPrinter {
 
     // Header
     res.AppendLine($"/// This file is auto-generated from {sourceFileName}");
+    res.AppendLine($"/// Generated {DateTime.Now.ToString("MM/dd/yyyy HH:mm")} {TimeZoneInfo.Local.StandardName}");
 
     // Dafny files to include
     foreach (string i in Includes) {
