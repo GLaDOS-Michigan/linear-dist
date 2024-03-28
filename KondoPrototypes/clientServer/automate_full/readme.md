@@ -1,3 +1,17 @@
 # Notes
 
-Attempting to generate async proof from sync proof.
+Generates async proof from sync proof.
+
+## Commands
+
+Generate monotonicity and message invariants:
+
+```bash
+/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Scripts/dafny /msgInvs distributedSystem.dfy
+```
+
+Generate async draft proof:
+
+```bash
+/Users/nudzhang/Documents/UMich2023sp/linear-dist.nosync/local-dafny/Scripts/dafny /genAsyncProof ../centralized/applicationProof.dfy
+```
